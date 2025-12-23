@@ -5,7 +5,7 @@ const faqs = [
     { id: 1, question: "Is eRuchi really free?", answer: "Yes! You'll receive free product samples—no cost, no hidden fees, and no obligation to buy anything." },
     { id: 2, question: "How can I be sure this isn't a scam?", answer: "We understand that free products may sound too good to be true. But we assure you that eRuchi partners with real brands that want to introduce their products to new audiences. Follow us on social media and check out our updates as we grow!" },
     { id: 3, question: "How exactly does eRuchi benefit from giving away free samples?", answer: "eRuchi serves as a bridge between consumers and brands. We connect you with products we believe you'll love, while brands pay us a service fee for facilitating this connection with engaged and curious consumers like you. We do this while maintaining strict consumer data privacy—brands never have access to identifiable data of individuals who receive their samples." },
-    { id: 4, question: "How do I sign up to be a sampler?", answer: "Just fill out our quick survey on the website. It only takes a few minutes!" },
+    { id: 4, question: "How do I sign up to be a sampler?", answer: "Just fill out our quick survey on the website. It only takes a few minutes!", link: "/login", linkText: "Sign up here" },
     { id: 5, question: "Is there really no catch? Will I ever be asked to pay for something later?", answer: "No catch, no hidden charges. You'll never be asked to pay for samples.We simply connect you with brands looking for genuine product samplers." },
     { id: 6, question: "Do I have to review the products?", answer: "More frequent reviews help you get new products more often." },
     { id: 7, question: "What personal information do I have to share to sign up?", answer: "We only ask for information relevant to matching you with the right products, such as your interests and basic details like name, location, and email." },
@@ -91,6 +91,14 @@ const FAQs = () => {
                                 </h2>
                                 <p className='text-base text-gray-700 leading-relaxed'>
                                     {faq.answer}
+                                    {faq.link && (
+                                        <a 
+                                            href={faq.link}
+                                            className='ml-2 text-blue-500 hover:text-blue-600 font-medium underline'
+                                        >
+                                            {faq.linkText}
+                                        </a>
+                                    )}
                                 </p>
                             </div>
                         ))}
