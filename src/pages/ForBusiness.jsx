@@ -16,7 +16,10 @@ const ForBusiness = () => {
             </div>
             
             <p className="text-gray-600 text-lg max-w-md">
-              Learn how targeted product sampling can connect you to your ideal audience. Drop your email address below and we'll get in touch!
+               Unlock your product’s market potential with optimised product testing.
+                eRuchi is the quickest and most cost-effective way to learn about your
+                consumers, and connect with them meaningfully. Reach out to us on any of the
+                platforms below!
             </p>
 
             {/* Contact Component - Desktop */}
@@ -71,25 +74,21 @@ const ForBusiness = () => {
             {/* First Card - Blue */}
             <div className="bg-blue-600 text-white rounded-3xl p-10 py-16 text-right">
               <h3 className="text-xl font-medium mb-2">Tell us about</h3>
-              <h2 className="text-3xl font-bold">Your Consumers</h2>
+              <h2 className="text-4xl font-bold">Your product and your consumers</h2>
             </div>
             
             {/* Second and Third Cards - Side by Side on Desktop */}
             <div className="grid md:grid-cols-2 gap-6">
               {/* Second Card - Dark */}
               <div className="bg-gray-800 text-white rounded-3xl p-10 py-16">
-                <h3 className="text-xl font-medium mb-2">Consumers receive</h3>
-                <h2 className="text-3xl font-bold mb-1">Your Product</h2>
-                <h2 className="text-3xl font-bold mb-6">& Love Them</h2>
-                <p className="text-gray-300 text-lg">Positive Experience</p>
+                <h3 className="text-xl font-medium mb-2">We’ll find out</h3>
+                <h2 className="text-4xl font-bold">What consumers think and how they feel</h2>
               </div>
               
               {/* Third Card - Blue */}
-              <div className="bg-blue-600 text-white rounded-3xl p-10 py-16 text-right">
-                <h3 className="text-xl font-medium mb-2">Strong</h3>
-                <h2 className="text-3xl font-bold mb-1">Word of Mouth</h2>
-                <h3 className="text-xl font-medium mb-6">and brand impressions</h3>
-                <p className="text-blue-100 text-lg">Brand growth</p>
+              <div className="bg-gradient-to-br from-gray-900 to-blue-900 text-white rounded-3xl p-10 py-16 text-right">
+                <h3 className="text-xl font-medium mb-2">We’ll return to you</h3>
+                <h2 className="text-5xl font-bold">Actionable insights</h2>
               </div>
             </div>
 

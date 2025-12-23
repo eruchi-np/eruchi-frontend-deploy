@@ -58,7 +58,7 @@ export default function Homepage() {
           {/* Right Side - CTA */}
           <div className="lg:pt-8">
             <p className="text-lg sm:text-xl text-gray-600 mb-6">
-              Your journey starts here. Let eRuchi connect you with product samples designed to match your interests.{' '}
+              Join eRuchi Early Access. Get free samples matched to your taste, share honest feedback, and help brands build products you’ll actually love.{' '}
               <a href="/faqs" className="text-blue-500 hover:text-blue-600 font-medium">
                 Learn More!
               </a>
@@ -100,7 +100,7 @@ export default function Homepage() {
               <span className="text-lg font-medium opacity-90">Step 3</span>
             </div>
             <h2 className="text-3xl lg:text-4xl font-semibold leading-tight">
-              Receive your products, completely free of costs.
+              Receive your products, and tell the brand what you think.
             </h2>
           </div>
         </div>
