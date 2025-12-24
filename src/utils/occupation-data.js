@@ -214,5 +214,7 @@ export const occupationOptions = [
   { id: 213, label: "Waiter/Waitress" },
   { id: 214, label: "Welder" },
   { id: 215, label: "Writer" },
-  { id: 216, label: "Zoologist" }
+  { id: 216, label: "Zoologist" },
+  { id: 217, label: "Student" },
+  { id: 218, label: "Unemployed" },
 ];
