@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, ClipboardList, User, Briefcase, History } from 'lucide-react';
+import { Home, HelpCircle, User, Briefcase } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 
 const BottomNavigation = () => {
@@ -7,8 +7,8 @@ const BottomNavigation = () => {
 
   const navItems = [
     { path: '/', icon: <Home size={24} />, label: 'Home' },
-    { path: '/campaigns', icon: <Briefcase size={24} />, label: 'Campaigns' },
-    { path: '/campaign-history', icon: <History size={24} />, label: 'History' },
+    { path: '/for-business', icon: <Briefcase size={24} />, label: 'For Business' },
+    { path: '/faqs', icon: <HelpCircle size={24} />, label: 'FAQs' },
     { path: '/profile', icon: <User size={24} />, label: 'Profile' },
   ];
 
