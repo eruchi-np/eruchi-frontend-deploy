@@ -45,7 +45,7 @@ const ForBusiness = () => {
             
             {/* Third Card - Blue Gradient */}
             <div className="bg-gradient-to-br from-gray-900 to-blue-900 text-white rounded-3xl p-10 md:p-16 text-center md:text-right">
-              <h3 className="text-xl font-medium mb-2">We'll return to you</h3>
+              <h3 className="text-xl font-medium mb-2">We'll return to you with</h3>
               <h2 className="text-3xl md:text-5xl font-bold">Actionable insights</h2>
             </div>
           </div>

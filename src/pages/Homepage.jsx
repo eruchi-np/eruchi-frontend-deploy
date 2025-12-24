@@ -80,7 +80,7 @@ export default function Homepage() {
               <span className="text-lg font-medium opacity-90">Step 1</span>
             </div>
             <h2 className="text-3xl lg:text-4xl font-semibold leading-tight">
-              Tell us<br />what you love.
+              Tell us<br />who you are and what you love.
             </h2>
           </div>
 
