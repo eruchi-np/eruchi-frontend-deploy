@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, X, Check, Info } from 'lucide-react';
 import { interestsData } from '../../../utils/interests-data'; // Adjust path as needed
-import toast from 'react-hot-toast'; // Optional, if you want to use toast for the max limit
 
 const Psychographics = ({ formData, updateFormData }) => {
   const [interests, setInterests] = useState([]);
@@ -95,7 +94,8 @@ const Psychographics = ({ formData, updateFormData }) => {
         setSelectedInterests(current);
         updateFormData('selectedInterests', current);
       } else {
-        toast.error("You can select a maximum of 5 interests");
+        // Show error message (you can add toast here)
+        console.error("You can select a maximum of 5 interests");
         return;
       }
     } else {
@@ -126,12 +126,73 @@ const Psychographics = ({ formData, updateFormData }) => {
     updateFormData('selectedInterests', []);
   };
 
-  // Determine if we should show results
-  const showResults = searchTerm.trim().length >= 3;
+  // Check if search term has at least 3 characters
+  const shouldShowInterests = searchTerm.trim().length >= 3;
 
   return (
     <div>
-      {/* ... (Welcome and Info dialogs unchanged) ... */}
+      {showWelcomeDialog && (
+        <div
+          className={`
+            fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#3399ff] p-0
+            transition-opacity duration-500 ease-in-out 
+            ${dialogOpacityClass}
+          `}
+        >
+          <div className="w-full h-full flex flex-col items-center justify-center">
+            <div className="flex flex-col items-center justify-center max-w-lg mx-auto px-4">
+              <h1 className="text-4xl font-bold mb-8 text-white text-center">Let's Discover What Makes You Unique</h1>
+              <div className="text-xl mb-12 space-y-6 text-white text-center">
+                <p>
+                  Tell us what's at the <strong>core</strong> of what defines you.
+                  <br />
+                  Your selections will help us match you with product samples that truly fit your personality and passions.
+                </p>
+              </div>
+              <button
+                onClick={handleCloseWelcomeDialog}
+                className="bg-white text-[#3399ff] hover:bg-gray-100 text-xl px-12 py-4 rounded-xl font-bold mx-auto transition-colors"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showInfoDialog && (
+        <div className={`
+          fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4
+          transition-opacity duration-500 ease-in-out 
+          ${dialogOpacityClass}
+        `}>
+          <div className="bg-[#3399ff] rounded-xl shadow-2xl p-6 md:p-8 max-w-xl w-full text-white text-center overflow-y-auto max-h-[calc(100vh-5rem)]">
+            <h1 className="text-2xl md:text-3xl font-bold mb-3 text-white text-center">
+              Tell us 3 to 5 things that define who you are.
+            </h1>
+            <p className="text-base md:text-lg mb-6 text-white text-center">
+              We're here to help you discover more about yourself—one click at a time.
+            </p>
+            
+            <p className="text-xl md:text-2xl font-bold mb-3 text-white text-center">
+              Try answering one of these questions to explore what defines you
+            </p>
+            <ul className="list-none space-y-1.5 text-white text-left mx-auto max-w-md text-sm md:text-base mb-6">
+              <li>What are your favourite things to do?</li>
+              <li>What's something you love talking about with friends?</li>
+              <li>Are you currently trying to improve or learn something new?</li>
+              <li>What makes you feel most you?</li>
+              <li>What kind of content do you keep coming back to online?</li>
+            </ul>
+            <button
+              onClick={handleCloseDialog}
+              className="bg-white text-[#3399ff] hover:bg-gray-100 text-base md:text-lg px-10 py-3 rounded-xl font-bold mx-auto transition-colors"
+            >
+              Sure!
+            </button>
+          </div>
+        </div>
+      )}
 
       {showInterestsModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
@@ -152,7 +213,7 @@ const Psychographics = ({ formData, updateFormData }) => {
                 <input
                   ref={searchInputRef}
                   type="text"
-                  placeholder="Search interests, hobbies, personality traits..."
+                  placeholder="Type at least 3 characters to search interests..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg"
@@ -162,15 +223,10 @@ const Psychographics = ({ formData, updateFormData }) => {
 
             {/* Options list */}
             <div className="flex-1 overflow-auto">
-              {!showResults ? (
-                <div className="px-6 py-12 text-center">
-                  <Search className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-lg font-medium text-gray-600 mb-2">
-                    Type at least 3 letters to search for interests...
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Start typing to discover hobbies, passions, and personality traits
-                  </p>
+              {!shouldShowInterests ? (
+                <div className="px-6 py-8 text-center text-gray-500">
+                  <div className="text-lg font-medium mb-2">Start typing to search</div>
+                  <div className="text-sm">Type at least 3 characters to see interests</div>
                 </div>
               ) : filteredInterests.length === 0 ? (
                 <div className="px-6 py-8 text-center text-gray-500">
@@ -216,10 +272,11 @@ const Psychographics = ({ formData, updateFormData }) => {
             <div className="p-4 border-t border-gray-200 bg-gray-50">
               <div className="flex justify-between items-center">
                 <div className="text-sm text-gray-500">
-                  {showResults 
-                    ? `${filteredInterests.length} interest${filteredInterests.length !== 1 ? 's' : ''} found`
-                    : 'Waiting for search...'
-                  }
+                  {shouldShowInterests ? (
+                    <>{filteredInterests.length} interest{filteredInterests.length !== 1 ? 's' : ''} found</>
+                  ) : (
+                    <>Type to search</>
+                  )}
                 </div>
                 <div className="text-sm font-medium text-gray-700">
                   Selected: {selectedInterests.length}/5
@@ -230,12 +287,11 @@ const Psychographics = ({ formData, updateFormData }) => {
         </div>
       )}
 
-      {/* ... (Rest of the component — main UI unchanged) ... */}
       <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Interests & Personality</h2>
       <p className="text-gray-600 mb-8">Tell us 3 to 5 things that define who you are</p>
 
       <div className="space-y-6">
-        {/* Selection Trigger */}
+        {/* Selection Trigger - Similar to SearchableSelect */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Select Your Interests
