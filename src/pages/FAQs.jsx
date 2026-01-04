@@ -112,21 +112,13 @@ const FAQs = () => {
                         </p>
                         <div className='flex flex-wrap justify-center gap-4'>
                             <a 
-                                href='mailto:sales@eruchi.com.np'
+                                href='mailto:support@eruchi.com.np'
                                 className='inline-flex items-center gap-2 bg-black text-white px-6 py-3 rounded-full text-base font-medium hover:bg-black-100 transition-colors shadow-lg'
                             >
                                 <Mail className='h-5 w-5' />
                                 Email
                             </a>
-                            <a 
-                                href='https://wa.me/+9779701227799'
-                                target='_blank'
-                                rel='noopener noreferrer'
-                                className='inline-flex items-center gap-2 bg-black text-white px-6 py-3 rounded-full text-base font-medium hover:bg-black-100 transition-colors shadow-lg'
-                            >
-                                <MessageCircle className='h-5 w-5' />
-                                WhatsApp
-                            </a>
+                           
                             <a 
                                 href='https://instagram.com/eruchi.np'
                                 target='_blank'

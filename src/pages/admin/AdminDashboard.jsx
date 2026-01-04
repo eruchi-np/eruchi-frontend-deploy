@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userAPI, adminAPI } from '../../services/api';
-import { Users, Package, Plus, ArrowLeft, Settings, ChevronDown, Check, Mail, Award, Search, Filter, MoreVertical } from 'lucide-react';
+import { Users, Package, Plus, ArrowLeft, Settings, ChevronDown, Check, Mail, Award, Search, Filter, MoreVertical, X } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const AdminDashboard = () => {
@@ -12,6 +12,12 @@ const AdminDashboard = () => {
   const [openDropdown, setOpenDropdown] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [bulkActionOpen, setBulkActionOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [pageSize] = useState(50);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -41,11 +47,25 @@ const AdminDashboard = () => {
     checkAdminAccess();
   }, [navigate]);
 
-  const fetchUsers = async (status = '') => {
+  const fetchUsers = async (status = '', page = 1) => {
     try {
-      const params = status ? { status } : {};
+      const params = { 
+        ...(status && { status }),
+        page,
+        limit: pageSize
+      };
       const response = await adminAPI.getUsers(params);
       setUsers(response.data.data);
+      
+      // Handle pagination data if available
+      if (response.data.pagination) {
+        setTotalPages(response.data.pagination.totalPages);
+        setTotalUsers(response.data.pagination.totalUsers);
+      } else {
+        // Fallback if no pagination
+        setTotalUsers(response.data.data.length);
+        setTotalPages(1);
+      }
     } catch (error) {
       console.error('Error fetching users:', error);
       setError('Failed to load users data');
@@ -55,18 +75,74 @@ const AdminDashboard = () => {
   const handleStatusFilter = (status) => {
     setStatusFilter(status);
     setFilterDropdownOpen(false);
-    fetchUsers(status);
+    setSelectedUsers([]);
+    setCurrentPage(1);
+    fetchUsers(status, 1);
   };
 
   const handleUpdateStatus = async (userId, newStatus) => {
     try {
       await adminAPI.updateUserStatus(userId, { status: newStatus });
       toast.success(`User status updated to ${newStatus}`);
-      fetchUsers(statusFilter);
+      fetchUsers(statusFilter, currentPage);
       setOpenDropdown(null);
     } catch (error) {
       console.error('Error updating user status:', error);
       toast.error(error.response?.data?.message || 'Failed to update user status');
+    }
+  };
+
+  const handleBulkUpdateStatus = async (newStatus) => {
+    if (selectedUsers.length === 0) {
+      toast.error('No users selected');
+      return;
+    }
+
+    const loadingToast = toast.loading(`Updating ${selectedUsers.length} user(s)...`);
+    
+    try {
+      const updatePromises = selectedUsers.map(userId => 
+        adminAPI.updateUserStatus(userId, { status: newStatus })
+      );
+      
+      await Promise.all(updatePromises);
+      
+      toast.success(`Successfully updated ${selectedUsers.length} user(s) to ${newStatus}`, {
+        id: loadingToast
+      });
+      
+      setSelectedUsers([]);
+      setBulkActionOpen(false);
+      fetchUsers(statusFilter, currentPage);
+    } catch (error) {
+      console.error('Error in bulk update:', error);
+      toast.error('Some updates failed. Please try again.', {
+        id: loadingToast
+      });
+    }
+  };
+
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+    setSelectedUsers([]);
+    fetchUsers(statusFilter, newPage);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSelectUser = (userId) => {
+    setSelectedUsers(prev => 
+      prev.includes(userId) 
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const handleSelectAll = () => {
+    const eligibleUsers = filteredUsers.filter(user => user.activeCampaign?.status);
+    if (selectedUsers.length === eligibleUsers.length) {
+      setSelectedUsers([]);
+    } else {
+      setSelectedUsers(eligibleUsers.map(user => user._id));
     }
   };
 
@@ -82,12 +158,13 @@ const AdminDashboard = () => {
     const handleClickOutside = () => {
       setOpenDropdown(null);
       setFilterDropdownOpen(false);
+      setBulkActionOpen(false);
     };
-    if (openDropdown || filterDropdownOpen) {
+    if (openDropdown || filterDropdownOpen || bulkActionOpen) {
       document.addEventListener('click', handleClickOutside);
       return () => document.removeEventListener('click', handleClickOutside);
     }
-  }, [openDropdown, filterDropdownOpen]);
+  }, [openDropdown, filterDropdownOpen, bulkActionOpen]);
 
   const filteredUsers = users.filter(user => {
     const searchLower = searchTerm.toLowerCase();
@@ -110,7 +187,7 @@ const AdminDashboard = () => {
   const stats = [
     {
       label: 'Total Users',
-      value: users.length,
+      value: totalUsers,
       icon: Users,
       gradient: 'from-violet-500 to-purple-600',
       bgGradient: 'from-violet-50 to-purple-50'
@@ -212,6 +289,76 @@ const AdminDashboard = () => {
             </div>
           ))}
         </div>
+
+        {/* Bulk Actions Bar */}
+        {selectedUsers.length > 0 && (
+          <div className="bg-[#3399ff] text-white rounded-2xl p-4 mb-6 shadow-lg">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+                    <Check className="h-5 w-5" />
+                  </div>
+                  <span className="font-semibold">{selectedUsers.length} user(s) selected</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-3">
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBulkActionOpen(!bulkActionOpen);
+                    }}
+                    className="flex items-center gap-2 bg-white text-gray-900 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+                  >
+                    Bulk Actions
+                    <ChevronDown className={`h-4 w-4 transition-transform ${bulkActionOpen ? 'rotate-180' : ''}`} />
+                  </button>
+                  
+                  {bulkActionOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden">
+                      <div className="p-2">
+                        <button
+                          onClick={() => handleBulkUpdateStatus('dispatched')}
+                          className="w-full text-left px-3 py-2.5 hover:bg-orange-50 rounded-lg transition-colors flex items-center gap-3"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+                            <Package className="h-4 w-4 text-orange-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">Mark Dispatched</p>
+                            <p className="text-xs text-gray-500">Update selected</p>
+                          </div>
+                        </button>
+                        
+                        <button
+                          onClick={() => handleBulkUpdateStatus('delivered')}
+                          className="w-full text-left px-3 py-2.5 hover:bg-emerald-50 rounded-lg transition-colors flex items-center gap-3"
+                        >
+                          <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                            <Check className="h-4 w-4 text-emerald-600" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">Mark Delivered</p>
+                            <p className="text-xs text-gray-500">Update selected</p>
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+                
+                <button
+                  onClick={() => setSelectedUsers([])}
+                  className="p-2 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Main Content Card */}
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -337,6 +484,27 @@ const AdminDashboard = () => {
             </div>
           </div>
 
+          {/* Select All Bar */}
+          {filteredUsers.filter(user => user.activeCampaign?.status).length > 0 && (
+            <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
+              <button
+                onClick={handleSelectAll}
+                className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors"
+              >
+                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                  selectedUsers.length === filteredUsers.filter(user => user.activeCampaign?.status).length
+                    ? 'bg-[#3399ff] border-[#3399ff]'
+                    : 'border-gray-300 bg-white'
+                }`}>
+                  {selectedUsers.length === filteredUsers.filter(user => user.activeCampaign?.status).length && (
+                    <Check className="h-3 w-3 text-white" />
+                  )}
+                </div>
+                Select All ({filteredUsers.filter(user => user.activeCampaign?.status).length} users)
+              </button>
+            </div>
+          )}
+
           {/* Users List */}
           <div className="divide-y divide-gray-100">
             {filteredUsers.length === 0 ? (
@@ -351,8 +519,25 @@ const AdminDashboard = () => {
               filteredUsers.map((user) => (
                 <div key={user._id} className="p-6 hover:bg-gray-50 transition-colors">
                   <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    {/* User Info */}
+                    {/* Checkbox + User Info */}
                     <div className="flex items-center gap-4 flex-1 min-w-0">
+                      {user.activeCampaign?.status && (
+                        <button
+                          onClick={() => handleSelectUser(user._id)}
+                          className="flex-shrink-0"
+                        >
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
+                            selectedUsers.includes(user._id)
+                              ? 'bg-[#3399ff] border-[#3399ff]'
+                              : 'border-gray-300 bg-white hover:border-gray-400'
+                          }`}>
+                            {selectedUsers.includes(user._id) && (
+                              <Check className="h-3 w-3 text-white" />
+                            )}
+                          </div>
+                        </button>
+                      )}
+                      
                       <div className={`w-12 h-12 rounded-xl bg-gradient-to-br from-[#3399ff] to-[#2ed6fd] flex items-center justify-center flex-shrink-0`}>
                         <span className="text-white font-bold text-lg">
                           {user.firstName?.charAt(0)?.toUpperCase() || 'U'}
@@ -450,6 +635,74 @@ const AdminDashboard = () => {
             )}
           </div>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 mt-6">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-gray-600">
+                Showing <span className="font-semibold text-gray-900">{((currentPage - 1) * pageSize) + 1}</span> to{' '}
+                <span className="font-semibold text-gray-900">{Math.min(currentPage * pageSize, totalUsers)}</span> of{' '}
+                <span className="font-semibold text-gray-900">{totalUsers}</span> users
+              </p>
+              
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    currentPage === 1
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-gray-900 text-white hover:bg-gray-800'
+                  }`}
+                >
+                  Previous
+                </button>
+                
+                <div className="flex items-center gap-1">
+                  {[...Array(Math.min(5, totalPages))].map((_, idx) => {
+                    let pageNum;
+                    if (totalPages <= 5) {
+                      pageNum = idx + 1;
+                    } else if (currentPage <= 3) {
+                      pageNum = idx + 1;
+                    } else if (currentPage >= totalPages - 2) {
+                      pageNum = totalPages - 4 + idx;
+                    } else {
+                      pageNum = currentPage - 2 + idx;
+                    }
+                    
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum)}
+                        className={`w-10 h-10 rounded-lg font-medium transition-colors ${
+                          currentPage === pageNum
+                            ? 'bg-[#3399ff] text-white'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
+                </div>
+                
+                <button
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                    currentPage === totalPages
+                      ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                      : 'bg-gray-900 text-white hover:bg-gray-800'
+                  }`}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
