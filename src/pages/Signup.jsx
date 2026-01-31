@@ -7,40 +7,33 @@ import toast, { Toaster } from 'react-hot-toast';
 import { isAuthenticated, redirectToProfile } from "../utils/auth";
 import { useNavigate } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
-import Swal from 'sweetalert2';
 import { Link } from 'react-router-dom';
 import Cookies from 'js-cookie';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-// Define validation schema using Zod
+// Updated schema to match backend expectations
 const formSchema = z.object({
-  firstName: z.string().min(1, "First Name is required"),
-  lastName: z.string().min(1, "Last Name is required"),
-  password: z
-    .string()
-    .min(6, "Password must be at least 6 characters")
-    .min(1, "Password is required"),
+  firstName: z.string().min(2, "First Name must be at least 2 characters").max(50),
+  lastName: z.string().min(2, "Last Name must be at least 2 characters").max(50),
+  password: z.string().min(6, "Password must be at least 6 characters"),
   confirmPassword: z.string().min(1, "Confirm Password is required"),
-  phone: z.string().regex(/^\d{10}$/, "Phone Number must be 10 digits"),
+  phone: z.string().regex(/^\+?\d{9,15}$/, "Phone Number must be valid (9–15 digits, optional +)"),
   email: z.string().email("Invalid email address"),
-  gender: z.string().min(1, "Please select your gender").pipe(
-    z.enum(["male", "female", "other"], { errorMap: () => ({ message: "Please select a valid gender" }) })
-  ),
-  dob: z.string().min(1, "Date of Birth is required")
-    .refine((dob) => {
-      const birthDate = new Date(dob);
-      const today = new Date();
-      let age = today.getFullYear() - birthDate.getFullYear();
-      const monthDifference = today.getMonth() - birthDate.getMonth();
-      if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
-        age--;
-      }
-      return age >= 13;
-    }, "You must be at least 13 years old to sign up"),
-  nationality: z.string().optional(),
-  termsAccepted: z.boolean().refine((val) => val === true, {
-    message: "You must accept the terms and conditions",
+  gender: z.enum(["Male", "Female", "Other", "Prefer not to say"], {
+    required_error: "Please select your gender",
+  }),
+  dob: z.string().min(1, "Date of Birth is required").refine((val) => {
+    const birth = new Date(val);
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age >= 13;
+  }, "You must be at least 13 years old"),
+  nationality: z.enum(["Nepali", "Other"]).optional(),
+  termsAccepted: z.literal(true, {
+    errorMap: () => ({ message: "You must accept the terms and conditions" }),
   }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
@@ -53,13 +46,10 @@ const Signup = () => {
   useEffect(() => {
     if (isAuthenticated()) {
       toast.error("You're already logged in. Back to Profile!");
-      setTimeout(() => {
-        redirectToProfile(navigate);
-      }, 1000);
+      setTimeout(() => redirectToProfile(navigate), 1000);
     }
   }, [navigate]);
 
-  const [signuperror, setSignuperror] = useState();
   const [isLoading, setIsLoading] = useState(false);
   
   const {
@@ -76,40 +66,48 @@ const Signup = () => {
 
   const onSubmit = async (data) => {
     setIsLoading(true);
-    
-    // Map gender to match backend expectations
-    const genderMap = {
-      'male': 'male',
-      'female': 'female', 
-      'other': 'other'
-    };
+
+    // Generate valid username: alphanumeric only, 3–30 chars
+    const emailPrefix = data.email.split('@')[0];
+    const safeUsername = emailPrefix
+      .replace(/[^a-zA-Z0-9]/g, '') // remove non-alphanumeric
+      .slice(0, 30)
+      .padEnd(3, '0'); // ensure min length
 
     try {
-      // Attempt Registration with your backend
-      const registerResponse = await axios.post(`${API_BASE_URL}/auth/register`, {
-        username: data.email.split('@')[0], // Generate username from email
+      const payload = {
+        username: safeUsername,
         email: data.email,
         password: data.password,
         firstName: data.firstName,
         lastName: data.lastName,
         phone: data.phone,
-        gender: genderMap[data.gender],
-        dateOfBirth: data.dob,
-        nationality: data.nationality,
-      });
+        gender: data.gender,              // Now matches backend enum (capitalized)
+        dateOfBirth: data.dob,            // YYYY-MM-DD from input type="date"
+        nationality: data.nationality || null,
+      };
 
-      // Registration successful, redirect to verification pending page
-      const userEmail = registerResponse.data.data.user.email;
+      console.log("[DEBUG] Sending registration payload:", payload);
+
+      const response = await axios.post(`${API_BASE_URL}/auth/register`, payload);
+
+      const userEmail = response.data.data.user.email;
       toast.success('Registration successful! Please verify your email.');
       navigate(`/email-verification?email=${encodeURIComponent(userEmail)}`);
       
-    } catch (registrationError) {
-      const errorMessage = registrationError.response?.data?.message || 
-                          registrationError.response?.data?.errors?.[0]?.msg || 
-                          'Registration failed. Please try again.';
+    } catch (err) {
+      const errorData = err.response?.data;
+      let errorMessage = 'Registration failed. Please try again.';
+
+      if (errorData?.errors) {
+        // Validation errors from backend
+        errorMessage = errorData.errors.map(e => e.msg).join(', ');
+      } else if (errorData?.message) {
+        errorMessage = errorData.message;
+      }
+
       toast.error(errorMessage);
-      console.error('Signup failed:', registrationError);
-      setSignuperror(errorMessage);
+      console.error('Signup failed:', err, errorData);
     } finally {
       setIsLoading(false);
     }
@@ -136,38 +134,34 @@ const Signup = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 pt-12">
           {/* First Name */}
           <div>
-            <label htmlFor="firstname" className="block text-lg font-semibold mb-1">
+            <label htmlFor="firstName" className="block text-lg font-semibold mb-1">
               First Name <span className="text-2xl text-[#2ed6fd]">*</span>
             </label>
             <input
               type="text"
-              id="firstname"
+              id="firstName"
               {...register("firstName")}
               className={`w-full text-lg font-medium outline-none py-4 border-b-2 bg-transparent transition-all duration-200 ${
                 errors.firstName ? "border-red-500" : "border-gray-300 focus:border-black"
               }`}
             />
-            {errors.firstName && (
-              <p className="text-sm text-red-500 mt-2 font-medium">{errors.firstName.message}</p>
-            )}
+            {errors.firstName && <p className="text-sm text-red-500 mt-2 font-medium">{errors.firstName.message}</p>}
           </div>
 
           {/* Last Name */}
           <div>
-            <label htmlFor="lastname" className="block text-lg font-semibold mb-1">
+            <label htmlFor="lastName" className="block text-lg font-semibold mb-1">
               Last Name <span className="text-2xl text-[#2ed6fd]">*</span>
             </label>
             <input
               type="text"
-              id="lastname"
+              id="lastName"
               {...register("lastName")}
               className={`w-full text-lg font-medium outline-none py-4 border-b-2 bg-transparent transition-all duration-200 ${
                 errors.lastName ? "border-red-500" : "border-gray-300 focus:border-black"
               }`}
             />
-            {errors.lastName && (
-              <p className="text-sm text-red-500 mt-2 font-medium">{errors.lastName.message}</p>
-            )}
+            {errors.lastName && <p className="text-sm text-red-500 mt-2 font-medium">{errors.lastName.message}</p>}
           </div>
 
           {/* Password */}
@@ -183,9 +177,7 @@ const Signup = () => {
                 errors.password ? "border-red-500" : "border-gray-300 focus:border-black"
               }`}
             />
-            {errors.password && (
-              <p className="text-sm text-red-500 mt-2 font-medium">{errors.password.message}</p>
-            )}
+            {errors.password && <p className="text-sm text-red-500 mt-2 font-medium">{errors.password.message}</p>}
           </div>
 
           {/* Confirm Password */}
@@ -201,9 +193,7 @@ const Signup = () => {
                 errors.confirmPassword ? "border-red-500" : "border-gray-300 focus:border-black"
               }`}
             />
-            {errors.confirmPassword && (
-              <p className="text-sm text-red-500 mt-2 font-medium">{errors.confirmPassword.message}</p>
-            )}
+            {errors.confirmPassword && <p className="text-sm text-red-500 mt-2 font-medium">{errors.confirmPassword.message}</p>}
           </div>
 
           {/* Phone Number */}
@@ -212,16 +202,15 @@ const Signup = () => {
               Phone Number <span className="text-2xl text-[#2ed6fd]">*</span>
             </label>
             <input
-              type="text"
+              type="tel"
               id="phone"
               {...register("phone")}
               className={`w-full text-lg font-medium outline-none py-4 border-b-2 bg-transparent transition-all duration-200 ${
                 errors.phone ? "border-red-500" : "border-gray-300 focus:border-black"
               }`}
+              placeholder="Enter Phone Number"
             />
-            {errors.phone && (
-              <p className="text-sm text-red-500 mt-2 font-medium">{errors.phone.message}</p>
-            )}
+            {errors.phone && <p className="text-sm text-red-500 mt-2 font-medium">{errors.phone.message}</p>}
           </div>
 
           {/* Email */}
@@ -237,12 +226,10 @@ const Signup = () => {
                 errors.email ? "border-red-500" : "border-gray-300 focus:border-black"
               }`}
             />
-            {errors.email && (
-              <p className="text-sm text-red-500 mt-2 font-medium">{errors.email.message}</p>
-            )}
+            {errors.email && <p className="text-sm text-red-500 mt-2 font-medium">{errors.email.message}</p>}
           </div>
 
-          {/* Gender */}
+          {/* Gender - Updated to match backend enum */}
           <div>
             <label htmlFor="gender" className="block text-lg font-semibold mb-1">
               Gender <span className="text-2xl text-[#2ed6fd]">*</span>
@@ -250,19 +237,18 @@ const Signup = () => {
             <select
               id="gender"
               {...register("gender")}
-              className="w-full text-lg font-medium outline-none py-4 border-b-2 border-gray-300 focus:border-black bg-transparent transition-all duration-200"
+              className={`w-full text-lg font-medium outline-none py-4 border-b-2 bg-transparent transition-all duration-200 ${
+                errors.gender ? "border-red-500" : "border-gray-300 focus:border-black"
+              }`}
               defaultValue=""
             >
-              <option value="" disabled>
-                Select Gender
-              </option>
-              <option value="male">Male</option>
-              <option value="female">Female</option>
-              <option value="other">Non Binary</option>
+              <option value="" disabled>Select Gender</option>
+              <option value="Male">Male</option>
+              <option value="Female">Female</option>
+              <option value="Other">Other</option>
+              <option value="Prefer not to say">Prefer not to say</option>
             </select>
-            {errors.gender && (
-              <p className="text-sm text-red-500 mt-2 font-medium">{errors.gender.message}</p>
-            )}
+            {errors.gender && <p className="text-sm text-red-500 mt-2 font-medium">{errors.gender.message}</p>}
           </div>
 
           {/* Date of Birth */}
@@ -276,12 +262,9 @@ const Signup = () => {
               {...register("dob")}
               className={`w-full text-lg font-medium outline-none py-4 border-b-2 bg-transparent transition-all duration-200 ${
                 errors.dob ? "border-red-500" : "border-gray-300 focus:border-black"
-              } ${!dobValue ? "text-gray-400" : "text-black"}`}
-              placeholder="dd/mm/yyyy"
+              }`}
             />
-            {errors.dob && (
-              <p className="text-sm text-red-500 mt-2 font-medium">{errors.dob.message}</p>
-            )}
+            {errors.dob && <p className="text-sm text-red-500 mt-2 font-medium">{errors.dob.message}</p>}
           </div>
 
           {/* Nationality */}
@@ -294,16 +277,14 @@ const Signup = () => {
               {...register("nationality")}
               className="w-full text-lg font-medium outline-none py-4 border-b-2 border-gray-300 focus:border-black bg-transparent transition-all duration-200"
             >
-              <option value="" disabled>
-                Select Nationality
-              </option>
-              <option value="nepali">Nepali</option>
-              <option value="other">Other</option>
+              <option value="">Select Nationality</option>
+              <option value="Nepali">Nepali</option>
+              <option value="Other">Other</option>
             </select>
           </div>
         </div>
 
-        {/* Terms and Conditions Checkbox */}
+        {/* Terms */}
         <div className="flex items-start mt-8 mb-2">
           <input
             type="checkbox"
@@ -330,7 +311,6 @@ const Signup = () => {
           <p className="text-sm text-red-500 mt-1 font-medium">{errors.termsAccepted.message}</p>
         )}
 
-        {/* Submit Button */}
         <div className="flex justify-center lg:justify-start pt-6">
           <button
             type="submit"

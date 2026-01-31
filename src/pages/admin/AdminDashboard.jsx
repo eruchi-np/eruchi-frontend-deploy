@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userAPI, adminAPI } from '../../services/api';
-import { Users, Package, Plus, ArrowLeft, Settings, ChevronDown, Check, Mail, Award, Search, Filter, MoreVertical, X } from 'lucide-react';
+import { 
+  Users, 
+  Package, 
+  Plus, 
+  ArrowLeft, 
+  ChevronDown, 
+  Check, 
+  Mail, 
+  Award, 
+  Search, 
+  Filter, 
+  MoreVertical, 
+  X 
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const AdminDashboard = () => {
@@ -150,6 +163,13 @@ const AdminDashboard = () => {
     navigate('/admin/create-campaign');
   };
 
+  // ────────────────────────────────────────────────
+  // NEW: Handler for "New Standalone Survey" button
+  // ────────────────────────────────────────────────
+  const handleCreateSepSurvey = () => {
+    navigate('/admin/create-sep-survey');
+  };
+
   const toggleDropdown = (userId) => {
     setOpenDropdown(openDropdown === userId ? null : userId);
   };
@@ -261,13 +281,25 @@ const AdminDashboard = () => {
                 <p className="text-sm text-gray-500">Admin Control Panel</p>
               </div>
             </div>
-            <button
-              onClick={handleCreateCampaign}
-              className="flex items-center gap-2 bg-gray-900 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-gray-800 transition-all"
-            >
-              <Plus className="h-4 w-4" />
-              New Campaign
-            </button>
+
+            {/* Buttons – Campaign + Standalone Survey */}
+            <div className="flex items-center gap-4">
+              <button
+                onClick={handleCreateCampaign}
+                className="flex items-center gap-2 bg-gray-900 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-gray-800 transition-all shadow-sm"
+              >
+                <Plus className="h-4 w-4" />
+                New Campaign
+              </button>
+
+              <button
+                onClick={handleCreateSepSurvey}
+                className="flex items-center gap-2 bg-purple-600 text-white px-5 py-2.5 rounded-xl font-medium hover:bg-purple-700 transition-all shadow-sm"
+              >
+                <Plus className="h-4 w-4" />
+                New Standalone Survey
+              </button>
+            </div>
           </div>
         </div>
       </div>

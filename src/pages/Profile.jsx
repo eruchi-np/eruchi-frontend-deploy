@@ -5,7 +5,8 @@ import {
   History, 
   AlertCircle, 
   Settings, 
-  Loader2 
+  Loader2,
+  Award
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { userAPI } from "../services/api";
@@ -149,7 +150,6 @@ const Profile = () => {
             </div>
 
             <div className="flex flex-col gap-3">
-              {/* Admin Panel Button - Only for admins */}
               {user.role === "admin" && (
                 <button
                   onClick={handleAdminPanel}
@@ -227,10 +227,10 @@ const Profile = () => {
               </div>
             </div>
 
-            {/* Quick Actions */}
+            {/* Quick Actions – Now with Survey History */}
             <div className="bg-white rounded-3xl shadow-sm p-8">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Link
                   to="/campaigns"
                   className="flex flex-col items-center justify-center p-6 border-2 border-gray-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
@@ -238,12 +238,30 @@ const Profile = () => {
                   <Package className="h-10 w-10 text-blue-500 mb-3 group-hover:scale-110 transition-transform" />
                   <span className="text-base font-semibold text-gray-900">Browse Campaigns</span>
                 </Link>
+
                 <Link
                   to="/campaign-history"
                   className="flex flex-col items-center justify-center p-6 border-2 border-gray-200 rounded-2xl hover:border-green-500 hover:bg-green-50 transition-all group"
                 >
                   <History className="h-10 w-10 text-green-500 mb-3 group-hover:scale-110 transition-transform" />
                   <span className="text-base font-semibold text-gray-900">Campaign History</span>
+                </Link>
+
+                <Link
+                  to="/standalone-surveys"
+                  className="flex flex-col items-center justify-center p-6 border-2 border-gray-200 rounded-2xl hover:border-purple-500 hover:bg-purple-50 transition-all group"
+                >
+                  <Award className="h-10 w-10 text-purple-500 mb-3 group-hover:scale-110 transition-transform" />
+                  <span className="text-base font-semibold text-gray-900">Standalone Surveys</span>
+                </Link>
+
+                {/* NEW: Survey History Button */}
+                <Link
+                  to="/survey-history"
+                  className="flex flex-col items-center justify-center p-6 border-2 border-gray-200 rounded-2xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group"
+                >
+                  <History className="h-10 w-10 text-indigo-500 mb-3 group-hover:scale-110 transition-transform" />
+                  <span className="text-base font-semibold text-gray-900">Survey History</span>
                 </Link>
               </div>
             </div>
@@ -252,13 +270,11 @@ const Profile = () => {
           {/* Right Column - Notifications */}
           <div className="lg:col-span-1">
             <div className="bg-white rounded-3xl shadow-sm p-8 sticky top-8 pb-12 lg:pb-8">
-              {/* Added pb-12 on mobile for extra bottom padding */}
               <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 mb-6">
                 <Bell className="h-6 w-6 text-blue-500" />
                 Notifications
               </h2>
               <div className="space-y-4 max-h-[600px] overflow-y-auto">
-                {/* Placeholder notifications - replace with real API later */}
                 <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:border-blue-300 transition-colors">
                   <h3 className="font-semibold text-gray-900 mb-1">Welcome to eRuchi!</h3>
                   <p className="text-sm text-gray-500 mb-2">

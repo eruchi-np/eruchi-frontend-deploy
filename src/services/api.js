@@ -73,4 +73,23 @@ export const adminAPI = {
   updateUserStatus: (userId, data) => api.put(`/admin/users/${userId}/status`, data),
 };
 
+export const sepSurveyAPI = {
+  // List of available standalone surveys
+  getAvailable: (params = {}) => api.get('/sepsurveys', { params }),
+
+  // Get single standalone survey details (questions + rules)
+  getById: (surveyId) => api.get(`/sepsurveys/${surveyId}`),
+
+  // Submit answers
+  submit: (surveyId, responses) => api.post(`/sepsurveys/${surveyId}/submit`, { responses }),
+
+  // Skip optional survey
+  skip: (surveyId) => api.post(`/sepsurveys/${surveyId}/skip`),
+
+  // User's submission history
+  getHistory: (params = {}) => api.get('/sepsurveys/history', { params }),
+
+  create: (data) => api.post('/sepsurveys', data),
+};
+
 export default api;

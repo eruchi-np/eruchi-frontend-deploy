@@ -1,74 +1,33 @@
 // src/components/layout/ProtectedRoute.jsx
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
 import { Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// Pages where we allow access even if profile is incomplete
+const ALLOWED_WITHOUT_COMPLETE = [
+  '/complete-basic-info',
+  '/complete-profile',
+  '/login',
+  '/signup',
+  '/reset-password',
+  '/reset-password/:token',
+  '/verify-email/:token',
+  '/email-verification',
+];
 
 const ProtectedRoute = ({ children, requireProfileComplete = false }) => {
-  const [loading, setLoading] = useState(true);
-  const [authenticated, setAuthenticated] = useState(false);
-  const [profileComplete, setProfileComplete] = useState(false);
+  const { user, loading } = useAuth();
   const location = useLocation();
 
-  useEffect(() => {
-    const checkAuth = async () => {
-      const token = localStorage.getItem('access_token');
-      const authMethod = localStorage.getItem('auth_method');
-
-      if (!token) {
-        setAuthenticated(false);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        let response;
-        
-        // Check if using cookie-based auth
-        if (authMethod === 'cookie' || token === 'USE_COOKIE_AUTH') {
-          // Use cookie authentication
-          response = await axios.get(`${API_BASE_URL}/users/me`, {
-            withCredentials: true // Send cookies
-          });
-        } else {
-          // Use token authentication
-          response = await axios.get(`${API_BASE_URL}/users/me`, {
-            headers: { Authorization: `Bearer ${token}` },
-            withCredentials: true // Also try cookies as fallback
-          });
-        }
-
-        const user = response.data.data.user;
-
-        if (!user) {
-          throw new Error("User data missing");
-        }
-
-        setAuthenticated(true);
-        setProfileComplete(user.isProfileComplete === true);
-
-      } catch (err) {
-        console.error("Auth check failed:", err.response?.data || err.message);
-        
-        // Only clear localStorage if it's a 401 error
-        if (err.response?.status === 401) {
-          localStorage.removeItem('access_token');
-          localStorage.removeItem('email');
-          localStorage.removeItem('username');
-          localStorage.removeItem('user_id');
-          localStorage.removeItem('auth_method');
-        }
-        
-        setAuthenticated(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
-  }, []);
+  // If we're already on a completion / public route → allow it unconditionally
+  if (ALLOWED_WITHOUT_COMPLETE.some(path => 
+    path.includes(':') 
+      ? location.pathname.startsWith(path.split('/:')[0])
+      : location.pathname === path
+  )) {
+    return children;
+  }
 
   if (loading) {
     return (
@@ -78,17 +37,18 @@ const ProtectedRoute = ({ children, requireProfileComplete = false }) => {
     );
   }
 
-  // Not logged in
-  if (!authenticated) {
+  if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Profile incomplete + page requires completion
-  if (requireProfileComplete && !profileComplete) {
-    return <Navigate to="/complete-profile" replace />;
+  if (!user.isRegistrationComplete) {
+    return <Navigate to="/complete-basic-info" state={{ from: location }} replace />;
   }
 
-  // All good — render the page
+  if (requireProfileComplete && !user.isProfileComplete) {
+    return <Navigate to="/complete-profile" state={{ from: location }} replace />;
+  }
+
   return children;
 };
 

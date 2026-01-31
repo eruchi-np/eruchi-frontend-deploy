@@ -159,7 +159,7 @@ const Survey = () => {
     
     try {
       await surveyAPI.submitSurvey({ responses });
-      toast.success('Survey submitted successfully! You have been awarded 100 credits.');
+      toast.success('Survey submitted successfully!');
       navigate('/profile');
     } catch (error) {
       console.error('Error submitting survey:', error);

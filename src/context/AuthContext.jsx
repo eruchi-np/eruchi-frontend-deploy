@@ -17,7 +17,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchUser = async () => {
+  const refreshUser = async () => {
     const token = localStorage.getItem('access_token');
     const authMethod = localStorage.getItem('auth_method');
     
@@ -29,64 +29,63 @@ export const AuthProvider = ({ children }) => {
 
     try {
       let res;
-      
-      // Check if using cookie-based auth
+      const config = { withCredentials: true };
+
       if (authMethod === 'cookie' || token === 'USE_COOKIE_AUTH') {
-        // Use cookie authentication
-        res = await axios.get(`${API_BASE_URL}/users/me`, {
-          withCredentials: true
-        });
+        res = await axios.get(`${API_BASE_URL}/users/me`, config);
       } else {
-        // Use token authentication
-        res = await axios.get(`${API_BASE_URL}/users/me`, {
-          headers: { Authorization: `Bearer ${token}` },
-          withCredentials: true // Also try cookies as fallback
-        });
+        config.headers = { Authorization: `Bearer ${token}` };
+        res = await axios.get(`${API_BASE_URL}/users/me`, config);
       }
       
       const userData = res.data.data.user;
       setUser(userData);
-      // Also sync localStorage for legacy components
+      // Sync localStorage for legacy components
       localStorage.setItem('username', `${userData.firstName} ${userData.lastName}`);
       localStorage.setItem('email', userData.email);
       localStorage.setItem('user_id', userData.id);
     } catch (err) {
       console.error('Failed to fetch user:', err);
       
-      // Only clear if 401 error
       if (err.response?.status === 401) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('email');
-        localStorage.removeItem('username');
+        localStorage.setItem('username');
         localStorage.removeItem('user_id');
         localStorage.removeItem('auth_method');
+        setUser(null);
       }
       
-      setUser(null);
+      if (err.response?.status === 429) {
+        console.warn('Rate limited on user fetch - retrying later');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // On mount + when storage changes (cross-tab)
+  // On mount + events
   useEffect(() => {
-    fetchUser();
+    refreshUser();
 
-    const handleStorage = () => fetchUser();
+    const interval = setInterval(refreshUser, 3 * 60 * 1000); // Refresh every 3 minutes
+
+    const handleStorage = () => refreshUser();
     window.addEventListener('storage', handleStorage);
-    window.addEventListener('authChange', fetchUser);
-    window.addEventListener('profileComplete', fetchUser);
+    window.addEventListener('authChange', refreshUser);
+    window.addEventListener('profileComplete', refreshUser);
 
     return () => {
+      clearInterval(interval);
       window.removeEventListener('storage', handleStorage);
-      window.removeEventListener('authChange', fetchUser);
-      window.removeEventListener('profileComplete', fetchUser);
+      window.removeEventListener('authChange', refreshUser);
+      window.removeEventListener('profileComplete', refreshUser);
     };
   }, []);
 
   const logout = () => {
     localStorage.clear();
-    // Clear both possible cookie names
+    // Clear cookies
     Cookies.remove('token');
     Cookies.remove('access_token');
     document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
@@ -96,7 +95,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, fetchUser, logout }}>
+    <AuthContext.Provider value={{ user, loading, refreshUser, logout }}>
       {children}
     </AuthContext.Provider>
   );
