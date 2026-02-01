@@ -1,46 +1,20 @@
-import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
-import { Menu, X, Loader2 } from 'lucide-react'
+import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Menu, X, Loader2 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext'; // ← Import this
 
 const Navbar = () => {
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
-  const [isAllowed, setIsAllowed] = useState(false)
-  const [user, setUser] = useState(null)
-  const [isLoading, setIsLoading] = useState(true)
+  const { user, loading } = useAuth(); // ← Use shared user state
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const toggleDrawer = () => {
-    setIsDrawerOpen(!isDrawerOpen)
-  }
+    setIsDrawerOpen(!isDrawerOpen);
+  };
 
-  useEffect(() => {
-    const updateNavbar = () => {
-      const token = localStorage.getItem("access_token")
-      const username = localStorage.getItem("username")
-      
-      if (token && username) {
-        setIsAllowed(true)
-        setUser({
-          username: username,
-          firstLetter: username.charAt(0).toUpperCase()
-        })
-      } else {
-        setIsAllowed(false)
-        setUser(null)
-      }
-      setIsLoading(false)
-    }
-
-    updateNavbar()
-    window.addEventListener('authChange', updateNavbar)
-    window.addEventListener('profileComplete', updateNavbar)
-    window.addEventListener('storage', updateNavbar)
-
-    return () => {
-      window.removeEventListener('authChange', updateNavbar)
-      window.removeEventListener('profileComplete', updateNavbar)
-      window.removeEventListener('storage', updateNavbar)
-    }
-  }, [])
+  // Derive first letter safely
+  const firstLetter = user?.username 
+    ? user.username.charAt(0).toUpperCase() 
+    : '';
 
   return (
     <nav className="rounded-lg border-b z-50 p-2.5 top-0 bg-white sticky">
@@ -65,15 +39,18 @@ const Navbar = () => {
           </Link>
         </div>
 
-        {/* User auth area */}
-        {isLoading ? (
-          <div className="hidden justify-center items-center md:flex space-y-7">
+        {/* User auth area - Desktop */}
+        {loading ? (
+          <div className="hidden md:flex justify-center items-center space-y-7">
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
         ) : user ? (
-          <div className="hidden justify-center items-center md:flex space-x-7">
-            <Link to="/profile" className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full font-semibold text-sm hover:bg-blue-600 transition-colors">
-              {user.firstLetter}
+          <div className="hidden md:flex justify-center items-center space-x-7">
+            <Link 
+              to="/profile" 
+              className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full font-semibold text-sm hover:bg-blue-600 transition-colors"
+            >
+              {firstLetter}
             </Link>
           </div>
         ) : (
@@ -99,6 +76,7 @@ const Navbar = () => {
               <X className="w-7 h-7 text-black" />
             </button>
           </div>
+
           <nav className="flex transition-all h-full relative fade-in-5 flex-col gap-6">
             <Link 
               to="/for-business" 
@@ -114,14 +92,19 @@ const Navbar = () => {
             >
               FAQs
             </Link>
-            {isAllowed && user ? (
+
+            {loading ? (
+              <div className="py-4">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </div>
+            ) : user ? (
               <Link 
                 to="/profile" 
                 onClick={toggleDrawer} 
                 className="flex items-center text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors py-2 border-b border-gray-100"
               >
                 <div className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full font-semibold text-sm mr-3">
-                  {user.firstLetter}
+                  {firstLetter}
                 </div>
                 Profile
               </Link>
@@ -135,7 +118,8 @@ const Navbar = () => {
               </Link>
             )}
           </nav>
-          {!isAllowed && (
+
+          {!user && !loading && (
             <div className="w-full justify-center items-center border-t-2 border-gray-200 bg-blue-600 rounded-xl absolute bottom-6 left-0 right-0 mx-6 text-white p-4 text-center shadow-lg hover:bg-blue-700 transition-colors">
               <Link to="/login" onClick={toggleDrawer}>
                 <span className="uppercase cursor-pointer font-bold text-lg">Login</span>
@@ -145,7 +129,7 @@ const Navbar = () => {
         </div>
       )}
     </nav>
-  )
-}
+  );
+};
 
-export default Navbar
+export default Navbar;

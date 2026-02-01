@@ -1,35 +1,27 @@
-export const isAuthenticated = () => {
-  return !!localStorage.getItem('access_token');
-};
+import axios from 'axios';
 
-export const redirectToProfile = (router) => {
-  router.push('/profile');
-};
-
-// Check if user is using cookie-based authentication (Google OAuth)
-export const isCookieAuth = () => {
-  const authMethod = localStorage.getItem('auth_method');
-  const token = localStorage.getItem('access_token');
-  return authMethod === 'cookie' || token === 'USE_COOKIE_AUTH';
-};
-
-// Get authentication method
-export const getAuthMethod = () => {
-  if (isCookieAuth()) {
-    return 'cookie';
+export const isAuthenticated = async () => {
+  try {
+    const res = await axios.get(`${import.meta.env.VITE_API_BASE_URL}/users/me`, {
+      withCredentials: true,
+    });
+    return !!res.data?.data?.user;
+  } catch (err) {
+    console.log('[auth] isAuthenticated check failed:', err?.response?.status);
+    return false;
   }
-  return 'token';
 };
 
-// Clear all authentication data
+export const isAuthenticatedSync = () => {
+  return !!localStorage.getItem('user_id') || !!localStorage.getItem('auth_method');
+};
+
+export const redirectToProfile = (navigate) => {
+  navigate('/profile');
+};
+
 export const clearAuth = () => {
-  localStorage.removeItem('access_token');
-  localStorage.removeItem('email');
-  localStorage.removeItem('username');
-  localStorage.removeItem('user_id');
-  localStorage.removeItem('auth_method');
-  
-  // Clear cookies
+  localStorage.clear();
   document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
   document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
 };

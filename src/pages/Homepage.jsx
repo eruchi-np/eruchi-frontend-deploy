@@ -1,45 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext'; // ← Import this
+import { Link } from 'react-router-dom';
 
 export default function Homepage() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const token = localStorage.getItem("access_token");
-    const username = localStorage.getItem("username");
-    
-    if (token && username) {
-      setIsLoggedIn(true);
-    } else {
-      setIsLoggedIn(false);
-    }
-    setLoading(false);
-
-    const handleAuthChange = () => {
-      const token = localStorage.getItem("access_token");
-      const username = localStorage.getItem("username");
-      setIsLoggedIn(!!(token && username));
-    };
-
-    window.addEventListener('authChange', handleAuthChange);
-    window.addEventListener('storage', handleAuthChange);
-
-    return () => {
-      window.removeEventListener('authChange', handleAuthChange);
-      window.removeEventListener('storage', handleAuthChange);
-    };
-  }, []);
+  const { user, loading } = useAuth(); // ← Use shared user state from context
 
   const handleButtonClick = () => {
-    if (isLoggedIn) {
-      window.location.href = '/profile';
+    if (user) {
+      window.location.href = '/profile'; // or '/dashboard' if you have one
     } else {
       window.location.href = '/login';
     }
   };
 
   if (loading) {
-    return null;
+    return null; // or a spinner if you prefer
   }
 
   return (
@@ -57,17 +32,17 @@ export default function Homepage() {
 
           {/* Right Side - CTA */}
           <div className="lg:pt-8">
-          <p className="text-lg sm:text-xl text-gray-600 mb-6">
+            <p className="text-lg sm:text-xl text-gray-600 mb-6">
               Join <span className="font-bold" style={{ color: '#3399ff' }}>eRuchi Early Access</span>. Get free samples matched to your taste, share honest feedback, and help brands build products you'll actually love.{' '}
               <a href="/faqs" className="text-blue-500 hover:text-blue-600 font-medium">
                 Learn More!
               </a>
             </p>
-            <button 
+            <button
               onClick={handleButtonClick}
               className="bg-blue-500 hover:bg-blue-600 text-white text-lg sm:text-xl font-medium px-8 py-4 rounded-full transition-colors duration-200 shadow-lg hover:shadow-xl"
             >
-              {isLoggedIn ? 'Go to Dashboard' : 'Become a Sampler'}
+              {user ? 'Go to Dashboard' : 'Become a Sampler'}
             </button>
           </div>
         </div>

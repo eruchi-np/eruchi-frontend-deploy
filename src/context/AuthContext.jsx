@@ -1,4 +1,3 @@
-// src/context/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import Cookies from 'js-cookie';
@@ -18,53 +17,42 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   const refreshUser = async () => {
-    const token = localStorage.getItem('access_token');
-    const authMethod = localStorage.getItem('auth_method');
-    
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
+    console.log('[AuthContext] refreshUser: attempting to fetch user via cookie');
 
     try {
-      let res;
-      const config = { withCredentials: true };
+      // Always try cookie auth (withCredentials sends the httpOnly token cookie)
+      const res = await axios.get(`${API_BASE_URL}/users/me`, {
+        withCredentials: true,
+      });
 
-      if (authMethod === 'cookie' || token === 'USE_COOKIE_AUTH') {
-        res = await axios.get(`${API_BASE_URL}/users/me`, config);
-      } else {
-        config.headers = { Authorization: `Bearer ${token}` };
-        res = await axios.get(`${API_BASE_URL}/users/me`, config);
-      }
-      
+      console.log('[AuthContext] refreshUser success:', res.data);
+
       const userData = res.data.data.user;
       setUser(userData);
-      // Sync localStorage for legacy components
+
+      // Keep non-sensitive info for UI/legacy components
       localStorage.setItem('username', `${userData.firstName} ${userData.lastName}`);
       localStorage.setItem('email', userData.email);
       localStorage.setItem('user_id', userData.id);
+      localStorage.setItem('auth_method', 'cookie');
+
     } catch (err) {
-      console.error('Failed to fetch user:', err);
-      
+      console.error('[AuthContext] refreshUser failed:', err?.response?.status, err?.response?.data);
+
       if (err.response?.status === 401) {
+        // Clear legacy data only
         localStorage.removeItem('access_token');
         localStorage.removeItem('email');
-        localStorage.setItem('username');
+        localStorage.removeItem('username');
         localStorage.removeItem('user_id');
         localStorage.removeItem('auth_method');
         setUser(null);
-      }
-      
-      if (err.response?.status === 429) {
-        console.warn('Rate limited on user fetch - retrying later');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // On mount + events
   useEffect(() => {
     refreshUser();
 
@@ -85,7 +73,6 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.clear();
-    // Clear cookies
     Cookies.remove('token');
     Cookies.remove('access_token');
     document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
