@@ -7,9 +7,11 @@ import HouseholdDurables from './steps/HouseholdDurables';
 import Psychographics from './steps/Psychographics';
 import { userAPI } from '../../services/api';
 import toast from "react-hot-toast";
+import { useAuth } from '../../context/AuthContext';  
 
 const DemographicsWizard = ({ onComplete }) => {
   const { currentStep, formData, nextStep, prevStep, updateFormData, errors } = useDemographics();
+  const { refreshUser } = useAuth();  // ← Get refreshUser from AuthContext
 
   const renderStep = () => {
     switch (currentStep) {
@@ -62,6 +64,11 @@ const DemographicsWizard = ({ onComplete }) => {
 
       if (response.data.success) {
         toast.success("Profile completed successfully! Welcome to eRuchi!");
+
+        // CRITICAL FIX: Immediately refresh user context so isProfileComplete = true
+        await refreshUser();  // This fetches fresh /users/me data → updates AuthContext
+
+        // Now safely trigger welcome screen
         onComplete();
       }
     } catch (error) {
@@ -82,7 +89,7 @@ const DemographicsWizard = ({ onComplete }) => {
         {renderStep()}
       </div>
 
-      {/* Fixed/Sticky Button Bar with Extra Bottom Spacing */}
+      {/* Fixed/Sticky Button Bar */}
       <div className="mt-auto pt-6 border-t border-gray-200 bg-white">
         <div className="px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center pb-8 sm:pb-12">
@@ -114,7 +121,7 @@ const DemographicsWizard = ({ onComplete }) => {
         </div>
       </div>
 
-      {/* Extra safe padding for mobile (avoids overlap with notch/home bar) */}
+      {/* Extra padding for mobile */}
       <div className="h-4 sm:h-8" />
     </div>
   );

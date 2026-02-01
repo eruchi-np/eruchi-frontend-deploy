@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import DemographicsWizard from '../components/demographics/DemographicsWizard';
-import WelcomeToTunila from '../components/demographics/steps/WelcomeToERuchi';
+import WelcomeToERuchi from '../components/demographics/steps/WelcomeToERuchi';
 
 const CompleteProfile = () => {
   const [profileCompleted, setProfileCompleted] = useState(false);
 
   const handleProfileComplete = () => {
-    console.log('Profile completed successfully!');
+    console.log('Profile completed – showing welcome screen');
     setProfileCompleted(true);
   };
 
   if (profileCompleted) {
-    return <WelcomeToTunila />;
+    return <WelcomeToERuchi />;
   }
 
   return (
