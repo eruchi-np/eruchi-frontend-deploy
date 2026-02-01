@@ -6,17 +6,24 @@ import {
   AlertCircle, 
   Settings, 
   Loader2,
-  Award
+  Award,
+  Trash2
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { userAPI } from "../services/api";
 import Logout from "../components/Logout";
+import axios from 'axios';
+import toast from 'react-hot-toast';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const Profile = () => {
   const [user, setUser] = useState(null);
   const [firstLetter, setFirstLetter] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   
   const navigate = useNavigate();
 
@@ -32,7 +39,6 @@ const Profile = () => {
 
         setUser(userData);
         setFirstLetter(userData.firstName?.charAt(0)?.toUpperCase() || "U");
-
       } catch (err) {
         console.error("Error fetching profile:", err);
 
@@ -77,6 +83,51 @@ const Profile = () => {
     navigate("/admin");
   };
 
+  const handleDeleteAccount = async () => {
+    setDeleteLoading(true);
+    try {
+      // 1. Delete/anonymize the account
+      await userAPI.deleteAccount();
+      toast.success("Your account has been permanently deleted.");
+
+      // 2. Immediately call logout endpoint to clear the cookie
+      await axios.post(
+        `${API_BASE_URL}/auth/logout`,
+        {},
+        { withCredentials: true }
+      );
+
+      // 3. Clear frontend state
+      localStorage.clear();
+
+      // 4. Hard redirect to home page (prevents any auth check loops)
+      window.location.href = '/';
+
+    } catch (err) {
+      console.error("Delete account failed:", err);
+      toast.error(
+        err.response?.data?.message || 
+        "Failed to delete account. Please try again or contact support."
+      );
+    } finally {
+      setDeleteLoading(false);
+      setShowDeleteModal(false);
+    }
+  };
+
+  // Helper function to display user's full name
+  const getDisplayName = () => {
+    const firstName = user.firstName || "";
+    const lastName = user.lastName || "";
+    
+    // Don't display "User" as last name
+    if (lastName.toLowerCase() === "user") {
+      return firstName;
+    }
+    
+    return `${firstName} ${lastName}`.trim();
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -114,33 +165,32 @@ const Profile = () => {
     );
   }
 
-  if (!user) {
-    return null;
-  }
+  if (!user) return null;
 
   return (
-    <main className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-gray-50 py-4 sm:py-8 px-4 sm:px-6 lg:px-8 pb-8 sm:pb-12 lg:pb-16">
       <div className="max-w-7xl mx-auto">
         {/* Profile Header */}
-        <div className="bg-white rounded-3xl shadow-sm p-8 mb-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div className="flex items-start gap-6">
+        <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm p-4 sm:p-6 lg:p-8 mb-4 sm:mb-6">
+          <div className="flex flex-col gap-4 sm:gap-6">
+            {/* User Info Section */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
               <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold text-gray-900">
-                    {user.firstName} {user.lastName}
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    {getDisplayName()}
                   </h1>
                   {user.role === "admin" && (
-                    <span className="px-3 py-1 bg-purple-100 text-purple-700 text-sm font-medium rounded-full border border-purple-200">
+                    <span className="px-2 sm:px-3 py-1 bg-purple-100 text-purple-700 text-xs sm:text-sm font-medium rounded-full border border-purple-200">
                       Admin
                     </span>
                   )}
                 </div>
-                <p className="text-base text-gray-600">{user.email}</p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm sm:text-base text-gray-600 break-all">{user.email}</p>
+                <p className="text-xs sm:text-sm text-gray-500">
                   Phone: {user.phone || "Not provided"}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-xs sm:text-sm text-gray-500">
                   Member since {new Date(user.createdAt).toLocaleDateString("en-US", {
                     month: "long",
                     year: "numeric",
@@ -149,28 +199,36 @@ const Profile = () => {
               </div>
             </div>
 
-            <div className="flex flex-col gap-3">
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               {user.role === "admin" && (
                 <button
                   onClick={handleAdminPanel}
-                  className="flex items-center justify-center gap-2 bg-purple-600 text-white px-6 py-3 rounded-full hover:bg-purple-700 transition-colors font-medium shadow-md"
+                  className="flex items-center justify-center gap-2 bg-purple-600 text-white px-4 sm:px-6 py-2.5 sm:py-3 rounded-full hover:bg-purple-700 transition-colors font-medium shadow-md text-sm sm:text-base"
                 >
-                  <Settings className="h-5 w-5" />
+                  <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
                   Admin Panel
                 </button>
               )}
               <Logout />
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="flex items-center justify-center gap-2 border-2 border-red-200 text-red-600 px-4 sm:px-6 py-2.5 sm:py-3 rounded-full hover:bg-red-50 hover:border-red-300 transition-colors font-medium text-sm sm:text-base"
+              >
+                <Trash2 className="h-4 w-4 sm:h-5 sm:w-5" />
+                Delete Account
+              </button>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Left Column - Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-4 sm:space-y-6">
             {/* Active Campaign Status */}
-            <div className="bg-white rounded-3xl shadow-sm p-8">
-              <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 mb-6">
-                <Package className="h-6 w-6 text-blue-500" />
+            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm p-4 sm:p-6 lg:p-8">
+              <h2 className="flex items-center gap-2 text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6">
+                <Package className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
                 Current Campaign Status
               </h2>
 
@@ -178,13 +236,13 @@ const Profile = () => {
                 {user.activeCampaign?.status ? (
                   <div className="text-center">
                     <div
-                      className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-semibold mb-4 border ${getStatusColor(
+                      className={`inline-flex items-center px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-semibold mb-3 sm:mb-4 border ${getStatusColor(
                         user.activeCampaign.status
                       )}`}
                     >
                       {getActiveCampaignStatus()}
                     </div>
-                    <p className="text-gray-600 mb-5 text-base">
+                    <p className="text-gray-600 mb-4 sm:mb-5 text-sm sm:text-base px-4">
                       {user.activeCampaign.status === "joined" && "Campaign joined! Waiting for sample dispatch..."}
                       {user.activeCampaign.status === "dispatched" && "Sample dispatched! Your product is on the way."}
                       {user.activeCampaign.status === "delivered" && "Sample delivered! You can now take the survey."}
@@ -193,23 +251,23 @@ const Profile = () => {
                     {user.activeCampaign.status === "delivered" ? (
                       <Link
                         to={`/survey/${user.activeCampaign.campaign}`}
-                        className="inline-block bg-green-500 text-white px-8 py-3 rounded-full text-base font-medium hover:bg-green-600 transition-colors shadow-lg"
+                        className="inline-block bg-green-500 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-sm sm:text-base font-medium hover:bg-green-600 transition-colors shadow-lg"
                       >
                         Take Survey & Earn Credits
                       </Link>
                     ) : (
-                      <p className="text-sm text-gray-500 mt-3">
+                      <p className="text-xs sm:text-sm text-gray-500 mt-3 px-4">
                         Survey will be available when status changes to "Delivered"
                       </p>
                     )}
                   </div>
                 ) : (
-                  <div className="text-center">
-                    <Package className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-600 mb-5 text-base font-medium">No active campaign</p>
+                  <div className="text-center px-4">
+                    <Package className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
+                    <p className="text-gray-600 mb-4 sm:mb-5 text-sm sm:text-base font-medium">No active campaign</p>
                     <Link
                       to="/campaigns"
-                      className="bg-blue-500 text-white px-8 py-3 rounded-full text-base font-medium hover:bg-blue-600 transition-colors shadow-lg"
+                      className="inline-block bg-blue-500 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-sm sm:text-base font-medium hover:bg-blue-600 transition-colors shadow-lg"
                     >
                       Browse Campaigns
                     </Link>
@@ -219,75 +277,74 @@ const Profile = () => {
             </div>
 
             {/* Credits Card */}
-            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl shadow-lg p-10 text-white">
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl sm:rounded-3xl shadow-lg p-6 sm:p-8 lg:p-10 text-white">
               <div className="text-center">
-                <div className="text-8xl font-bold mb-3">{user.credits || 0}</div>
-                <h2 className="text-3xl font-bold mb-2">Credits</h2>
-                <p className="text-blue-100 text-lg">Complete surveys to earn more credits</p>
+                <div className="text-5xl sm:text-6xl lg:text-8xl font-bold mb-2 sm:mb-3">{user.credits || 0}</div>
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-1 sm:mb-2">Credits</h2>
+                <p className="text-blue-100 text-sm sm:text-base lg:text-lg">Complete surveys to earn more credits</p>
               </div>
             </div>
 
-            {/* Quick Actions – Now with Survey History */}
-            <div className="bg-white rounded-3xl shadow-sm p-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Quick Actions</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Quick Actions */}
+            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm p-4 sm:p-6 lg:p-8">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6">Quick Actions</h2>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <Link
                   to="/campaigns"
-                  className="flex flex-col items-center justify-center p-6 border-2 border-gray-200 rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
+                  className="flex flex-col items-center justify-center p-4 sm:p-6 border-2 border-gray-200 rounded-xl sm:rounded-2xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
                 >
-                  <Package className="h-10 w-10 text-blue-500 mb-3 group-hover:scale-110 transition-transform" />
-                  <span className="text-base font-semibold text-gray-900">Browse Campaigns</span>
+                  <Package className="h-8 w-8 sm:h-10 sm:w-10 text-blue-500 mb-2 sm:mb-3 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs sm:text-sm lg:text-base font-semibold text-gray-900 text-center">Browse Campaigns</span>
                 </Link>
 
                 <Link
                   to="/campaign-history"
-                  className="flex flex-col items-center justify-center p-6 border-2 border-gray-200 rounded-2xl hover:border-green-500 hover:bg-green-50 transition-all group"
+                  className="flex flex-col items-center justify-center p-4 sm:p-6 border-2 border-gray-200 rounded-xl sm:rounded-2xl hover:border-green-500 hover:bg-green-50 transition-all group"
                 >
-                  <History className="h-10 w-10 text-green-500 mb-3 group-hover:scale-110 transition-transform" />
-                  <span className="text-base font-semibold text-gray-900">Campaign History</span>
+                  <History className="h-8 w-8 sm:h-10 sm:w-10 text-green-500 mb-2 sm:mb-3 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs sm:text-sm lg:text-base font-semibold text-gray-900 text-center">Campaign History</span>
                 </Link>
 
                 <Link
                   to="/standalone-surveys"
-                  className="flex flex-col items-center justify-center p-6 border-2 border-gray-200 rounded-2xl hover:border-purple-500 hover:bg-purple-50 transition-all group"
+                  className="flex flex-col items-center justify-center p-4 sm:p-6 border-2 border-gray-200 rounded-xl sm:rounded-2xl hover:border-purple-500 hover:bg-purple-50 transition-all group"
                 >
-                  <Award className="h-10 w-10 text-purple-500 mb-3 group-hover:scale-110 transition-transform" />
-                  <span className="text-base font-semibold text-gray-900">Standalone Surveys</span>
+                  <Award className="h-8 w-8 sm:h-10 sm:w-10 text-purple-500 mb-2 sm:mb-3 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs sm:text-sm lg:text-base font-semibold text-gray-900 text-center">Standalone Surveys</span>
                 </Link>
 
-                {/* NEW: Survey History Button */}
                 <Link
                   to="/survey-history"
-                  className="flex flex-col items-center justify-center p-6 border-2 border-gray-200 rounded-2xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group"
+                  className="flex flex-col items-center justify-center p-4 sm:p-6 border-2 border-gray-200 rounded-xl sm:rounded-2xl hover:border-indigo-500 hover:bg-indigo-50 transition-all group"
                 >
-                  <History className="h-10 w-10 text-indigo-500 mb-3 group-hover:scale-110 transition-transform" />
-                  <span className="text-base font-semibold text-gray-900">Survey History</span>
+                  <History className="h-8 w-8 sm:h-10 sm:w-10 text-indigo-500 mb-2 sm:mb-3 group-hover:scale-110 transition-transform" />
+                  <span className="text-xs sm:text-sm lg:text-base font-semibold text-gray-900 text-center">Survey History</span>
                 </Link>
               </div>
             </div>
           </div>
 
           {/* Right Column - Notifications */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-3xl shadow-sm p-8 sticky top-8 pb-12 lg:pb-8">
-              <h2 className="flex items-center gap-2 text-xl font-bold text-gray-900 mb-6">
-                <Bell className="h-6 w-6 text-blue-500" />
+          <div className="lg:col-span-1 mb-8 lg:mb-0">
+            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm p-4 sm:p-6 lg:p-8 lg:sticky lg:top-8">
+              <h2 className="flex items-center gap-2 text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6">
+                <Bell className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
                 Notifications
               </h2>
-              <div className="space-y-4 max-h-[600px] overflow-y-auto">
-                <div className="bg-gray-50 rounded-2xl p-5 border border-gray-200 hover:border-blue-300 transition-colors">
-                  <h3 className="font-semibold text-gray-900 mb-1">Welcome to eRuchi!</h3>
-                  <p className="text-sm text-gray-500 mb-2">
+              <div className="space-y-3 sm:space-y-4 max-h-[400px] lg:max-h-[600px] overflow-y-auto">
+                <div className="bg-gray-50 rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-gray-200 hover:border-blue-300 transition-colors">
+                  <h3 className="font-semibold text-gray-900 mb-1 text-sm sm:text-base">Welcome to eRuchi!</h3>
+                  <p className="text-xs sm:text-sm text-gray-500 mb-2">
                     {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                   </p>
-                  <p className="text-sm text-gray-700">Start exploring campaigns and earn credits.</p>
+                  <p className="text-xs sm:text-sm text-gray-700">Start exploring campaigns and earn credits.</p>
                 </div>
 
                 {user.activeCampaign?.status === "delivered" && (
-                  <div className="bg-green-50 rounded-2xl p-5 border border-green-200">
-                    <h3 className="font-semibold text-green-800 mb-1">Sample Delivered!</h3>
-                    <p className="text-sm text-gray-600 mb-2">Today</p>
-                    <p className="text-sm text-gray-700">Your sample has been delivered. Complete the survey to earn credits!</p>
+                  <div className="bg-green-50 rounded-xl sm:rounded-2xl p-4 sm:p-5 border border-green-200">
+                    <h3 className="font-semibold text-green-800 mb-1 text-sm sm:text-base">Sample Delivered!</h3>
+                    <p className="text-xs sm:text-sm text-gray-600 mb-2">Today</p>
+                    <p className="text-xs sm:text-sm text-gray-700">Your sample has been delivered. Complete the survey to earn credits!</p>
                   </div>
                 )}
               </div>
@@ -295,6 +352,52 @@ const Profile = () => {
           </div>
         </div>
       </div>
+
+      {/* Delete Account Confirmation Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 lg:p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-600 mb-3 sm:mb-4 flex items-center gap-2 sm:gap-3">
+              <Trash2 className="h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0" />
+              <span>Delete Your Account</span>
+            </h2>
+
+            <p className="text-gray-700 mb-4 sm:mb-6 text-sm sm:text-base leading-relaxed">
+              This action is <strong>permanent and irreversible</strong>. 
+              Your personal information will be anonymized, your credits and campaigns will be lost, 
+              and you will lose access to your account forever.
+            </p>
+
+            <p className="text-red-600 font-medium mb-6 sm:mb-8 text-sm sm:text-base">
+              Are you sure you want to delete your account?
+            </p>
+
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleteLoading}
+                className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 border-2 border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:opacity-50 text-sm sm:text-base"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteLoading}
+                className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-sm sm:text-base"
+              >
+                {deleteLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  'Yes, Delete My Account'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 };

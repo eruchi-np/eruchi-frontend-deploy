@@ -172,7 +172,7 @@ const CompleteBasicInfo = () => {
                 type="tel"
                 {...register("phone")}
                 className={`w-full px-4 py-3 border ${errors.phone ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                placeholder="98XXXXXXXX or +977..."
+                placeholder="Enter Phone Number"
               />
               {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone.message}</p>}
             </div>

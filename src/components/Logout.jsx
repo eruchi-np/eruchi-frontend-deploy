@@ -9,34 +9,35 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const Logout = () => {
   const navigate = useNavigate();
-  const { logout } = useAuth?.() || {};
+  const { logout: contextLogout } = useAuth(); // renamed for clarity
 
   const handleLogout = async () => {
     try {
-      // Call backend to clear the httpOnly cookie
+      // Call backend to expire the httpOnly cookie
       await axios.post(
         `${API_BASE_URL}/auth/logout`,
         {}, 
-        { withCredentials: true }  // This sends the current cookie so backend can clear it
+        { withCredentials: true } // Ensures the current cookie is sent so backend can clear it
       );
 
-      console.log('Logout API success — cookie cleared by server');
+      console.log('Logout successful - cookie cleared by server');
     } catch (error) {
-      console.warn('Logout API call failed, but clearing frontend state anyway', error);
-      // Continue anyway — don't block user
+      console.warn('Logout API failed - proceeding with frontend cleanup', error);
+      // Continue anyway - don't block the user
     }
 
-    // Clear frontend state (localStorage, context, etc.)
+    // Clear frontend state
     clearAuth();
 
-    if (logout) {
-      logout();
+    // Use AuthContext logout if available
+    if (contextLogout) {
+      contextLogout();
     }
 
-    // Notify other components
+    // Notify other components (Navbar, Homepage, etc.)
     window.dispatchEvent(new Event('authChange'));
 
-    // Redirect to login
+    // Redirect to login page
     navigate('/login', { replace: true });
   };
 

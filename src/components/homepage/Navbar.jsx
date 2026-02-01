@@ -1,14 +1,44 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Menu, X, Loader2 } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext'; // ← Import this
+import { Link, useNavigate } from 'react-router-dom';
+import { Menu, X, Loader2, LogOut } from 'lucide-react';
+import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 const Navbar = () => {
-  const { user, loading } = useAuth(); // ← Use shared user state
+  const { user, loading, logout: contextLogout } = useAuth();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const navigate = useNavigate();
 
   const toggleDrawer = () => {
     setIsDrawerOpen(!isDrawerOpen);
+  };
+
+  const handleLogout = async () => {
+    try {
+      // Call backend to clear the httpOnly cookie
+      await axios.post(
+        `${API_BASE_URL}/auth/logout`,
+        {}, 
+        { withCredentials: true } // Sends current cookie so backend can expire it
+      );
+      console.log('Backend logout successful');
+    } catch (error) {
+      console.warn('Backend logout failed - cleaning frontend anyway', error);
+      // Continue anyway
+    }
+
+    // Clear frontend state
+    if (contextLogout) {
+      contextLogout();
+    }
+
+    // Close drawer if open (mobile)
+    setIsDrawerOpen(false);
+
+    // Redirect to login
+    navigate('/login', { replace: true });
   };
 
   // Derive first letter safely
@@ -45,13 +75,23 @@ const Navbar = () => {
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
         ) : user ? (
-          <div className="hidden md:flex justify-center items-center space-x-7">
+          <div className="hidden md:flex justify-center items-center space-x-4">
+            {/* Profile Circle */}
             <Link 
               to="/profile" 
               className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full font-semibold text-sm hover:bg-blue-600 transition-colors"
             >
               {firstLetter}
             </Link>
+
+            {/* Logout Icon */}
+            <button
+              onClick={handleLogout}
+              className="flex items-center justify-center w-8 h-8 bg-red-100 text-red-600 rounded-full hover:bg-red-200 transition-colors"
+              title="Logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
           </div>
         ) : (
           <div className="hidden lg:flex">
@@ -98,16 +138,30 @@ const Navbar = () => {
                 <Loader2 className="w-6 h-6 animate-spin mx-auto" />
               </div>
             ) : user ? (
-              <Link 
-                to="/profile" 
-                onClick={toggleDrawer} 
-                className="flex items-center text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors py-2 border-b border-gray-100"
-              >
-                <div className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full font-semibold text-sm mr-3">
-                  {firstLetter}
-                </div>
-                Profile
-              </Link>
+              <>
+                <Link 
+                  to="/profile" 
+                  onClick={toggleDrawer} 
+                  className="flex items-center text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors py-2 border-b border-gray-100"
+                >
+                  <div className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full font-semibold text-sm mr-3">
+                    {firstLetter}
+                  </div>
+                  Profile
+                </Link>
+
+                {/* Logout in mobile drawer */}
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    toggleDrawer();
+                  }}
+                  className="flex items-center text-lg font-semibold text-red-600 hover:text-red-700 transition-colors py-2 border-b border-gray-100 w-full text-left"
+                >
+                  <LogOut className="h-5 w-5 mr-3" />
+                  Logout
+                </button>
+              </>
             ) : (
               <Link 
                 to="/login" 

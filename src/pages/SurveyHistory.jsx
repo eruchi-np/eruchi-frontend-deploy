@@ -1,9 +1,8 @@
-// src/pages/SurveyHistory.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { surveyAPI, sepSurveyAPI } from '../services/api';
 import { 
-  Loader2, ArrowLeft, Award, Calendar, AlertCircle, 
+  Loader2, ArrowLeft, Calendar, AlertCircle, 
   History as HistoryIcon, Package, FileText 
 } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -124,13 +123,7 @@ const SurveyHistory = () => {
                     })}
                   </div>
 
-                  {/* Credits */}
-                  <div className="flex items-center gap-2 bg-green-50 text-green-800 px-4 py-2 rounded-lg text-sm">
-                    <Award className="h-4 w-4" />
-                    +{entry.type === 'campaign' 
-                      ? (entry.survey?.creditsToAward || 100) 
-                      : (entry.survey?.credits || 50)} credits earned
-                  </div>
+                  {/* Removed credits display completely */}
                 </div>
               </div>
             ))}

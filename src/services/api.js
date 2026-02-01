@@ -51,7 +51,7 @@ export const authAPI = {
 export const userAPI = {
   getProfile: () => api.get('/users/me'),
   getCampaignHistory: () => api.get('/users/me/campaign-history'),
-  deleteAccount: () => api.delete('/users/me'),
+  deleteAccount: () => api.delete('/users/me/delete'),
   updateDemographics: (data) => api.put('/users/me/demographics', data)
 };
 
