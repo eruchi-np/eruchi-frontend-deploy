@@ -11,35 +11,23 @@ const Logout = () => {
   const navigate = useNavigate();
   const { logout: contextLogout } = useAuth(); // renamed for clarity
 
-  const handleLogout = async () => {
-    try {
-      // Call backend to expire the httpOnly cookie
-      await axios.post(
-        `${API_BASE_URL}/auth/logout`,
-        {}, 
-        { withCredentials: true } // Ensures the current cookie is sent so backend can clear it
-      );
+ const handleLogout = async () => {
+  try {
+    await axios.post(`${API_BASE_URL}/auth/logout`, {}, { withCredentials: true });
+  } catch (err) {
+    console.warn('Logout API failed', err);
+  }
 
-      console.log('Logout successful - cookie cleared by server');
-    } catch (error) {
-      console.warn('Logout API failed - proceeding with frontend cleanup', error);
-      // Continue anyway - don't block the user
-    }
+  // Set lock flag BEFORE clearing state (prevents race)
+  localStorage.setItem('logout_lock', Date.now().toString());
 
-    // Clear frontend state
-    clearAuth();
+  clearAuth();
+  if (contextLogout) contextLogout();
+  window.dispatchEvent(new Event('authChange'));
 
-    // Use AuthContext logout if available
-    if (contextLogout) {
-      contextLogout();
-    }
-
-    // Notify other components (Navbar, Homepage, etc.)
-    window.dispatchEvent(new Event('authChange'));
-
-    // Redirect to login page
-    navigate('/login', { replace: true });
-  };
+  // Redirect to home (not login)
+  window.location.href = '/';
+};
 
   return (
     <button

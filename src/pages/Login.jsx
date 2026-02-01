@@ -28,25 +28,26 @@ const Login = () => {
 
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
-      // If logout lock is active → skip redirect, show login form
+      // If recent logout lock → skip everything (prevents bounce)
       const logoutLock = localStorage.getItem('logout_lock');
       if (logoutLock) {
         const timestamp = parseInt(logoutLock, 10);
-        if (Date.now() - timestamp < 10 * 60 * 1000) { // 10 minutes
-          console.log('[Login] Skipping redirect - recent logout lock active');
+        if (Date.now() - timestamp < 15 * 60 * 1000) { // 15 minutes
+          console.log('[Login] Skipping auth check - recent logout lock active');
           return;
         }
-        // Lock expired → clean up
+        // Clean up expired lock
         localStorage.removeItem('logout_lock');
       }
 
-      // Normal check
+      // Normal check only if no lock
+      console.log('[Login] Checking authentication...');
       if (await isAuthenticated()) {
-        console.log('[Login] User authenticated → redirecting to profile');
+        console.log('[Login] Already authenticated → redirecting');
         toast.error("You're already logged in!");
         setTimeout(() => {
           redirectToProfile(navigate);
-        }, 1000);
+        }, 800);
       }
     };
 
@@ -156,16 +157,14 @@ const Login = () => {
               </span>
             </h1>
 
-            {/* Show warning after logout */}
+            {/* Show warning after logout/delete */}
             {localStorage.getItem('logout_lock') && (
               <div className="bg-yellow-50 border-l-4 border-yellow-400 p-5 mb-6 rounded-r-lg">
                 <p className="text-yellow-800 font-bold text-lg mb-2">
-                  You have been logged out from this browser.
+                  You have been logged out.
                 </p>
                 <p className="text-yellow-700">
-                  <strong>Important security note:</strong>  
-                  This only clears your local session.  
-                  To fully end your session (especially on shared devices),  
+                  For full session termination (especially on shared devices), 
                   please <strong>close all open browser tabs and windows</strong>.
                 </p>
               </div>

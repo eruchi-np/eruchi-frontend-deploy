@@ -44,10 +44,26 @@ const Signup = () => {
   const navigate = useNavigate();
   
   useEffect(() => {
-    if (isAuthenticated()) {
-      toast.error("You're already logged in. Back to Profile!");
-      setTimeout(() => redirectToProfile(navigate), 1000);
-    }
+    const checkAuth = async () => {
+      // If recent logout → skip auth check
+      const logoutLock = localStorage.getItem('logout_lock');
+      if (logoutLock) {
+        const timestamp = parseInt(logoutLock, 10);
+        if (Date.now() - timestamp < 15 * 60 * 1000) { // 15 minutes
+          console.log('[Signup] Skipping auth check - recent logout lock active');
+          return;
+        }
+        localStorage.removeItem('logout_lock');
+      }
+
+      // Normal check
+      if (await isAuthenticated()) {
+        toast.error("You're already logged in. Back to Profile!");
+        setTimeout(() => redirectToProfile(navigate), 1000);
+      }
+    };
+
+    checkAuth();
   }, [navigate]);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -82,8 +98,8 @@ const Signup = () => {
         firstName: data.firstName,
         lastName: data.lastName,
         phone: data.phone,
-        gender: data.gender,              // Now matches backend enum (capitalized)
-        dateOfBirth: data.dob,            // YYYY-MM-DD from input type="date"
+        gender: data.gender,
+        dateOfBirth: data.dob,
         nationality: data.nationality || null,
       };
 
@@ -100,7 +116,6 @@ const Signup = () => {
       let errorMessage = 'Registration failed. Please try again.';
 
       if (errorData?.errors) {
-        // Validation errors from backend
         errorMessage = errorData.errors.map(e => e.msg).join(', ');
       } else if (errorData?.message) {
         errorMessage = errorData.message;
@@ -229,7 +244,7 @@ const Signup = () => {
             {errors.email && <p className="text-sm text-red-500 mt-2 font-medium">{errors.email.message}</p>}
           </div>
 
-          {/* Gender - Updated to match backend enum */}
+          {/* Gender */}
           <div>
             <label htmlFor="gender" className="block text-lg font-semibold mb-1">
               Gender <span className="text-2xl text-[#2ed6fd]">*</span>

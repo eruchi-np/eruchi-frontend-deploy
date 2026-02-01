@@ -86,21 +86,24 @@ const Profile = () => {
   const handleDeleteAccount = async () => {
     setDeleteLoading(true);
     try {
-      // 1. Delete/anonymize the account
+      // 1. Delete/anonymize account
       await userAPI.deleteAccount();
       toast.success("Your account has been permanently deleted.");
 
-      // 2. Immediately call logout endpoint to clear the cookie
+      // 2. Immediately log out via backend (clears cookie)
       await axios.post(
         `${API_BASE_URL}/auth/logout`,
         {},
         { withCredentials: true }
       );
 
-      // 3. Clear frontend state
+      // 3. Set strong lock (blocks auth checks for 15 min)
+      localStorage.setItem('logout_lock', Date.now().toString());
+
+      // 4. Clear frontend state
       localStorage.clear();
 
-      // 4. Hard redirect to home page (prevents any auth check loops)
+      // 5. Hard redirect to HOME (no auth bounce)
       window.location.href = '/';
 
     } catch (err) {
@@ -120,7 +123,6 @@ const Profile = () => {
     const firstName = user.firstName || "";
     const lastName = user.lastName || "";
     
-    // Don't display "User" as last name
     if (lastName.toLowerCase() === "user") {
       return firstName;
     }
