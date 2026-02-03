@@ -33,7 +33,18 @@ export default function Homepage() {
           {/* Right Side - CTA */}
           <div className="lg:pt-8">
             <p className="text-lg sm:text-xl text-gray-600 mb-6">
-              Join <span className="font-bold" style={{ color: '#3399ff' }}>eRuchi Early Access</span>. Get free samples matched to your taste, share honest feedback, and help brands build products you'll actually love.{' '}
+              {user ? (
+                <>
+                  <span className="font-bold" style={{ color: '#3399ff' }}>
+                    Welcome back, {user.firstName || user.username || 'Sampler'}!
+                  </span>{' '}
+                  Get free samples matched to your taste, share honest feedback, and help brands build products you'll actually love.{' '}
+                </>
+              ) : (
+                <>
+                  Join <span className="font-bold" style={{ color: '#3399ff' }}>eRuchi Early Access</span>. Get free samples matched to your taste, share honest feedback, and help brands build products you'll actually love.{' '}
+                </>
+              )}
               <a href="/faqs" className="text-blue-500 hover:text-blue-600 font-medium">
                 Learn More!
               </a>

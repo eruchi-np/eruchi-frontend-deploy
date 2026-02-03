@@ -13,7 +13,9 @@ import {
   Search, 
   Filter, 
   MoreVertical, 
-  X 
+  X,
+  AlertTriangle,
+  Skull
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -31,6 +33,8 @@ const AdminDashboard = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
   const [pageSize] = useState(50);
+  const [showDangerModal, setShowDangerModal] = useState(false);
+  const [buttonShaking, setButtonShaking] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -163,11 +167,83 @@ const AdminDashboard = () => {
     navigate('/admin/create-campaign');
   };
 
-  // ────────────────────────────────────────────────
-  // NEW: Handler for "New Standalone Survey" button
-  // ────────────────────────────────────────────────
   const handleCreateSepSurvey = () => {
     navigate('/admin/create-sep-survey');
+  };
+
+  const handleDangerClick = () => {
+    setShowDangerModal(true);
+    setButtonShaking(true);
+    setTimeout(() => setButtonShaking(false), 500);
+  };
+
+  const handleFinalClick = () => {
+    setShowDangerModal(false);
+    
+    // Array of funny outcomes
+    const outcomes = [
+      () => {
+        toast('CONGRATULATIONS! You are a bad admin', {
+          duration: 5000,
+          icon: '',
+        });
+      },
+      () => {
+        toast('Eat ass', {
+          duration: 5000,
+          icon: '',
+        });
+      },
+      () => {
+        toast('You are not funny', {
+          duration: 5000,
+          icon: '',
+        });
+      },
+      () => {
+        let countdown = 3;
+        const countdownToast = toast(`Self-destruct in ${countdown}...`, {
+          duration: 4000,
+          icon: '💣',
+        });
+        const interval = setInterval(() => {
+          countdown--;
+          if (countdown > 0) {
+            toast(`Self-destruct in ${countdown}...`, {
+              id: countdownToast,
+              icon: '💣',
+            });
+          } else {
+            toast('Just kidding! Everything is fine.', {
+              id: countdownToast,
+              icon: '',
+            });
+            clearInterval(interval);
+          }
+        }, 1000);
+      },
+      () => {
+        toast('Fuck You!!', {
+          duration: 6000,
+          icon: '',
+        });
+      },
+      () => {
+        const originalTitle = document.title;
+        document.title = ' YOU HAVE BEEN SPOOKED ';
+        toast('SUCK my PP', {
+          duration: 5000,
+          icon: '',
+        });
+        setTimeout(() => {
+          document.title = originalTitle;
+        }, 5000);
+      }
+    ];
+
+    // Pick a random outcome
+    const randomOutcome = outcomes[Math.floor(Math.random() * outcomes.length)];
+    randomOutcome();
   };
 
   const toggleDropdown = (userId) => {
@@ -735,7 +811,107 @@ const AdminDashboard = () => {
             </div>
           </div>
         )}
+
+        {/* DANGER ZONE - Fun Easter Egg */}
+        <div className="mt-12 mb-16">
+          <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-2xl p-6 border-4 border-red-700 shadow-2xl relative overflow-hidden">
+            {/* Animated background patterns */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-0 left-0 w-32 h-32 bg-black rounded-full blur-3xl"></div>
+              <div className="absolute bottom-0 right-0 w-32 h-32 bg-black rounded-full blur-3xl"></div>
+            </div>
+            
+            <div className="relative">
+              <div className="flex items-center gap-3 mb-3">
+                <AlertTriangle className="h-8 w-8 text-yellow-300 animate-pulse" />
+                <h2 className="text-2xl font-black text-white uppercase tracking-wider">DANGER ZONE</h2>
+                <AlertTriangle className="h-8 w-8 text-yellow-300 animate-pulse" />
+              </div>
+              <p className="text-red-100 mb-6 font-medium text-lg">
+                CRITICAL WARNING: This button is extremely dangerous. 
+              </p>
+              <button
+                onClick={handleDangerClick}
+                className={`inline-flex items-center gap-3 bg-black text-red-500 px-8 py-4 rounded-xl font-black text-lg hover:bg-red-900 hover:text-white transition-all shadow-lg border-4 border-red-900 uppercase tracking-wider ${
+                  buttonShaking ? 'animate-shake' : ''
+                }`}
+              >
+                <Skull className="h-6 w-6" />
+                DO NOT CLICK
+                <Skull className="h-6 w-6" />
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Danger Modal */}
+      {showDangerModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="bg-gradient-to-br from-red-600 to-red-800 rounded-2xl max-w-lg w-full p-8 shadow-2xl border-4 border-yellow-400 relative animate-scaleIn">
+            {/* Flashing border effect */}
+            <div className="absolute inset-0 border-4 border-yellow-300 rounded-2xl animate-pulse"></div>
+            
+            <div className="relative">
+              <div className="text-center mb-6">
+                <Skull className="h-20 w-20 text-yellow-300 mx-auto mb-4 animate-bounce" />
+                <h2 className="text-4xl font-black text-white mb-3 uppercase tracking-wider">
+                  FINAL WARNING 
+                </h2>
+                <p className="text-yellow-100 text-xl font-bold mb-2">
+                  ARE YOU ABSOLUTELY SURE?!
+                </p>
+                <p className="text-red-200 text-lg leading-relaxed mb-4">
+                  This action will trigger something that cannot be undone. Your admin privileges, your data, everything is at risk!
+                </p>
+                <p className="text-yellow-300 font-black text-2xl animate-pulse">
+                   PROCEED AT YOUR OWN RISK! 
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-4">
+                <button
+                  onClick={() => setShowDangerModal(false)}
+                  className="flex-1 py-4 px-6 bg-green-600 text-white rounded-xl font-bold text-lg hover:bg-green-700 transition-colors border-2 border-green-800 shadow-lg"
+                >
+                  I'm Smart, Cancel This
+                </button>
+                <button
+                  onClick={handleFinalClick}
+                  className="flex-1 py-4 px-6 bg-red-900 text-yellow-300 rounded-xl font-black text-lg hover:bg-black transition-all border-2 border-yellow-400 shadow-lg animate-pulse uppercase"
+                >
+                  I DARE YOU
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style jsx>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-10px) rotate(-5deg); }
+          75% { transform: translateX(10px) rotate(5deg); }
+        }
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scaleIn {
+          from { transform: scale(0.8); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+        .animate-shake {
+          animation: shake 0.5s ease-in-out;
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-in-out;
+        }
+        .animate-scaleIn {
+          animation: scaleIn 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
