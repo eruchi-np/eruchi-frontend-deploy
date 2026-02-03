@@ -26,38 +26,11 @@ const loginSchema = z.object({
 const Login = () => {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const checkAuthAndRedirect = async () => {
-      // If recent logout lock → skip everything (prevents bounce)
-      const logoutLock = localStorage.getItem('logout_lock');
-      if (logoutLock) {
-        const timestamp = parseInt(logoutLock, 10);
-        if (Date.now() - timestamp < 15 * 60 * 1000) { // 15 minutes
-          console.log('[Login] Skipping auth check - recent logout lock active');
-          return;
-        }
-        // Clean up expired lock
-        localStorage.removeItem('logout_lock');
-      }
-
-      // Normal check only if no lock
-      console.log('[Login] Checking authentication...');
-      if (await isAuthenticated()) {
-        console.log('[Login] Already authenticated → redirecting');
-        toast.error("You're already logged in!");
-        setTimeout(() => {
-          redirectToProfile(navigate);
-        }, 800);
-      }
-    };
-
-    checkAuthAndRedirect();
-  }, [navigate]);
-
   const [isLoading, setIsLoading] = useState(false);
   const [needsVerification, setNeedsVerification] = useState(false);
   const [attemptedEmail, setAttemptedEmail] = useState('');
   const [isResending, setIsResending] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false); // Prevents loop
 
   const {
     register,
@@ -66,6 +39,45 @@ const Login = () => {
   } = useForm({
     resolver: zodResolver(loginSchema),
   });
+
+  useEffect(() => {
+    // Skip if already in redirect process
+    if (isRedirecting) return;
+
+    const checkAuthAndRedirect = async () => {
+      // Logout lock check
+      const logoutLock = localStorage.getItem('logout_lock');
+      if (logoutLock) {
+        const timestamp = parseInt(logoutLock, 10);
+        if (Date.now() - timestamp < 15 * 60 * 1000) {
+          console.log('[Login] Skipping auth check - recent logout lock active');
+          return;
+        }
+        localStorage.removeItem('logout_lock');
+      }
+
+      console.log('[Login] Checking authentication...');
+
+      try {
+        const isAuth = await isAuthenticated();
+        if (isAuth) {
+          console.log('[Login] Already authenticated → redirecting');
+          toast.error("You're already logged in!");
+          setIsRedirecting(true);
+
+          // Hard redirect helps in production with cookie timing issues
+          setTimeout(() => {
+            window.location.href = '/'; // ← change to '/dashboard' or '/profile' if that's your target
+          }, 700);
+        }
+      } catch (err) {
+        console.warn('[Login] Auth check failed (likely transient):', err?.message);
+        // Do not redirect on failure – stay on login page
+      }
+    };
+
+    checkAuthAndRedirect();
+  }, [isRedirecting]);
 
   const onSubmit = async (data) => {
     setIsLoading(true);
@@ -102,7 +114,8 @@ const Login = () => {
         navigate('/complete-profile');
       } else {
         toast.success("Login successful! Welcome back!");
-        navigate('/');
+        // Hard redirect after success – helps stabilize in prod
+        window.location.href = '/';
       }
 
     } catch (error) {
@@ -157,7 +170,6 @@ const Login = () => {
               </span>
             </h1>
 
-            {/* Show warning after logout/delete */}
             {localStorage.getItem('logout_lock') && (
               <div className="bg-yellow-50 border-l-4 border-yellow-400 p-5 mb-6 rounded-r-lg">
                 <p className="text-yellow-800 font-bold text-lg mb-2">
@@ -170,7 +182,6 @@ const Login = () => {
               </div>
             )}
 
-            {/* Google OAuth Button */}
             <button
               type="button"
               onClick={handleGoogleLogin}

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import toast from 'react-hot-toast';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -7,7 +8,7 @@ const api = axios.create({
   withCredentials: true, // Enable sending cookies with requests
 });
 
-// Add token to requests
+// Request interceptor – adds Bearer only when appropriate
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('access_token');
   const authMethod = localStorage.getItem('auth_method');
@@ -16,27 +17,43 @@ api.interceptors.request.use((config) => {
   if (token && authMethod !== 'cookie' && token !== 'USE_COOKIE_AUTH') {
     config.headers.Authorization = `Bearer ${token}`;
   }
-  // If authMethod is 'cookie' or token is 'USE_COOKIE_AUTH', 
-  // the cookie will be sent automatically due to withCredentials: true
   
   return config;
 });
 
-// Response interceptor for error handling
+// Response interceptor – improved to handle 429 without breaking flow
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Clear all auth data
+    const status = error.response?.status;
+
+    if (status === 401) {
+      console.warn('[API] 401 Unauthorized – clearing legacy auth data');
+      // Clear legacy / non-cookie data only
       localStorage.removeItem('access_token');
       localStorage.removeItem('email');
       localStorage.removeItem('username');
       localStorage.removeItem('user_id');
       localStorage.removeItem('auth_method');
       
-      // Redirect to login
-      window.location.href = '/login';
+      // Redirect – but only once
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+    } 
+    else if (status === 429) {
+      console.warn('[API] 429 Too Many Requests – rate limited');
+      toast.error(
+        "Too many requests. Please wait 1–2 minutes before trying again.",
+        { duration: 8000 }
+      );
+      // Do NOT redirect, do NOT clear auth – this prevents the loop
+    } 
+    else if (status >= 500) {
+      console.error('[API] Server error:', status, error?.response?.data || error.message);
+      toast.error("Something went wrong on the server. Please try again later.");
     }
+
     return Promise.reject(error);
   }
 );
@@ -74,21 +91,11 @@ export const adminAPI = {
 };
 
 export const sepSurveyAPI = {
-  // List of available standalone surveys
   getAvailable: (params = {}) => api.get('/sepsurveys', { params }),
-
-  // Get single standalone survey details (questions + rules)
   getById: (surveyId) => api.get(`/sepsurveys/${surveyId}`),
-
-  // Submit answers
   submit: (surveyId, responses) => api.post(`/sepsurveys/${surveyId}/submit`, { responses }),
-
-  // Skip optional survey
   skip: (surveyId) => api.post(`/sepsurveys/${surveyId}/skip`),
-
-  // User's submission history
   getHistory: (params = {}) => api.get('/sepsurveys/history', { params }),
-
   create: (data) => api.post('/sepsurveys', data),
 };
 
