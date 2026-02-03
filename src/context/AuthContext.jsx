@@ -27,7 +27,27 @@ export const AuthProvider = ({ children }) => {
 
       console.log('[AuthContext] refreshUser success:', res.data);
 
-      const userData = res.data.data.user;
+      let userData = res.data.data.user;
+
+      // ────────────────────────────────────────────────────────────────
+      // WORKAROUND: Force role: "admin" when backend does not send it
+      // This is needed because /users/me response is missing the role field
+      // Add more conditions if you have other admin accounts in the future
+      const isKnownAdmin =
+        userData.email?.toLowerCase() === 'admin@eruchi.com.np' ||
+        userData.username?.toLowerCase() === 'admin';
+
+      if (isKnownAdmin && userData.role !== 'admin') {
+        console.warn(
+          '[AuthContext] Backend did not include role field → forcing role: "admin" for known admin user'
+        );
+        userData = {
+          ...userData,
+          role: 'admin',
+        };
+      }
+      // ────────────────────────────────────────────────────────────────
+
       setUser(userData);
 
       // Keep non-sensitive info for UI/legacy components
