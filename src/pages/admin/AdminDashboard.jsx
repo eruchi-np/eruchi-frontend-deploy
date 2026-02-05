@@ -177,75 +177,32 @@ const AdminDashboard = () => {
     setTimeout(() => setButtonShaking(false), 500);
   };
 
-  const handleFinalClick = () => {
+const handleFinalClick = () => {
     setShowDangerModal(false);
     
-    // Array of funny outcomes
-    const outcomes = [
-      () => {
-        toast('CONGRATULATIONS! You are a bad admin', {
-          duration: 5000,
-          icon: '',
-        });
-      },
-      () => {
-        toast('Eat ass', {
-          duration: 5000,
-          icon: '',
-        });
-      },
-      () => {
-        toast('You are not funny', {
-          duration: 5000,
-          icon: '',
-        });
-      },
-      () => {
-        let countdown = 3;
-        const countdownToast = toast(`Self-destruct in ${countdown}...`, {
-          duration: 4000,
+    // Only self-destruct countdown
+    let countdown = 20; // 60 seconds = 1 minute
+    const countdownToast = toast(`Self-destruct in ${countdown} seconds...`, {
+      duration: 61000, // Slightly longer than countdown
+      icon: '💣',
+    });
+    
+    const interval = setInterval(() => {
+      countdown--;
+      if (countdown > 0) {
+        toast(`Self-destruct in ${countdown} second${countdown !== 1 ? 's' : ''}...`, {
+          id: countdownToast,
           icon: '💣',
         });
-        const interval = setInterval(() => {
-          countdown--;
-          if (countdown > 0) {
-            toast(`Self-destruct in ${countdown}...`, {
-              id: countdownToast,
-              icon: '💣',
-            });
-          } else {
-            toast('Just kidding! Everything is fine.', {
-              id: countdownToast,
-              icon: '',
-            });
-            clearInterval(interval);
-          }
-        }, 1000);
-      },
-      () => {
-        toast('Fuck You!!', {
-          duration: 6000,
+      } else {
+        toast('💥 BOOM!', {
+          id: countdownToast,
           icon: '',
         });
-      },
-      () => {
-        const originalTitle = document.title;
-        document.title = ' YOU HAVE BEEN SPOOKED ';
-        toast('SUCK my PP', {
-          duration: 5000,
-          icon: '',
-        });
-        setTimeout(() => {
-          document.title = originalTitle;
-        }, 5000);
+        clearInterval(interval);
       }
-    ];
-
-    // Pick a random outcome
-    const randomOutcome = outcomes[Math.floor(Math.random() * outcomes.length)];
-    randomOutcome();
+    }, 1000);
   };
-
   const toggleDropdown = (userId) => {
     setOpenDropdown(openDropdown === userId ? null : userId);
   };

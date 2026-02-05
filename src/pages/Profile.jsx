@@ -223,11 +223,11 @@ const Profile = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-            {/* Active Campaign Status */}
+            {/* Active Campaign Status / Campaigns and Surveys */}
             <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm p-4 sm:p-6 lg:p-8">
               <h2 className="flex items-center gap-2 text-lg sm:text-xl font-bold text-gray-900 mb-4 sm:mb-6">
                 <Package className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500" />
-                Current Campaign Status
+                {user.activeCampaign?.status ? 'Current Campaign Status' : 'Campaigns and Surveys'}
               </h2>
 
               <div className="min-h-[140px] flex flex-col justify-center">
@@ -262,13 +262,21 @@ const Profile = () => {
                 ) : (
                   <div className="text-center px-4">
                     <Package className="h-12 w-12 sm:h-16 sm:w-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
-                    <p className="text-gray-600 mb-4 sm:mb-5 text-sm sm:text-base font-medium">No active campaign</p>
-                    <Link
-                      to="/campaigns"
-                      className="inline-block bg-blue-500 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-sm sm:text-base font-medium hover:bg-blue-600 transition-colors shadow-lg"
-                    >
-                      Browse Campaigns
-                    </Link>
+                    <p className="text-gray-600 mb-4 sm:mb-5 text-sm sm:text-base">No active campaign. Browse available campaigns or complete surveys to earn credits.</p>
+                    <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                      <Link
+                        to="/campaigns"
+                        className="inline-block bg-blue-500 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-sm sm:text-base font-medium hover:bg-blue-600 transition-colors shadow-lg"
+                      >
+                        Browse Campaigns
+                      </Link>
+                      <Link
+                        to="/standalone-surveys"
+                        className="inline-block bg-purple-500 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-full text-sm sm:text-base font-medium hover:bg-purple-600 transition-colors shadow-lg"
+                      >
+                        Browse Surveys
+                      </Link>
+                    </div>
                   </div>
                 )}
               </div>
@@ -357,21 +365,15 @@ const Profile = () => {
           </div>
         </div>
 
-       {/* Danger Zone - Delete Account */}
+       {/* Delete Account Box */}
         <div className="mt-8 sm:mt-12 mb-12 sm:mb-16 lg:mb-20">
-          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm p-4 sm:p-6 lg:p-8 border-2 border-red-100">
-            <h2 className="text-lg sm:text-xl font-bold text-red-600 mb-2">Danger Zone</h2>
-            <p className="text-sm sm:text-base text-gray-600 mb-4">
-              Once you delete your account, there is no going back. Please be certain.
-            </p>
-            <button
-              onClick={() => setShowDeleteModal(true)}
-              className="inline-flex items-center gap-2 text-sm px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 hover:border-red-400 transition-colors font-medium"
-            >
-              <Trash2 className="h-4 w-4" />
-              Delete Account
-            </button>
-          </div>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="inline-flex items-center gap-2 text-sm px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 hover:border-red-400 transition-colors font-medium"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete Account
+          </button>
         </div>
       </div>
 
@@ -397,7 +399,7 @@ const Profile = () => {
 
             <div className="space-y-4">
               <p className="text-sm sm:text-base text-gray-700 leading-relaxed">
-                <span className="font-semibold text-blue-600">eRuchi Credits</span> are our way of rewarding engaged users and increasing their chances of receiving premium samples.
+                <span className="font-semibold text-blue-600">eRuchi Credits</span> are our way of rewarding engaged users and increasing their chances of receiving frequent samples.
               </p>
               
               <p className="text-sm sm:text-base text-gray-700 leading-relaxed">
@@ -406,7 +408,7 @@ const Profile = () => {
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-4">
                 <p className="text-sm text-blue-800 font-medium">
-                Pro Tip: Stay active and complete surveys promptly to maximize your Credits!
+                  Stay active and complete surveys promptly to maximize your Credits!
                 </p>
               </div>
 
@@ -425,43 +427,58 @@ const Profile = () => {
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl sm:rounded-2xl max-w-lg w-full p-5 sm:p-6 lg:p-8 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-600 mb-3 sm:mb-4 flex items-center gap-2 sm:gap-3">
-              <Trash2 className="h-6 w-6 sm:h-7 sm:w-7 flex-shrink-0" />
-              <span>Delete Your Account</span>
-            </h2>
-
-            <p className="text-gray-700 mb-4 sm:mb-6 text-sm sm:text-base leading-relaxed">
-              This action is <strong>permanent and irreversible</strong>. 
-              Your personal information will be anonymized, your credits and campaigns will be lost, 
-              and you will lose access to your account forever.
-            </p>
-
-            <p className="text-red-600 font-medium mb-6 sm:mb-8 text-sm sm:text-base">
-              Are you sure you want to delete your account?
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-br from-[#3399ff] to-[#2ed6fd] rounded-full">
+                  <Trash2 className="h-6 w-6 sm:h-7 sm:w-7 text-white" />
+                </div>
+                <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Delete Your Account</h2>
+              </div>
               <button
                 onClick={() => setShowDeleteModal(false)}
-                disabled={deleteLoading}
-                className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 border-2 border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:opacity-50 text-sm sm:text-base"
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                aria-label="Close"
               >
-                Cancel
+                <X className="h-5 w-5 text-gray-500" />
               </button>
-              <button
-                onClick={handleDeleteAccount}
-                disabled={deleteLoading}
-                className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-sm sm:text-base"
-              >
-                {deleteLoading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
-                    <span>Deleting...</span>
-                  </>
-                ) : (
-                  'Yes, Delete My Account'
-                )}
-              </button>
+            </div>
+
+            <div className="space-y-4">
+              <p className="text-gray-700 text-sm sm:text-base leading-relaxed">
+                This action is <strong>permanent and irreversible</strong>. 
+                Your personal information will be anonymized, your credits and campaigns will be lost, 
+                and you will lose access to your account forever.
+              </p>
+
+              <div className="bg-gradient-to-br from-[#3399ff]/10 to-[#2ed6fd]/10 border border-[#3399ff]/30 rounded-lg p-4">
+                <p className="text-sm sm:text-base text-gray-800 font-medium">
+                  Are you sure you want to delete your account?
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-2">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={deleteLoading}
+                  className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 border-2 border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors disabled:opacity-50 text-sm sm:text-base"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleteLoading}
+                  className="flex-1 py-2.5 sm:py-3 px-4 sm:px-6 bg-red-500 text-white rounded-lg font-medium hover:bg-red-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm sm:text-base shadow-lg"
+                >
+                  {deleteLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 sm:h-5 sm:w-5 animate-spin" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    'Yes, Delete My Account'
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

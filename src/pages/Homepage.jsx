@@ -35,9 +35,7 @@ export default function Homepage() {
             <p className="text-lg sm:text-xl text-gray-600 mb-6">
               {user ? (
                 <>
-                  <span className="font-bold" style={{ color: '#3399ff' }}>
-                    Welcome back, {user.firstName || user.username || 'Sampler'}!
-                  </span>{' '}
+                  Welcome back, <span className="font-bold" style={{ color: '#3399ff' }}>{user.firstName || user.username || 'Sampler'}</span>!{' '}
                   Get free samples matched to your taste, share honest feedback, and help brands build products you'll actually love.{' '}
                 </>
               ) : (
