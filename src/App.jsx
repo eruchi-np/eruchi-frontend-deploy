@@ -25,6 +25,7 @@ import EmailVerificationPending from './pages/EmailVerificationPending';
 import VerifyEmail from './pages/VerifyEmail';
 import StandaloneSurvey from './pages/StandaloneSurvey.jsx';
 import StandaloneSurveys from './pages/StandaloneSurveys.jsx';
+import TermsPage from './pages/Terms.jsx';
 import SurveyHistory from './pages/SurveyHistory.jsx';
 
 // Admin
@@ -53,6 +54,7 @@ function App() {
         <Route path="/faqs" element={<FAQs />} />
         <Route path="/email-verification" element={<EmailVerificationPending />} />
         <Route path="/verify-email/:token" element={<VerifyEmail />} />
+        <Route path="/terms" element={<TermsPage />} />
 
         {/* ==================== BASIC INFO COMPLETION (Tier 1) ==================== */}
         <Route
