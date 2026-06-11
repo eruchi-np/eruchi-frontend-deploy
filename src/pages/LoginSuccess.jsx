@@ -60,13 +60,7 @@ const LoginSuccess = () => {
           await new Promise(resolve => setTimeout(resolve, 200));
 
           // Check if profile is complete
-          if (!userData.isProfileComplete) {
-            toast.success('Welcome! Please complete your profile to continue.');
-            navigate('/complete-profile', { replace: true });
-          } else {
-            toast.success('Login successful! Welcome back!');
-            navigate('/', { replace: true });
-          }
+          navigate('/');
           
         } else {
           // We have the token from cookie! This is the ideal case
@@ -98,12 +92,7 @@ const LoginSuccess = () => {
           await new Promise(resolve => setTimeout(resolve, 200));
 
           // Check if profile is complete
-          if (!userData.isProfileComplete) {
-            navigate('/complete-profile', { replace: true });
-          } else {
-            toast.success('Login successful! Welcome back!');
-            navigate('/', { replace: true });
-          }
+          navigate('/');
         }
 
       } catch (err) {

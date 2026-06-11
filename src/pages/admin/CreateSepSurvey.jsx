@@ -11,7 +11,7 @@ const CreateSepSurvey = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    status: 'draft',
+    status: 'published',
     credits: 50,
     isMandatory: false,
     startDate: new Date().toISOString().split('T')[0],
