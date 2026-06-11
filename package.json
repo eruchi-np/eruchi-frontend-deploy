@@ -12,6 +12,9 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
     "axios": "^1.12.2",
+    "framer-motion": "^12.40.0",
+    "gsap": "^3.15.0",
+    "html5-qrcode": "^2.3.8",
     "js-cookie": "^3.0.5",
     "latest": "^0.2.0",
     "lucide-react": "^0.294.0",
@@ -20,6 +23,7 @@
     "react-dom": "^18.2.0",
     "react-hook-form": "^7.64.0",
     "react-hot-toast": "^2.6.0",
+    "react-qr-code": "^2.2.0",
     "react-router-dom": "^6.20.1",
     "sweetalert2": "^11.23.0",
     "zod": "^4.1.11"

@@ -1,4 +1,3 @@
-// src/components/layout/ProtectedRoute.jsx
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
@@ -20,7 +19,7 @@ const ProtectedRoute = ({ children, requireProfileComplete = false }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
-  // Allow public/completion routes unconditionally
+  // If we're already on a completion / public route → allow it unconditionally
   if (ALLOWED_WITHOUT_COMPLETE.some(path => 
     path.includes(':') 
       ? location.pathname.startsWith(path.split('/:')[0])
@@ -41,19 +40,12 @@ const ProtectedRoute = ({ children, requireProfileComplete = false }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // NEW: Skip completion requirements for admin users
-  const isAdmin = user.role === 'admin' ||
-                  user.email?.toLowerCase() === 'admin@eruchi.com.np' ||
-                  user.username?.toLowerCase() === 'admin';
+  if (!user.isRegistrationComplete) {
+    return <Navigate to="/complete-basic-info" state={{ from: location }} replace />;
+  }
 
-  if (!isAdmin) {
-    if (!user.isRegistrationComplete) {
-      return <Navigate to="/complete-basic-info" state={{ from: location }} replace />;
-    }
-
-    if (requireProfileComplete && !user.isProfileComplete) {
-      return <Navigate to="/complete-profile" state={{ from: location }} replace />;
-    }
+  if (requireProfileComplete && !user.isProfileComplete) {
+    return <Navigate to="/profile" state={{ from: location }} replace />;
   }
 
   return children;
