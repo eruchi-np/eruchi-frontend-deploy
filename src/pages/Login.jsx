@@ -65,7 +65,7 @@ const Login = () => {
       const response = await axios.post(`${API_BASE_URL}/auth/login`, {
         email: data.username,
         password: data.password,
-      });
+      }, { withCredentials: true });
 
       const userData = response?.data?.data?.user;
       const token = response?.data?.data?.token;
