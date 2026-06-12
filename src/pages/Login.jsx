@@ -70,25 +70,27 @@ const Login = () => {
       const userData = response?.data?.data?.user;
       const token = response?.data?.data?.token;
 
-      if (!userData || !token) {
+      if (!userData) {
         throw new Error('Invalid login response');
       }
 
-      // Save auth data
-      localStorage.setItem('access_token', token);
+      if (token) {
+        localStorage.setItem('access_token', token);
+        Cookies.set("access_token", token, {
+          expires: 1,
+          secure: import.meta.env.PROD,
+          sameSite: "Strict",
+        });
+      } else {
+        localStorage.setItem('access_token', 'USE_COOKIE_AUTH');
+        localStorage.setItem('auth_method', 'cookie');
+      }
+
       localStorage.setItem('email', userData.email);
       localStorage.setItem('username', `${userData.firstName} ${userData.lastName}`);
       localStorage.setItem('user_id', userData.id);
 
-      Cookies.set("access_token", token, {
-        expires: 1,
-        secure: import.meta.env.PROD,
-        sameSite: "Strict",
-      });
-
       window.dispatchEvent(new Event('authChange'));
-
-      //Check isProfileComplete
       toast.success("Login successful! Welcome back!");
       navigate('/');
 
