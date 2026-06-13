@@ -47,9 +47,6 @@ const languageOptions = [
             placeholder="Select your first language"
             label="First Language"
           />
-          <p className="text-xs text-gray-500 mt-2">
-            Note: "Nepali" always shows up on top
-          </p>
         </div>
 
         {/* Highest Level of Completed Education */}

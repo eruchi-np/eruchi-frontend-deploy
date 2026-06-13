@@ -29,6 +29,7 @@ export default function Stepper({
 
   const updateStep = newStep => {
     setCurrentStep(newStep);
+    window.scrollTo({ top: 0, behavior: 'instant' });
     if (newStep > totalSteps) {
       onFinalStepCompleted();
     } else {
@@ -56,7 +57,7 @@ export default function Stepper({
     // FIX: run validation on the final step before triggering onFinalStepCompleted
     if (onBeforeNext && !onBeforeNext(currentStep)) return;
     setDirection(1);
-    updateStep(totalSteps + 1);
+    onFinalStepCompleted();
   };
 
   return (

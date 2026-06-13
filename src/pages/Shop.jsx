@@ -66,9 +66,6 @@ function VoucherCard({ offer, onRedeem }) {
           <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-gray-300/40 to-transparent" />
           
           <div className="w-full flex items-center justify-between z-10">
-            <span className="text-[8px] sm:text-[10px] font-medium tracking-widest text-gray-400 uppercase font-mono">
-              <span className="hidden sm:inline">Verified </span>Token
-            </span>
             <Ticket className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 opacity-60" strokeWidth={1.5} />
           </div>
 
@@ -92,7 +89,7 @@ function VoucherCard({ offer, onRedeem }) {
           </h2>
           
           <p className="text-gray-500 text-[10px] sm:text-xs font-normal">
-            {discountLabel} {offer.discountType === "percentage" ? "Storewide" : "Direct Cash"}
+            {discountLabel} off
           </p>
           
           <p className="text-gray-400 text-[9px] sm:text-[11px] font-normal line-clamp-1">

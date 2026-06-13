@@ -64,7 +64,7 @@ const Navbar = () => {
         {/* Logo */}
         <div className="cursor-pointer">
           <Link to="/">
-            <img src="/logo.png" width={135} height={60} alt="eruchi_icon" />
+            <img src="/LogoEarlyAccess.png" width={135} height={60} alt="eruchi_icon" />
           </Link>
         </div>
 
@@ -162,7 +162,7 @@ const Navbar = () => {
               onClick={toggleDrawer}
               className="text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors py-2 border-b border-gray-100"
             >
-              BUSINESS
+              MERCHANT
             </Link>
             
             {isAllowed && user ? (

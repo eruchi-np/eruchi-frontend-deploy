@@ -36,7 +36,7 @@ export default function VoucherDetail() {
 
     const QR_SIZE = 180;
     const CARD_W = 400;
-    const CARD_H = 560;
+    const CARD_H = 600;
     const CX = CARD_W / 2;
     const snap = voucher.offerSnapshot || {};
     const discountLabel =
@@ -44,7 +44,16 @@ export default function VoucherDetail() {
         ? `${snap.discountValue}% off`
         : `Rs. ${snap.discountValue} off`;
 
-    // Serialize QR SVG → Image
+    // 1. Fetch logo for the canvas
+    const logoImg = await new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null); 
+      img.src = '/logo.png';
+    });
+
+    // 2. Serialize QR SVG → Image
     const svgStr = new XMLSerializer().serializeToString(svg);
     const svgUrl = URL.createObjectURL(new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' }));
     const qrImg = await new Promise((resolve) => {
@@ -58,19 +67,33 @@ export default function VoucherDetail() {
     canvas.height = CARD_H;
     const ctx = canvas.getContext('2d');
 
-    // White background
-    ctx.fillStyle = '#ffffff';
+    // Background (Very light blue instead of pure white for branding)
+    ctx.fillStyle = '#f8fafc'; 
     ctx.fillRect(0, 0, CARD_W, CARD_H);
 
     ctx.textAlign = 'center';
 
-    // Business name
-    ctx.fillStyle = '#9ca3af';
+    // Draw Logo
+    let currentY = 30;
+    if (logoImg) {
+      const logoHeight = 36;
+      const logoWidth = (logoImg.width / logoImg.height) * logoHeight;
+      ctx.drawImage(logoImg, CX - (logoWidth / 2), currentY, logoWidth, logoHeight);
+      currentY += 50;
+    } else {
+      currentY += 20; // fallback spacing if logo fails to load
+    }
+
+    // Business name (using the exact brand hex, slightly transparent look)
+    ctx.fillStyle = '#3399FF'; 
+    ctx.globalAlpha = 0.8;
     ctx.font = '600 11px system-ui, sans-serif';
-    ctx.fillText((snap.businessName || '').toUpperCase(), CX, 44);
+    ctx.fillText((snap.businessName || '').toUpperCase(), CX, currentY);
+    ctx.globalAlpha = 1.0;
+    currentY += 32;
 
     // Title (with overflow truncation)
-    ctx.fillStyle = '#111827';
+    ctx.fillStyle = '#0f172a'; // dark slate for contrast
     ctx.font = 'bold 22px system-ui, sans-serif';
     let title = snap.title || '';
     const maxW = CARD_W - 64;
@@ -78,47 +101,49 @@ export default function VoucherDetail() {
       while (ctx.measureText(title + '\u2026').width > maxW) title = title.slice(0, -1);
       title += '\u2026';
     }
-    ctx.fillText(title, CX, 76);
+    ctx.fillText(title, CX, currentY);
+    currentY += 28;
 
-    // Discount
-    ctx.fillStyle = '#16a34a';
-    ctx.font = '600 15px system-ui, sans-serif';
-    ctx.fillText(discountLabel, CX, 104);
+    // Discount (Exact brand hex)
+    ctx.fillStyle = '#3399FF'; 
+    ctx.font = '600 16px system-ui, sans-serif';
+    ctx.fillText(discountLabel, CX, currentY);
+    currentY += 24;
 
     // Divider
-    ctx.strokeStyle = '#f3f4f6';
+    ctx.strokeStyle = '#e2e8f0'; // slate border
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(32, 122);
-    ctx.lineTo(CARD_W - 32, 122);
+    ctx.moveTo(32, currentY);
+    ctx.lineTo(CARD_W - 32, currentY);
     ctx.stroke();
+    currentY += 24;
 
     // QR code
     const qrX = (CARD_W - QR_SIZE) / 2;
-    const qrY = 144;
-    ctx.drawImage(qrImg, qrX, qrY, QR_SIZE, QR_SIZE);
+    ctx.drawImage(qrImg, qrX, currentY, QR_SIZE, QR_SIZE);
 
     // Hint text
-    ctx.fillStyle = '#9ca3af';
+    ctx.fillStyle = '#64748b'; // slate gray
     ctx.font = '12px system-ui, sans-serif';
-    ctx.fillText('Show this to store staff to redeem', CX, qrY + QR_SIZE + 28);
+    ctx.fillText('Show this to store staff to redeem', CX, currentY + QR_SIZE + 28);
 
     // Expiry
-    ctx.fillStyle = '#374151';
+    ctx.fillStyle = '#0f172a'; // dark slate
     ctx.font = '600 13px system-ui, sans-serif';
     ctx.fillText(
       `Expires ${new Date(voucher.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`,
       CX,
-      qrY + QR_SIZE + 54
+      currentY + QR_SIZE + 54
     );
 
     // Voucher ID
-    ctx.fillStyle = '#d1d5db';
+    ctx.fillStyle = '#cbd5e1';
     ctx.font = '10px system-ui, sans-serif';
     ctx.fillText(`ID: ${voucher._id}`, CX, CARD_H - 28);
 
     // Branding
-    ctx.fillStyle = '#9ca3af';
+    ctx.fillStyle = '#94a3b8';
     ctx.font = '11px system-ui, sans-serif';
     ctx.fillText('eruchi', CX, CARD_H - 12);
 
@@ -130,20 +155,20 @@ export default function VoucherDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-900 rounded-full animate-spin" />
+      <div className="min-h-screen bg-blue-50 flex items-center justify-center">
+        <div className="w-8 h-8 border-2 border-blue-200 border-t-[#3399FF] rounded-full animate-spin" />
       </div>
     );
   }
 
   if (error || !voucher) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center px-4">
+      <div className="min-h-screen bg-blue-50 flex items-center justify-center px-4">
         <div className="text-center">
           <p className="text-red-500 mb-4">{error || "Voucher not found"}</p>
           <button
             onClick={() => navigate("/vouchers")}
-            className="px-6 py-2.5 rounded-full bg-gray-900 text-white text-sm"
+            className="px-6 py-2.5 rounded-full bg-[#3399FF] text-white text-sm hover:opacity-90 transition-opacity"
           >
             Back to Vouchers
           </button>
@@ -166,28 +191,34 @@ export default function VoucherDetail() {
 
   return (
     <div
-      className="min-h-screen bg-gray-50 pb-24"
+      className="min-h-screen bg-blue-50 pb-24"
       style={{ fontFamily: "'Inter', sans-serif" }}
     >
       <div className="max-w-md mx-auto px-4 pt-8">
         {/* Back */}
         <button
           onClick={() => navigate("/vouchers")}
-          className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-900 transition-colors mb-6"
+          className="flex items-center gap-2 text-sm text-[#3399FF] hover:opacity-75 transition-opacity mb-6 font-medium"
         >
           <ArrowLeft size={16} />
           My Vouchers
         </button>
 
         {/* Card */}
-        <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
+        <div className="bg-white rounded-3xl border border-blue-100 overflow-hidden shadow-lg shadow-[#3399FF]/5">
           {/* Header */}
-          <div className="p-6 border-b border-gray-100">
-            <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
+          <div className="p-6 border-b border-blue-50 text-center bg-gradient-to-b from-blue-50/50 to-white">
+            <img 
+              src="/logo.png" 
+              alt="Brand Logo" 
+              className="h-12 w-auto mx-auto mb-4 object-contain"
+              onError={(e) => { e.target.style.display = 'none'; }} 
+            />
+            <p className="text-xs text-[#3399FF] opacity-80 uppercase tracking-wider mb-1 font-semibold">
               {snap.businessName}
             </p>
-            <h1 className="text-xl font-bold text-gray-900">{snap.title}</h1>
-            <p className="text-green-600 font-semibold mt-1">{discountLabel}</p>
+            <h1 className="text-2xl font-bold text-slate-900">{snap.title}</h1>
+            <p className="text-[#3399FF] font-bold text-lg mt-1">{discountLabel}</p>
           </div>
 
           {/* QR area */}
@@ -195,14 +226,14 @@ export default function VoucherDetail() {
             {isActive && (
               <>
                 <div className="relative">
-                  <div ref={qrRef} className="p-4 bg-white rounded-2xl border border-gray-100">
-                    <QRCode value={qrValue} size={220} />
+                  <div ref={qrRef} className="p-4 bg-white rounded-2xl border-2 border-blue-50 shadow-inner">
+                    <QRCode value={qrValue} size={220} fgColor="#000000" />
                   </div>
                 </div>
-                <p className="text-xs text-gray-400 mt-3 text-center">
+                <p className="text-xs text-[#3399FF] opacity-70 mt-4 text-center font-medium">
                   Show this QR to store staff to redeem
                 </p>
-                <p className="text-sm font-medium text-gray-700 mt-1">
+                <p className="text-sm font-semibold text-slate-700 mt-1">
                   Expires{" "}
                   {new Date(voucher.expiresAt).toLocaleDateString(undefined, {
                     day: "numeric",
@@ -212,16 +243,16 @@ export default function VoucherDetail() {
                 </p>
                 <button
                   onClick={handleFullscreen}
-                  className="mt-4 flex items-center gap-2 px-5 py-2.5 rounded-full bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors"
+                  className="mt-6 w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-[#3399FF] text-white text-sm font-semibold hover:opacity-90 transition-opacity shadow-md shadow-[#3399FF]/20"
                 >
-                  <Maximize2 size={14} />
+                  <Maximize2 size={16} />
                   Show to staff
                 </button>
                 <button
                   onClick={downloadVoucher}
-                  className="mt-2 flex items-center gap-2 px-5 py-2.5 rounded-full border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors"
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-[#3399FF]/30 text-[#3399FF] text-sm font-semibold hover:bg-[#3399FF]/5 transition-colors"
                 >
-                  <Download size={14} />
+                  <Download size={16} />
                   Download Voucher
                 </button>
               </>
@@ -229,12 +260,12 @@ export default function VoucherDetail() {
 
             {(isUsed || isExpired) && (
               <div className="relative">
-                <div className="p-4 bg-white rounded-2xl border border-gray-100 opacity-30 grayscale">
-                  <QRCode value={qrValue} size={220} />
+                <div className="p-4 bg-white rounded-2xl border border-gray-100 opacity-40 grayscale">
+                  <QRCode value={qrValue} size={220} fgColor="#000000" />
                 </div>
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div
-                    className={`px-5 py-2 rounded-full text-sm font-bold rotate-[-15deg] border-2 ${
+                    className={`px-5 py-2 rounded-full text-sm font-bold rotate-[-15deg] border-2 shadow-lg bg-white/90 backdrop-blur-sm ${
                       isUsed
                         ? "border-gray-400 text-gray-500"
                         : "border-red-400 text-red-500"
@@ -247,7 +278,7 @@ export default function VoucherDetail() {
             )}
 
             {isUsed && voucher.usedAt && (
-              <p className="text-sm text-gray-400 mt-3">
+              <p className="text-sm text-gray-500 mt-4 font-medium">
                 Used on{" "}
                 {new Date(voucher.usedAt).toLocaleDateString(undefined, {
                   day: "numeric",
@@ -257,7 +288,7 @@ export default function VoucherDetail() {
               </p>
             )}
             {isExpired && (
-              <p className="text-sm text-red-400 mt-3">
+              <p className="text-sm text-red-500 mt-4 font-medium">
                 Expired on{" "}
                 {new Date(voucher.expiresAt).toLocaleDateString(undefined, {
                   day: "numeric",
