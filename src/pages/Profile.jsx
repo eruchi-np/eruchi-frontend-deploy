@@ -55,6 +55,7 @@ const Profile = () => {
 
   const handleProfileComplete = async () => {
     await refreshUser();
+    setUser(prev => ({ ...prev, isProfileComplete: true }));
     setShowWizard(false);
   };
 
@@ -92,9 +93,10 @@ const Profile = () => {
   return (
     <div className="min-h-screen bg-white text-gray-900 text-sm font-['Inter'] antialiased">
       {/* Main Structural Linear Container */}
-      <div className="max-w-[940px] mx-auto px-6 py-12 lg:py-16 space-y-14">
+      {/* pb-28 on mobile gives clearance above the fixed bottom nav bar */}
+      <div className="max-w-[940px] mx-auto px-6 pt-12 pb-28 lg:py-16 space-y-14">
         
-        {/* Identity Row (No more boxy background wrappers) */}
+        {/* Identity Row */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-gray-100 pb-8 gap-6">
           <div>
             <span className="text-[10px] uppercase tracking-widest font-bold text-[#3399FF] block mb-1">
@@ -149,17 +151,17 @@ const Profile = () => {
               <>
                 <div>
                   <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
-                    Demographic Pipeline Verification Required
+                    Complete Your Profile
                   </h2>
                   <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                    Please map your demographic attributes to gain immediate clearance to premium survey allocations.
+                    Tell us more about you! We'll use this to send you surveys that are relevant to you.
                   </p>
                 </div>
                 <button
                   onClick={() => setShowWizard(true)}
                   className="shrink-0 bg-[#102A43] text-white text-xs font-bold tracking-wide px-4 py-2.5 rounded-lg hover:opacity-95 transition-opacity"
                 >
-                  Verify Now
+                  Complete Profile
                 </button>
               </>
             ) : (
@@ -170,39 +172,30 @@ const Profile = () => {
           </div>
         )}
 
-        {/* TIER 1: Available Credit Ledger (Full Width Minimal Focus Row) */}
+        {/* TIER 1: Available Credit Ledger */}
         <div className="space-y-3">
           <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">
-              01 // Available Ledger Balance
-            </h3>
           </div>
           <div className="pt-1">
             <CreditsCard credits={localCredits ?? 0} hideRedeem hideValue />
           </div>
         </div>
 
-        {/* TIER 2: Voucher Assets (Full Width Asset Stream) */}
+        {/* TIER 2: Voucher Assets */}
         <div className="space-y-3">
           <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-            <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">
-              02 // Your Active Reward Vault
-            </h3>
           </div>
           <div className="pt-1">
             <VouchersCard />
           </div>
         </div>
 
-        {/* TIERS 3 & 4: Sub-Feeds Layout (Elegant Side-by-Side Separation Line) */}
+        {/* TIERS 3 & 4: Sub-Feeds Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 pt-4">
           
           {/* TIER 3: Notifications Segment */}
           <div className="space-y-4">
             <div className="border-b border-gray-100 pb-2">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                03 // Broadcast Streams
-              </h3>
             </div>
             <NotificationsCard />
           </div>
@@ -210,9 +203,6 @@ const Profile = () => {
           {/* TIER 4: Survey Activity Logs */}
           <div className="space-y-4">
             <div className="border-b border-gray-100 pb-2">
-              <h3 className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                04 // Campaign History Logs
-              </h3>
             </div>
             <SurveyHistoryCard completedCount={user.totalSurveys ?? 0} />
           </div>

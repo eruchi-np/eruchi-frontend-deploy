@@ -6,9 +6,11 @@ import { Toaster } from "react-hot-toast";
 import Navbar from './components/homepage/Navbar';
 import ProfileCompletionBar from './components/layout/ProfileCompletionBar';
 import BottomNavigation from './components/layout/BottomNavigation';
+import Footer from './components/layout/Footer';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import ProfileCompletionGuard from './components/layout/ProfileCompletionGuard';
 import BusinessProtectedRoute from './pages/business/BusinessProtectedRoutes';
+import ScrollToTop from './components/layout/ScrollToTop';
 
 // Pages
 import Homepage from './pages/Homepage';
@@ -22,7 +24,7 @@ import Campaigns from './pages/Campaigns';
 import Survey from './pages/Survey';
 import CampaignHistory from './pages/CampaignHistory';
 import CompleteProfile from './pages/CompleteProfile';
-import CompleteBasicInfo from './pages/CompleteBasicInfo'; 
+import CompleteBasicInfo from './pages/CompleteBasicInfo';
 import EmailVerificationPending from './pages/EmailVerificationPending';
 import VerifyEmail from './pages/VerifyEmail';
 import StandaloneSurvey from './pages/StandaloneSurvey.jsx';
@@ -32,6 +34,8 @@ import Shop from './pages/Shop.jsx';
 import Vouchers from './pages/Vouchers';
 import VoucherDetail from './pages/VoucherDetail';
 import EditProfile from './pages/EditProfile';
+import Terms from './pages/Terms';
+import PrivacyPolicy from './pages/PrivacyPolicy';
 
 // Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -42,11 +46,12 @@ import AdminBusinessManagement from './pages/admin/AdminBusinessManagement';
 // Business
 import BusinessScan from './pages/business/BusinessScan';
 import BusinessDashboard from './pages/business/BusinessDashboard';
-import BusinessLogin from './pages/business/BusinessLogin'; // Added import
+import BusinessLogin from './pages/business/BusinessLogin';
 
 // Public / auth pages
 import ResetPassword from './pages/ResetPassword';
 import ResetPasswordToken from './pages/ResetPasswordToken';
+
 import { AnimationProvider } from './components/animations/AnimationContext';
 import PageTransition from './components/animations/PageTransition';
 
@@ -54,8 +59,19 @@ function App() {
   return (
     <AnimationProvider>
       <Router>
-        <Toaster position="top-center" reverseOrder={false} />
-        
+        <ScrollToTop />
+
+        <Toaster
+          position="top-center"
+          reverseOrder={false}
+          toastOptions={{
+            duration: 4000,
+            loading: {
+              duration: Infinity,
+            },
+          }}
+        />
+
         <div className="sticky top-0 z-50">
           <Navbar />
           <ProfileCompletionBar />
@@ -75,6 +91,8 @@ function App() {
             <Route path="/email-verification" element={<EmailVerificationPending />} />
             <Route path="/verify-email/:token" element={<VerifyEmail />} />
             <Route path="/edit-profile" element={<EditProfile />} />
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
             {/* ==================== BASIC INFO COMPLETION (Tier 1) ==================== */}
             <Route
@@ -98,7 +116,7 @@ function App() {
               }
             />
 
-            {/* ==================== PROTECTED ROUTES (Require Login + Profile Complete) ==================== */}
+            {/* ==================== PROTECTED ROUTES ==================== */}
             <Route
               path="/profile"
               element={
@@ -107,6 +125,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/shop"
               element={
@@ -115,6 +134,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/vouchers"
               element={
@@ -123,6 +143,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/vouchers/:id"
               element={
@@ -131,6 +152,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/campaigns"
               element={
@@ -139,6 +161,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/survey/:campaignId"
               element={
@@ -147,6 +170,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/campaign-history"
               element={
@@ -155,7 +179,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
-            {/* Standalone Surveys */}
+
             <Route
               path="/standalone-surveys"
               element={
@@ -164,6 +188,7 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             <Route
               path="/standalone-survey/:surveyId"
               element={
@@ -173,7 +198,6 @@ function App() {
               }
             />
 
-            {/* Unified Survey History */}
             <Route
               path="/survey-history"
               element={
@@ -186,6 +210,7 @@ function App() {
             {/* ==================== ADMIN ROUTES ==================== */}
             <Route path="/admin" element={<AdminDashboard />} />
             <Route path="/admin/create-campaign" element={<CreateCampaign />} />
+
             <Route
               path="/admin/create-sep-survey"
               element={
@@ -194,10 +219,12 @@ function App() {
                 </ProtectedRoute>
               }
             />
+
             <Route path="/admin/businesses" element={<AdminBusinessManagement />} />
 
             {/* ==================== BUSINESS ROUTES ==================== */}
-            <Route path="/business/login" element={<BusinessLogin />} /> {/* Updated route */}
+            <Route path="/business/login" element={<BusinessLogin />} />
+
             <Route
               path="/business/scan"
               element={
@@ -206,6 +233,7 @@ function App() {
                 </BusinessProtectedRoute>
               }
             />
+
             <Route
               path="/business/dashboard"
               element={
@@ -216,9 +244,18 @@ function App() {
             />
 
             {/* 404 */}
-            <Route path="*" element={<div className="text-center py-20 text-2xl">404 - Page Not Found</div>} />
+            <Route
+              path="*"
+              element={
+                <div className="text-center py-20 text-2xl">
+                  404 - Page Not Found
+                </div>
+              }
+            />
           </Route>
         </Routes>
+
+        <Footer />
         <BottomNavigation />
       </Router>
     </AnimationProvider>

@@ -68,7 +68,7 @@ const BottomNavigation = () => {
   const navItems = [
     { path: '/', icon: <Home size={24} />, label: 'Home' },
     { path: '/standalone-surveys', icon: <ClipboardList size={24} />, label: 'Surveys', requiresProfile: true },
-    { path: '/shop', icon: <ShoppingBag size={24} />, label: 'Shop' },
+    { path: '/shop', icon: <ShoppingBag size={24} />, label: 'REWARDS' },
     { path: '/faqs', icon: <HelpCircle size={24} />, label: 'FAQs' },
     { path: '/profile', icon: <User size={24} />, label: 'Profile' },
 

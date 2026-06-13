@@ -41,7 +41,7 @@ const SurveyHistoryCard = () => {
           <HistoryIcon className="w-7 h-7 text-gray-200 mb-1" />
           <p className="text-xs text-gray-400">No surveys completed yet.</p>
           <p className="text-[11px] text-gray-300 leading-relaxed max-w-[200px]">
-            Completed campaigns and standalone surveys will appear here.
+            Completed surveys will appear here.
           </p>
         </div>
       ) : (

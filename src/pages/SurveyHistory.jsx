@@ -43,10 +43,10 @@ const SurveyHistory = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+      <div className="min-h-screen flex items-center justify-center bg-white px-4">
         <div className="text-center">
-          <Loader2 className="h-12 w-12 animate-spin text-blue-600 mx-auto" />
-          <p className="mt-4 text-gray-600 font-medium">Loading history...</p>
+          <Loader2 className="h-8 w-8 animate-spin text-[#3399FF] mx-auto" />
+          <p className="mt-3 text-gray-400 text-xs tracking-wide font-medium">Loading history...</p>
         </div>
       </div>
     );
@@ -54,12 +54,15 @@ const SurveyHistory = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 py-8">
-        <div className="text-center max-w-md">
-          <AlertCircle className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-3">Error</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <button onClick={() => window.location.reload()} className="px-6 py-3 bg-blue-600 text-white rounded-lg">
+      <div className="min-h-screen flex items-center justify-center bg-white px-4">
+        <div className="text-center max-w-sm">
+          <AlertCircle className="h-10 w-10 text-red-400 mx-auto mb-3" />
+          <h2 className="text-base font-bold text-gray-900 mb-2">Something went wrong</h2>
+          <p className="text-gray-500 text-xs mb-5">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-5 py-2.5 bg-[#102A43] text-white text-xs font-bold rounded-lg"
+          >
             Retry
           </button>
         </div>
@@ -68,73 +71,105 @@ const SurveyHistory = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-16 sm:pb-20">
-      <div className="max-w-5xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
-        <div className="flex items-center justify-between mb-6 sm:mb-8">
-          <button onClick={() => navigate(-1)} className="flex items-center text-gray-600 hover:text-gray-900">
-            <ArrowLeft className="h-5 w-5 mr-2" /> Back
+    <div className="min-h-screen bg-white font-['Inter']">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 pt-6 pb-28 sm:pb-10">
+
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-6">
+          <button
+            onClick={() => navigate(-1)}
+            className="p-2 rounded-lg border border-gray-100 bg-gray-50 text-gray-400 hover:text-gray-700 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
           </button>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Survey History</h1>
-          <div className="w-10" />
+          <div>
+            <span className="text-[10px] uppercase tracking-widest font-bold text-[#3399FF] block">
+              Activity
+            </span>
+            <h1 className="text-xl font-light text-gray-900 tracking-tight leading-tight">
+              Survey History
+            </h1>
+          </div>
         </div>
 
         {allResponses.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-8 sm:p-12 text-center">
-            <HistoryIcon className="h-16 w-16 sm:h-20 sm:w-20 text-gray-400 mx-auto mb-6" />
-            <h3 className="text-xl sm:text-2xl font-semibold mb-3">No surveys completed yet</h3>
-            <p className="text-gray-600 mb-6">Complete a survey to see it here.</p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button onClick={() => navigate('/campaigns')} className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                Browse Campaigns
-              </button>
-              <button onClick={() => navigate('/standalone-surveys')} className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-                Browse Standalone Surveys
-              </button>
+          /* ── Empty State ── */
+          <div className="flex flex-col items-center justify-center text-center py-16 px-6">
+            <div className="w-16 h-16 rounded-2xl bg-gray-50 border border-gray-100 flex items-center justify-center mb-5">
+              <HistoryIcon className="h-7 w-7 text-gray-300" />
             </div>
+            <h3 className="text-base font-semibold text-gray-900 mb-1">No surveys completed yet</h3>
+            <p className="text-xs text-gray-400 mb-7 max-w-[220px] leading-relaxed">
+              Complete a survey to see it here.
+            </p>
+            <button
+              onClick={() => navigate('/standalone-surveys')}
+              className="px-6 py-3 bg-[#102A43] text-white text-xs font-bold tracking-wide rounded-lg hover:opacity-90 transition-opacity"
+            >
+              Browse Surveys
+            </button>
           </div>
         ) : (
-          <div className="space-y-4 sm:space-y-6">
-            {allResponses.map((entry) => (
-              <div
-                key={entry._id}
-                className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden"
-              >
-                <div className="p-5 sm:p-6">
-                  {/* Badge + Title */}
-                  <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-                    <h2 className="text-lg sm:text-xl font-bold text-gray-900 line-clamp-2 flex-1">
-                      {entry.type === 'campaign' 
-                        ? entry.campaign?.title || 'Campaign Survey'
-                        : entry.survey?.title || 'Standalone Survey'}
-                    </h2>
+          /* ── Response List ── */
+          <>
+            {/* Count summary */}
+            <div className="flex items-baseline gap-2 pb-4 mb-4 border-b border-gray-100">
+              <span className="text-3xl font-light text-gray-900 tracking-tight">{allResponses.length}</span>
+              <span className="text-xs text-gray-400 tracking-wide">
+                {allResponses.length === 1 ? 'Survey Completed' : 'Surveys Completed'}
+              </span>
+            </div>
 
-                    <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs whitespace-nowrap ${
-                      entry.type === 'campaign' ? 'bg-blue-100 text-blue-800' : 'bg-indigo-100 text-indigo-800'
-                    }`}>
-                      {entry.type === 'campaign' ? <Package className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
-                      {entry.type === 'campaign' ? 'Campaign' : 'Standalone'}
+            <div className="flex flex-col gap-3">
+              {allResponses.map((entry) => {
+                const title = entry.type === 'campaign'
+                  ? entry.campaign?.title || 'Campaign Survey'
+                  : entry.survey?.title || 'Standalone Survey';
+                const credits = entry.type === 'campaign'
+                  ? (entry.survey?.creditsToAward || 100)
+                  : (entry.survey?.credits || 50);
+                const date = new Date(entry.createdAt).toLocaleDateString('en-US', {
+                  year: 'numeric', month: 'short', day: 'numeric',
+                });
+
+                return (
+                  <div
+                    key={entry._id}
+                    className="flex items-center gap-3 p-4 rounded-xl border border-gray-100 bg-white"
+                  >
+                    {/* Icon */}
+                    <div className="w-9 h-9 rounded-lg bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0">
+                      {entry.type === 'campaign'
+                        ? <Package className="w-4 h-4 text-gray-400" />
+                        : <FileText className="w-4 h-4 text-gray-400" />}
+                    </div>
+
+                    {/* Text */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-gray-800 truncate">{title}</p>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <Calendar className="w-3 h-3 text-gray-300" />
+                        <p className="text-[11px] text-gray-400">{date}</p>
+                      </div>
+                    </div>
+
+                    {/* Credits + Badge */}
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1 text-emerald-600">
+                        <Award className="w-3.5 h-3.5" />
+                        <span className="text-xs font-bold">+{credits}</span>
+                      </div>
+                      {entry.type === 'campaign' && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-blue-50 text-blue-600">
+                          Campaign
+                        </span>
+                      )}
                     </div>
                   </div>
-
-                  {/* Date */}
-                  <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 mb-3">
-                    <Calendar className="h-4 w-4" />
-                    {new Date(entry.createdAt).toLocaleDateString('en-US', {
-                      year: 'numeric', month: 'long', day: 'numeric'
-                    })}
-                  </div>
-
-                  {/* Credits */}
-                  <div className="flex items-center gap-2 bg-green-50 text-green-800 px-4 py-2 rounded-lg text-sm">
-                    <Award className="h-4 w-4" />
-                    +{entry.type === 'campaign' 
-                      ? (entry.survey?.creditsToAward || 100) 
-                      : (entry.survey?.credits || 50)} credits earned
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     </div>

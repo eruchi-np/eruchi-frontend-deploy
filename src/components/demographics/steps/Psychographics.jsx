@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom'; // 1. Added createPortal import
 import { Search, X, Check, Info } from 'lucide-react';
 import { interestsData } from '../../../utils/interests-data'; // Adjust path as needed
 
@@ -131,10 +132,11 @@ const Psychographics = ({ formData, updateFormData }) => {
 
   return (
     <div>
-      {showWelcomeDialog && (
+      {/* 2. Portaled Welcome Dialog */}
+      {showWelcomeDialog && typeof document !== 'undefined' && createPortal(
         <div
           className={`
-            fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#3399ff] p-0
+            fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-[#3399ff] p-0
             transition-opacity duration-500 ease-in-out 
             ${dialogOpacityClass}
           `}
@@ -157,12 +159,14 @@ const Psychographics = ({ formData, updateFormData }) => {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {showInfoDialog && (
+      {/* 3. Portaled Info Dialog */}
+      {showInfoDialog && typeof document !== 'undefined' && createPortal(
         <div className={`
-          fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4
+          fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-4
           transition-opacity duration-500 ease-in-out 
           ${dialogOpacityClass}
         `}>
@@ -191,11 +195,13 @@ const Psychographics = ({ formData, updateFormData }) => {
               Sure!
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {showInterestsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+      {/* 4. Portaled Interests Modal */}
+      {showInterestsModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[80vh] flex flex-col">
             {/* Header with search */}
             <div className="p-4 border-b border-gray-200">
@@ -284,7 +290,8 @@ const Psychographics = ({ formData, updateFormData }) => {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <h2 className="text-2xl font-bold text-gray-900 mb-2">Your Interests & Personality</h2>

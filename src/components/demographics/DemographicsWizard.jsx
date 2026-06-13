@@ -112,7 +112,7 @@ const DemographicsWizard = ({ onComplete }) => {
     return (
       <div 
         onClick={() => step < activeStep && onStepClick(step)}
-        className={`flex flex-col items-center flex-1 transition-all duration-300 ${
+        className={`flex flex-col items-center flex-1 self-start transition-all duration-300 ${
           step < activeStep ? 'cursor-pointer' : 'pointer-events-none'
         }`}
       >
@@ -131,11 +131,13 @@ const DemographicsWizard = ({ onComplete }) => {
             step
           )}
         </div>
-        <span className={`mt-2 text-xs font-semibold text-center tracking-wide transition-colors duration-300 ${
-          isActive ? 'text-blue-600' : 'text-gray-400'
-        }`}>
-          {stepLabels[step - 1]}
-        </span>
+
+        {/* Only render label for the active step */}
+        {isActive && (
+          <span className="mt-2 text-xs font-semibold text-center tracking-wide text-blue-600">
+            {stepLabels[step - 1]}
+          </span>
+        )}
       </div>
     );
   };
@@ -173,7 +175,7 @@ const DemographicsWizard = ({ onComplete }) => {
           <HouseholdDurables formData={formData} updateFormData={updateFormData} errors={combinedErrors} />
         </Step>
         <Step>
-          <Psychographics formData={formData} updateFormData={updateFormData} errors={combinedErrors} />
+          <Psychographics formData={formData} updateFormData={updateFormData} errors={combinedErrors} isActive={currentStep === 4} />
         </Step>
       </Stepper>
     </div>

@@ -194,18 +194,18 @@ export default function Homepage() {
             worth something real
           </h1>
           <div className="flex items-center gap-3">
-            <CTAButton onClick={() => navigate("/faqs")} fluid>
-              FAQs
-            </CTAButton>
+            <div className="flex-1 [&>*>*:last-child]:hidden">
+              <CTAButton onClick={() => navigate("/faqs")} fluid>FAQs</CTAButton>
+            </div>
+
+            {/* Survey Button (Right - Wide Blue Pill) */}
             <div className="flex-1 [&>*>*:last-child]:hidden">
               <SurveyButton onClick={handleSurveyClick} fluid label={isLoggedIn ? "Survey" : "Join Us"} />
-            </div>
+            </div>         
           </div>
         </AnimatedContent>
 
         {/* ── Cards ── */}
-        {/* Mobile: 2-col grid — card 1 full-width, cards 2 & 3 side-by-side */}
-        {/* Desktop (lg+): original 3-column equal grid */}
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
           {STEP_CARDS.map(({ step, bg, top, bottom }, index) => (
             <AnimatedContent
@@ -262,6 +262,9 @@ export default function Homepage() {
             </AnimatedContent>
           ))}
         </div>
+
+        {/* ── Buffer clearance area for the bottom nav bar on mobile devices ── */}
+        <div className="h-24 lg:hidden" />
 
       </div>
     </div>
