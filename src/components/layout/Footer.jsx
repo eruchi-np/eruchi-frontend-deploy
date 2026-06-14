@@ -1,3 +1,4 @@
+// src/components/layout/Footer.jsx
 import React from 'react';
 import { Link } from 'react-router-dom';
 
@@ -33,10 +34,9 @@ const Footer = () => {
                 {[
                   { label: 'Home', to: '/' },
                   { label: 'Surveys', to: '/standalone-surveys' },
-                  { label: 'Campaigns', to: '/campaigns' },
-                  { label: 'Shop', to: '/shop' },
+                  { label: 'Rewards', to: '/shop' },
                   { label: 'FAQs', to: '/faqs' },
-                  { label: 'For Business', to: '/for-business' },
+                  { label: 'Merchants', to: '/for-business' },
                 ].map(({ label, to }) => (
                   <li key={label}>
                     <Link to={to} className="text-[12px] text-gray-500 hover:text-gray-900 transition-colors">
@@ -99,8 +99,7 @@ const Footer = () => {
                 {[
                   { label: 'Home', to: '/' },
                   { label: 'Surveys', to: '/standalone-surveys' },
-                  { label: 'Campaigns', to: '/campaigns' },
-                  { label: 'Shop', to: '/shop' },
+                  { label: 'Rewards', to: '/shop' },
                 ].map(({ label, to }) => (
                   <li key={label}>
                     <Link to={to} className="text-[12px] text-gray-500 hover:text-gray-900 transition-colors">
@@ -116,7 +115,7 @@ const Footer = () => {
               <p className="text-[10px] uppercase tracking-widest font-bold text-gray-400 mb-3">Company</p>
               <ul className="space-y-2">
                 {[
-                  { label: 'For Business', to: '/for-business' },
+                  { label: 'Merchant', to: '/for-business' },
                   { label: 'FAQs', to: '/faqs' },
                   { label: 'Sign Up', to: '/signup' },
                   { label: 'Log In', to: '/login' },

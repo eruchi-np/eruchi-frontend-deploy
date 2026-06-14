@@ -1,6 +1,7 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from "react-hot-toast";
+import React, { useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import toast, { Toaster } from "react-hot-toast";
 
 // Layout & Components
 import Navbar from './components/homepage/Navbar';
@@ -11,6 +12,7 @@ import ProtectedRoute from './components/layout/ProtectedRoute';
 import ProfileCompletionGuard from './components/layout/ProfileCompletionGuard';
 import BusinessProtectedRoute from './pages/business/BusinessProtectedRoutes';
 import ScrollToTop from './components/layout/ScrollToTop';
+import BusinessAccessGuard from './components/layout/BusinessAccessGuard';
 
 // Pages
 import Homepage from './pages/Homepage';
@@ -46,7 +48,6 @@ import AdminBusinessManagement from './pages/admin/AdminBusinessManagement';
 // Business
 import BusinessScan from './pages/business/BusinessScan';
 import BusinessDashboard from './pages/business/BusinessDashboard';
-import BusinessLogin from './pages/business/BusinessLogin';
 
 // Public / auth pages
 import ResetPassword from './pages/ResetPassword';
@@ -55,47 +56,61 @@ import ResetPasswordToken from './pages/ResetPasswordToken';
 import { AnimationProvider } from './components/animations/AnimationContext';
 import PageTransition from './components/animations/PageTransition';
 
+function RouteChangeHandler() {
+  const location = useLocation();
+  useEffect(() => {
+    toast.dismiss();
+  }, [location.pathname]);
+  return null;
+}
+
 function App() {
   return (
+    <>
+    {createPortal(
+      <Toaster
+        position="top-center"
+        reverseOrder={false}
+        toastOptions={{
+          duration: 4000,
+          loading: {
+            duration: Infinity,
+          },
+        }}
+      />,
+      document.body
+    )}
     <AnimationProvider>
       <Router>
+        <RouteChangeHandler />
         <ScrollToTop />
-
-        <Toaster
-          position="top-center"
-          reverseOrder={false}
-          toastOptions={{
-            duration: 4000,
-            loading: {
-              duration: Infinity,
-            },
-          }}
-        />
 
         <div className="sticky top-0 z-50">
           <Navbar />
           <ProfileCompletionBar />
         </div>
+        
+        <BusinessAccessGuard />
 
         <Routes>
           <Route element={<PageTransition />}>
             {/* ==================== PUBLIC ROUTES ==================== */}
             <Route path="/signup" element={<Signup />} />
-            <Route path="/login" element={<Login />} />
+           <Route path="/login" element={<Login />} />
             <Route path="/login/success" element={<LoginSuccess />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/reset-password/:token" element={<ResetPasswordToken />} />
             <Route path="/" element={<Homepage />} />
             <Route path="/for-business" element={<ForBusiness />} />
-            <Route path="/faqs" element={<FAQs />} />
-            <Route path="/email-verification" element={<EmailVerificationPending />} />
+           <Route path="/faqs" element={<FAQs />} />
+           <Route path="/email-verification" element={<EmailVerificationPending />} />
             <Route path="/verify-email/:token" element={<VerifyEmail />} />
             <Route path="/edit-profile" element={<EditProfile />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
             {/* ==================== BASIC INFO COMPLETION (Tier 1) ==================== */}
-            <Route
+           <Route
               path="/complete-basic-info"
               element={
                 <ProtectedRoute>
@@ -223,7 +238,6 @@ function App() {
             <Route path="/admin/businesses" element={<AdminBusinessManagement />} />
 
             {/* ==================== BUSINESS ROUTES ==================== */}
-            <Route path="/business/login" element={<BusinessLogin />} />
 
             <Route
               path="/business/scan"
@@ -259,6 +273,7 @@ function App() {
         <BottomNavigation />
       </Router>
     </AnimationProvider>
+    </>
   );
 }
 

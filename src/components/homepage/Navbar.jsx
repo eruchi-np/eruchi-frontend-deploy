@@ -8,6 +8,7 @@ const Navbar = () => {
   const [isAllowed, setIsAllowed] = useState(false)
   const [user, setUser] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isBusiness, setIsBusiness] = useState(false)
 
   const { user: authUser } = useAuth()
 
@@ -17,32 +18,38 @@ const Navbar = () => {
 
   useEffect(() => {
     const updateNavbar = () => {
-      const token = localStorage.getItem("access_token")
-      const username = localStorage.getItem("username")
-      
+      const token = localStorage.getItem('access_token')
+      const username = localStorage.getItem('username')
+      const isBusinessFlag = localStorage.getItem('is_business') === 'true'
+      const businessName = localStorage.getItem('business_name')
+
+      // Business session — set flag and exit early
+      if (isBusinessFlag && businessName) {
+        setIsBusiness(true)
+        setIsAllowed(true)
+        setUser({
+          username: businessName,
+          firstLetter: businessName.charAt(0).toUpperCase(),
+          isBusiness: true,
+        })
+        setIsLoading(false)
+        return
+      }
+
+      // Regular user session
+      setIsBusiness(false)
+
       if (token && username) {
         setIsAllowed(true)
         setUser({
           username: username,
-          firstLetter: username.charAt(0).toUpperCase()
+          firstLetter: username.charAt(0).toUpperCase(),
         })
       } else {
-        const isBusiness = localStorage.getItem('is_business') === 'true';
-        const businessName = localStorage.getItem('business_name');
-        if (isBusiness && businessName) {
-          setIsAllowed(true);
-          setUser({
-            username: businessName,
-            firstLetter: businessName.charAt(0).toUpperCase(),
-            isBusiness: true,
-          });
-          setIsLoading(false);
-          return;
-        } else {
-          setIsAllowed(false)
-          setUser(null)
-        }
+        setIsAllowed(false)
+        setUser(null)
       }
+
       setIsLoading(false)
     }
 
@@ -58,6 +65,23 @@ const Navbar = () => {
     }
   }, [])
 
+  // ── Business session: locked-down navbar, no links, no menu ──────────────
+  if (isBusiness) {
+    return (
+      <nav className="rounded-lg border-b z-50 p-2.5 top-0 bg-white sticky">
+        <div className="flex items-center mx-4 h-[60px]">
+          <img
+            src="/LogoEarlyAccess.png"
+            width={135}
+            height={60}
+            alt="eruchi_icon"
+          />
+        </div>
+      </nav>
+    )
+  }
+
+  // ── Regular navbar ────────────────────────────────────────────────────────
   return (
     <nav className="rounded-lg border-b z-50 p-2.5 top-0 bg-white sticky">
       <div className="flex justify-between items-center mx-4">
@@ -97,7 +121,7 @@ const Navbar = () => {
         ) : user ? (
           <div className="hidden justify-center items-center md:flex space-x-7">
             <Link
-              to={user.isBusiness ? '/business/dashboard' : '/profile'}
+              to="/profile"
               className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full font-semibold text-sm hover:bg-blue-600 transition-colors"
             >
               {user.firstLetter}
@@ -127,8 +151,8 @@ const Navbar = () => {
             </button>
           </div>
           <nav className="flex transition-all h-full relative fade-in-5 flex-col gap-6">
-            <Link 
-              to="/" 
+            <Link
+              to="/"
               onClick={toggleDrawer}
               className="text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors py-2 border-b border-gray-100"
             >
@@ -150,25 +174,25 @@ const Navbar = () => {
                 SURVEYS
               </Link>
             )}
-            <Link 
-              to="/faqs" 
+            <Link
+              to="/faqs"
               onClick={toggleDrawer}
               className="text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors py-2 border-b border-gray-100"
             >
               FAQs
             </Link>
-            <Link 
-              to="/for-business" 
+            <Link
+              to="/for-business"
               onClick={toggleDrawer}
               className="text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors py-2 border-b border-gray-100"
             >
               MERCHANT
             </Link>
-            
+
             {isAllowed && user ? (
-              <Link 
-                to={user.isBusiness ? '/business/dashboard' : '/profile'}
-                onClick={toggleDrawer} 
+              <Link
+                to="/profile"
+                onClick={toggleDrawer}
                 className="flex items-center text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors py-2 border-b border-gray-100"
               >
                 <div className="flex items-center justify-center w-8 h-8 bg-blue-500 text-white rounded-full font-semibold text-sm mr-3">
@@ -177,8 +201,8 @@ const Navbar = () => {
                 Profile
               </Link>
             ) : (
-              <Link 
-                to="/login" 
+              <Link
+                to="/login"
                 onClick={toggleDrawer}
                 className="text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors py-2 border-b border-gray-100"
               >

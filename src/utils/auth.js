@@ -1,3 +1,5 @@
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
+
 export const isAuthenticated = () => {
   return !!localStorage.getItem('access_token');
 };
@@ -21,15 +23,29 @@ export const getAuthMethod = () => {
   return 'token';
 };
 
-// Clear all authentication data
-export const clearAuth = () => {
+// Clear all authentication data from localStorage
+const clearLocalStorage = () => {
   localStorage.removeItem('access_token');
   localStorage.removeItem('email');
   localStorage.removeItem('username');
   localStorage.removeItem('user_id');
   localStorage.removeItem('auth_method');
-  
-  // Clear cookies
-  document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-  document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+  // Business session keys
+  localStorage.removeItem('is_business');
+  localStorage.removeItem('business_name');
+};
+
+// Clear all authentication data and invalidate the httpOnly cookie via the backend
+export const clearAuth = async () => {
+  clearLocalStorage();
+
+  // document.cookie cannot clear httpOnly cookies — must call the backend
+  try {
+    await fetch(`${API_BASE_URL}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include', // sends the httpOnly cookie so the server can clear it
+    });
+  } catch {
+    // Non-fatal: localStorage is already cleared so the UI will treat the user as logged out
+  }
 };

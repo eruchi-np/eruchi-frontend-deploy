@@ -8,10 +8,10 @@ const faqCategories = [
     {
         category: "Getting Started",
         faqs: [
-            { id: 1, question: "What is eRuchi?", answer: "eRuchi is a rewards platform where you can earn exciting rewards, including but not limited to mobile top-ups, retail store discount vouchers, and gift cards; simply by sharing your opinions through surveys and other activities. Please note: we will keep you updated on when new rewards/features are added." },
+            { id: 1, question: "What is eRuchi?", answer: "eRuchi is a rewards platform where you can earn exciting rewards, like discount vouchers; simply by sharing your opinions through surveys and other activities. Please note: we will keep you updated on when new rewards/features are added." },
             { id: 2, question: "Who can sign up on eRuchi?", answer: "Anyone can sign up on eRuchi! Registration is free and open to all eligible users. Simply create an account with a valid email address or phone number to get started." },
             { id: 3, question: "Is it free to join eRuchi?", answer: "Yes, joining eRuchi is completely free. There are no hidden fees or charges to sign up or participate in activities." },
-            { id: 4, question: "How do I create an account?", answer: 'Visit our website, click "Sign Up," and fill in your basic details such as your name, email address or phone number, and a password. Once verified, your account will be ready to use.' },
+            { id: 4, question: "How do I create an account?", answer: 'Visit our website, click "Join Us," and fill in your basic details such as your name, email address or phone number, and a password. Once verified, your account will be ready to use.' },
         ],
     },
     {
@@ -26,7 +26,7 @@ const faqCategories = [
     {
         category: "Credits & Rewards",
         faqs: [
-            { id: 9, question: "What kinds of rewards can I earn?", answer: "You can earn Ruchi credits after each successful completion of surveys and any variety of activity available on your dashboard. With Ruchi credits, you will be able to claim a variety of rewards including mobile top-ups, retail store discount vouchers, gift cards, and more. The available rewards are displayed in the Rewards section of your dashboard." },
+            { id: 9, question: "What kinds of rewards can I earn?", answer: "You can earn Ruchi credits after each successful completion of surveys. With Ruchi credits, you will be able to claim a variety of rewards including discount vouchers for different places like cafes, recreation, sports and more. The available rewards are displayed in the Rewards section of your dashboard." },
             { id: 10, question: "How do I redeem my rewards?", answer: "Once you've accumulated enough points, go to the Rewards section, choose your preferred reward, and follow the redemption steps. Most rewards are delivered digitally to your registered phone number or email." },
             { id: 11, question: "Is there a minimum points threshold before I can redeem?", answer: "Yes, there is a minimum points balance required before redemption. The exact threshold is shown in the Rewards section and varies by reward type." },
             { id: 12, question: "How long does it take to receive my reward after redemption?", answer: "Most rewards are processed instantly or within 24 hours. In rare cases, it may take up to 3–5 business days. If you haven't received your reward after that time, please contact our support team." },
