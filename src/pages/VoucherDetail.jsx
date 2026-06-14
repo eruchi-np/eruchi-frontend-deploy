@@ -31,125 +31,187 @@ export default function VoucherDetail() {
   };
 
   const downloadVoucher = async () => {
-    const svg = qrRef.current?.querySelector('svg');
+    const svg = qrRef.current?.querySelector("svg");
     if (!svg) return;
 
     const QR_SIZE = 180;
     const CARD_W = 400;
-    const CARD_H = 600;
     const CX = CARD_W / 2;
     const snap = voucher.offerSnapshot || {};
+
     const discountLabel =
       snap.discountType === "percentage"
         ? `${snap.discountValue}% off`
         : `Rs. ${snap.discountValue} off`;
 
-    // 1. Fetch logo for the canvas
+    // Description box constants
+    const BOX_X = 32;
+    const BOX_W = CARD_W - 64;
+    const BOX_PAD_X = 16;
+    const BOX_PAD_Y = 10;
+    const DESC_LINE_H = 18;
+    const descInnerW = BOX_W - BOX_PAD_X * 2;
+
+    // Pre-wrap description lines and calculate box height
+    let descLines = [];
+    if (snap.description) {
+      const tempCtx = document.createElement("canvas").getContext("2d");
+      tempCtx.font = "12px system-ui, sans-serif";
+      const words = snap.description.split(" ");
+      let line = "";
+      for (const word of words) {
+        const test = line ? `${line} ${word}` : word;
+        if (tempCtx.measureText(test).width > descInnerW && line) {
+          descLines.push(line);
+          line = word;
+        } else {
+          line = test;
+        }
+      }
+      if (line) descLines.push(line);
+    }
+
+    const descBoxH = descLines.length > 0
+      ? descLines.length * DESC_LINE_H + BOX_PAD_Y * 2
+      : 0;
+    const CARD_H = 600 + (descBoxH > 0 ? descBoxH + 20 : 0);
+
+    // Fetch logo
     const logoImg = await new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = "anonymous";
       img.onload = () => resolve(img);
-      img.onerror = () => resolve(null); 
-      img.src = '/logo.png';
+      img.onerror = () => resolve(null);
+      img.src = "/logo.png";
     });
 
-    // 2. Serialize QR SVG → Image
+    // Serialize QR SVG → Image
     const svgStr = new XMLSerializer().serializeToString(svg);
-    const svgUrl = URL.createObjectURL(new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' }));
+    const svgUrl = URL.createObjectURL(
+      new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" })
+    );
     const qrImg = await new Promise((resolve) => {
       const img = new Image();
       img.onload = () => { URL.revokeObjectURL(svgUrl); resolve(img); };
       img.src = svgUrl;
     });
 
-    const canvas = document.createElement('canvas');
+    const canvas = document.createElement("canvas");
     canvas.width = CARD_W;
     canvas.height = CARD_H;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext("2d");
 
-    // Background (Very light blue instead of pure white for branding)
-    ctx.fillStyle = '#f8fafc'; 
+    ctx.fillStyle = "#f8fafc";
     ctx.fillRect(0, 0, CARD_W, CARD_H);
+    ctx.textAlign = "center";
 
-    ctx.textAlign = 'center';
+    let y = 30;
 
-    // Draw Logo
-    let currentY = 30;
+    // Logo
     if (logoImg) {
-      const logoHeight = 36;
-      const logoWidth = (logoImg.width / logoImg.height) * logoHeight;
-      ctx.drawImage(logoImg, CX - (logoWidth / 2), currentY, logoWidth, logoHeight);
-      currentY += 50;
+      const logoH = 36;
+      const logoW = (logoImg.width / logoImg.height) * logoH;
+      ctx.drawImage(logoImg, CX - logoW / 2, y, logoW, logoH);
+      y += 50;
     } else {
-      currentY += 20; // fallback spacing if logo fails to load
+      y += 20;
     }
 
-    // Business name (using the exact brand hex, slightly transparent look)
-    ctx.fillStyle = '#3399FF'; 
+    // Brand name
+    ctx.fillStyle = "#3399FF";
     ctx.globalAlpha = 0.8;
-    ctx.font = '600 11px system-ui, sans-serif';
-    ctx.fillText((snap.businessName || '').toUpperCase(), CX, currentY);
+    ctx.font = "600 11px system-ui, sans-serif";
+    ctx.fillText(
+      (snap.brandName || snap.businessName || "").toUpperCase(),
+      CX, y
+    );
     ctx.globalAlpha = 1.0;
-    currentY += 32;
+    y += 28;
 
-    // Title (with overflow truncation)
-    ctx.fillStyle = '#0f172a'; // dark slate for contrast
-    ctx.font = 'bold 22px system-ui, sans-serif';
-    let title = snap.title || '';
+    // Title
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "bold 22px system-ui, sans-serif";
+    let title = snap.title || "";
     const maxW = CARD_W - 64;
     if (ctx.measureText(title).width > maxW) {
-      while (ctx.measureText(title + '\u2026').width > maxW) title = title.slice(0, -1);
-      title += '\u2026';
+      while (ctx.measureText(title + "\u2026").width > maxW)
+        title = title.slice(0, -1);
+      title += "\u2026";
     }
-    ctx.fillText(title, CX, currentY);
-    currentY += 28;
+    ctx.fillText(title, CX, y);
+    y += 26;
 
-    // Discount (Exact brand hex)
-    ctx.fillStyle = '#3399FF'; 
-    ctx.font = '600 16px system-ui, sans-serif';
-    ctx.fillText(discountLabel, CX, currentY);
-    currentY += 24;
+    // Discount
+    ctx.fillStyle = "#3399FF";
+    ctx.font = "600 15px system-ui, sans-serif";
+    ctx.fillText(discountLabel, CX, y);
+    y += 18;
+
+    // Description box
+    if (descLines.length > 0) {
+      y += 12;
+
+      // Light blue pill background
+      ctx.fillStyle = "#EFF6FF";
+      ctx.beginPath();
+      ctx.roundRect(BOX_X, y, BOX_W, descBoxH, 10);
+      ctx.fill();
+
+      // Description text
+      ctx.fillStyle = "#4B5563";
+      ctx.font = "12px system-ui, sans-serif";
+      let ty = y + BOX_PAD_Y + 13;
+      for (const line of descLines) {
+        ctx.fillText(line, CX, ty);
+        ty += DESC_LINE_H;
+      }
+
+      y += descBoxH;
+    }
+
+    y += 16;
 
     // Divider
-    ctx.strokeStyle = '#e2e8f0'; // slate border
+    ctx.strokeStyle = "#e2e8f0";
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(32, currentY);
-    ctx.lineTo(CARD_W - 32, currentY);
+    ctx.moveTo(32, y);
+    ctx.lineTo(CARD_W - 32, y);
     ctx.stroke();
-    currentY += 24;
+    y += 24;
 
     // QR code
     const qrX = (CARD_W - QR_SIZE) / 2;
-    ctx.drawImage(qrImg, qrX, currentY, QR_SIZE, QR_SIZE);
+    ctx.drawImage(qrImg, qrX, y, QR_SIZE, QR_SIZE);
 
-    // Hint text
-    ctx.fillStyle = '#64748b'; // slate gray
-    ctx.font = '12px system-ui, sans-serif';
-    ctx.fillText('Show this to store staff to redeem', CX, currentY + QR_SIZE + 28);
+    // Hint
+    ctx.fillStyle = "#64748b";
+    ctx.font = "12px system-ui, sans-serif";
+    ctx.fillText("Show this to store staff to redeem", CX, y + QR_SIZE + 28);
 
     // Expiry
-    ctx.fillStyle = '#0f172a'; // dark slate
-    ctx.font = '600 13px system-ui, sans-serif';
+    ctx.fillStyle = "#0f172a";
+    ctx.font = "600 13px system-ui, sans-serif";
     ctx.fillText(
-      `Expires ${new Date(voucher.expiresAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}`,
-      CX,
-      currentY + QR_SIZE + 54
+      `Expires ${new Date(voucher.expiresAt).toLocaleDateString(undefined, {
+        day: "numeric", month: "short", year: "numeric",
+      })}`,
+      CX, y + QR_SIZE + 52
     );
 
     // Voucher ID
-    ctx.fillStyle = '#cbd5e1';
-    ctx.font = '10px system-ui, sans-serif';
+    ctx.fillStyle = "#cbd5e1";
+    ctx.font = "10px system-ui, sans-serif";
     ctx.fillText(`ID: ${voucher._id}`, CX, CARD_H - 28);
 
     // Branding
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '11px system-ui, sans-serif';
-    ctx.fillText('eruchi', CX, CARD_H - 12);
+    ctx.fillStyle = "#94a3b8";
+    ctx.font = "11px system-ui, sans-serif";
+    ctx.fillText("eruchi", CX, CARD_H - 12);
 
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.download = `voucher-${voucher._id}.png`;
-    a.href = canvas.toDataURL('image/png');
+    a.href = canvas.toDataURL("image/png");
     a.click();
   };
 
@@ -208,17 +270,24 @@ export default function VoucherDetail() {
         <div className="bg-white rounded-3xl border border-blue-100 overflow-hidden shadow-lg shadow-[#3399FF]/5">
           {/* Header */}
           <div className="p-6 border-b border-blue-50 text-center bg-gradient-to-b from-blue-50/50 to-white">
-            <img 
-              src="/logo.png" 
-              alt="Brand Logo" 
+            <img
+              src="/logo.png"
+              alt="Brand Logo"
               className="h-12 w-auto mx-auto mb-4 object-contain"
-              onError={(e) => { e.target.style.display = 'none'; }} 
+              onError={(e) => { e.target.style.display = "none"; }}
             />
-            <p className="text-xs text-[#3399FF] opacity-80 uppercase tracking-wider mb-1 font-semibold">
-              {snap.businessName}
+            <p className="text-xs text-[#3399FF] opacity-80 uppercase tracking-widest mb-1 font-bold">
+              {snap.brandName || snap.businessName}
             </p>
             <h1 className="text-2xl font-bold text-slate-900">{snap.title}</h1>
             <p className="text-[#3399FF] font-bold text-lg mt-1">{discountLabel}</p>
+
+            {/* Description */}
+            {snap.description && (
+              <p className="text-gray-500 text-sm mt-3 leading-relaxed max-w-xs mx-auto border-t border-blue-50 pt-3">
+                {snap.description}
+              </p>
+            )}
           </div>
 
           {/* QR area */}
@@ -226,7 +295,10 @@ export default function VoucherDetail() {
             {isActive && (
               <>
                 <div className="relative">
-                  <div ref={qrRef} className="p-4 bg-white rounded-2xl border-2 border-blue-50 shadow-inner">
+                  <div
+                    ref={qrRef}
+                    className="p-4 bg-white rounded-2xl border-2 border-blue-50 shadow-inner"
+                  >
                     <QRCode value={qrValue} size={220} fgColor="#000000" />
                   </div>
                 </div>
