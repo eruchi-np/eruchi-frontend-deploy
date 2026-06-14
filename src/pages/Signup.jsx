@@ -11,7 +11,7 @@ import { Link } from 'react-router-dom';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-// Form schema remains unchanged to match backend expectations
+// Updated the error message to include the Privacy Policy
 const formSchema = z.object({
   firstName: z.string().min(2, "First Name must be at least 2 characters").max(50),
   lastName: z.string().min(2, "Last Name must be at least 2 characters").max(50),
@@ -32,7 +32,7 @@ const formSchema = z.object({
   }, "You must be at least 13 years old"),
   nationality: z.enum(["Nepali", "Other"]).optional(),
   termsAccepted: z.literal(true, {
-    errorMap: () => ({ message: "You must accept the terms and conditions" }),
+    errorMap: () => ({ message: "You must accept the terms, conditions, and privacy policy" }),
   }),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords do not match",
@@ -65,7 +65,6 @@ const Signup = () => {
   const onSubmit = async (data) => {
     setIsLoading(true);
 
-    // Generate valid username: alphanumeric only, 3–30 chars
     const emailPrefix = data.email.split('@')[0];
     const safeUsername = emailPrefix
       .replace(/[^a-zA-Z0-9]/g, '')
@@ -114,7 +113,6 @@ const Signup = () => {
       <div className="flex justify-center items-center">
         <div className="flex w-full rounded-lg lg:w-[600px] mx-5 space-y-12 flex-wrap flex-col">
           
-          {/* Header section matching login typography */}
           <h1 className="text-[40px] lg:text-4xl font-bold leading-tight">
             Glad to have you with us!
             <br />
@@ -283,7 +281,7 @@ const Signup = () => {
               </div>
             </div>
 
-            {/* Terms and Conditions Checkbox */}
+            {/* UPDATED: Terms and Conditions Checkbox */}
             <div className="flex flex-col space-y-2 pt-2 px-2">
               <div className="flex items-start">
                 <input
@@ -304,6 +302,15 @@ const Signup = () => {
                   >
                     Terms and Conditions
                   </Link>
+                  {" "}&{" "}
+                  <Link 
+                    to="/privacy-policy" 
+                    className="font-semibold text-black hover:text-gray-700 underline transition-colors duration-200" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                  >
+                    Privacy Policy
+                  </Link>
                 </label>
               </div>
               {errors.termsAccepted && (
@@ -323,7 +330,7 @@ const Signup = () => {
               </Link>
             </div>
 
-            {/* Submit button matching Login styling perfectly */}
+            {/* Submit button */}
             <button
               type="submit"
               className={`w-full mt-4 p-4 font-bold text-lg rounded-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-all duration-200 ${

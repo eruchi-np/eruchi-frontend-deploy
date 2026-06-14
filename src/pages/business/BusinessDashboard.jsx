@@ -54,6 +54,7 @@ export default function BusinessDashboard() {
       await businessAPI.logout();
       localStorage.removeItem('is_business');
       localStorage.removeItem('business_name');
+      window.dispatchEvent(new Event('authChange'));
       navigate("/login");
     } catch (error) {
       console.error(error);

@@ -47,8 +47,8 @@ const Profile = () => {
     })();
   }, [navigate]);
 
-  const handleLogout = () => {
-    clearAuth();
+   const handleLogout = async () => {
+    await clearAuth();
     window.dispatchEvent(new Event("authChange"));
     navigate("/login");
   };

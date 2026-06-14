@@ -74,9 +74,11 @@ export default function Homepage() {
       navigate(isLoggedIn ? "/standalone-surveys" : "/login");
     };
 
+  const firstName = username.split(" ")[0];
+
   const description = isLoggedIn ? (
     <>
-      Welcome back, {username}! Get free samples matched to your taste, share
+      Welcome back, {firstName}! Get free samples matched to your taste, share
       honest feedback, and help brands build products you'll actually love.{" "}
       <a
         href="/faqs"
