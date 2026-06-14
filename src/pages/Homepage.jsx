@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import CTAButton from "../components/widgets/CTAbutton";
 import SurveyButton from "../components/widgets/SurveyButton";
 import { ArrowRight } from "lucide-react";
 import AnimatedContent from "../components/animations/AnimatedContent";
@@ -89,8 +88,7 @@ export default function Homepage() {
     </>
   ) : (
     <>
-      eRuchi is Kathmandu's consumer opinion platform. Two-minute surveys 
-      on the brands you use daily for Ruchi Credits you redeem at Mamba, Ujamaa, and more.{" "}
+      Fill short surveys or polls daily for Ruchi Credits that are directly redeemable for exciting rewards!{" "}
       <a
         href="/faqs"
         className="underline hover:text-gray-900 transition-colors"
@@ -119,12 +117,9 @@ export default function Homepage() {
             duration={0.8}
             className="min-w-0"
           >
-            <div className="mb-8">
-              <SurveyButton onClick={handleSurveyClick} label={isLoggedIn ? "Survey" : "Join Us"} />
-            </div>
             <div
               className="flex items-center gap-3 mb-5 whitespace-nowrap"
-              style={{ fontSize: "clamp(24px, 2.8vw, 40px)", fontWeight: 400, lineHeight: 1.2 }}
+              style={{ fontSize: "clamp(28px, 3.2vw, 46px)", fontWeight: 400, lineHeight: 1.2 }}
             >
               <span className="text-gray-900">Survey</span>
               <ArrowRight className="w-10 h-10 text-black shrink-0" />
@@ -152,11 +147,11 @@ export default function Homepage() {
               className="text-gray-900 text-right mb-8"
               style={{ fontSize: "clamp(40px, 5vw, 50px)", fontWeight: 400, lineHeight: 1.1 }}
             >
-              Your opinions,
+              Quick Surveys
               <br />
-              worth something real
+              to Claim Rewards
             </h1>
-            <CTAButton onClick={() => navigate("/faqs")}>FAQs</CTAButton>
+            <SurveyButton onClick={handleSurveyClick} label={isLoggedIn ? "Survey" : "Join Us"} />
           </AnimatedContent>
         </div>
 
@@ -191,16 +186,11 @@ export default function Homepage() {
               lineHeight: 1.1,
             }}
           >
-            Your opinions,
+            Quick Surveys
             <br />
-            worth something real
+            to Claim Rewards
           </h1>
           <div className="flex items-center gap-3">
-            <div className="flex-1 [&>*>*:last-child]:hidden">
-              <CTAButton onClick={() => navigate("/faqs")} fluid>FAQs</CTAButton>
-            </div>
-
-            {/* Survey Button (Right - Wide Blue Pill) */}
             <div className="flex-1 [&>*>*:last-child]:hidden">
               <SurveyButton onClick={handleSurveyClick} fluid label={isLoggedIn ? "Survey" : "Join Us"} />
             </div>         
