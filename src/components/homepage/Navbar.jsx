@@ -71,7 +71,7 @@ const Navbar = () => {
       <nav className="rounded-lg border-b z-50 p-2.5 top-0 bg-white sticky">
         <div className="flex items-center mx-4 h-[60px]">
           <img
-            src="/LogoEarlyAccess.png"
+            src="/logo.png"
             width={135}
             height={60}
             alt="eruchi_icon"

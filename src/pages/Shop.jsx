@@ -20,7 +20,6 @@ function VoucherCard({ offer, onRedeem }) {
       ? `${offer.discountValue}%`
       : `Rs. ${offer.discountValue}`;
 
-  // Calculates exact stock remaining and determines context constraints
   const stockInfo = useMemo(() => {
     if (offer.totalStock !== null && offer.totalStock !== undefined) {
       return {
@@ -28,23 +27,19 @@ function VoucherCard({ offer, onRedeem }) {
         isMonthly: false,
       };
     }
-    
     if (offer.monthlyStock !== null && offer.monthlyStock !== undefined) {
-      const currentLog = offer.monthlyRedemptionLog && offer.monthlyRedemptionLog.length > 0
-        ? offer.monthlyRedemptionLog[offer.monthlyRedemptionLog.length - 1]
-        : null;
-      const redeemedThisMonth = currentLog ? currentLog.count : 0;
-      
+      const currentLog =
+        offer.monthlyRedemptionLog && offer.monthlyRedemptionLog.length > 0
+          ? offer.monthlyRedemptionLog[offer.monthlyRedemptionLog.length - 1]
+          : null;
       return {
-        remaining: Math.max(0, offer.monthlyStock - redeemedThisMonth),
+        remaining: Math.max(0, offer.monthlyStock - (currentLog ? currentLog.count : 0)),
         isMonthly: true,
       };
     }
-
     return null;
   }, [offer]);
 
-  // Formats date formats elegantly for visualization block interfaces
   const formattedDeadline = useMemo(() => {
     if (!offer.validUntil) return null;
     return new Date(offer.validUntil).toLocaleDateString("en-US", {
@@ -56,92 +51,119 @@ function VoucherCard({ offer, onRedeem }) {
 
   const isOut = stockInfo !== null && stockInfo.remaining === 0;
   const isLowStock = stockInfo !== null && stockInfo.remaining <= 10;
+  const brandName =
+    offer.business?.brandName || offer.business?.name || "Official Brand";
 
   return (
-    <div className="w-full h-full cursor-pointer border border-gray-100 bg-white rounded-[16px] sm:rounded-[24px] shadow-sm hover:shadow-md transition-shadow duration-300 p-3 sm:p-5 flex flex-col justify-between group">
-      <div>
-        {/* Uniform Minimalist Ticket Token Visual Frame */}
-        <div className="rounded-xl sm:rounded-2xl mb-3 sm:mb-5 flex flex-col items-center justify-between p-3 sm:p-5 relative w-full overflow-hidden border border-gray-100/60 bg-gray-50/60 h-[110px] sm:h-[160px]">
-          <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-gray-300/40 to-transparent" />
-          <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-gray-300/40 to-transparent" />
-          
-          <div className="w-full flex items-center justify-between z-10">
-            <Ticket className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 opacity-60" strokeWidth={1.5} />
-          </div>
+    <div className="w-full h-full cursor-pointer bg-white rounded-[16px] sm:rounded-[24px] shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col justify-between group overflow-hidden border border-gray-100">
+      {/* ── Blue top accent strip ── */}
 
-          <div className="text-center z-10 my-auto flex flex-col items-center">
-            <span className="text-gray-800 font-medium tracking-wide text-2xl sm:text-[36px] leading-none">
-              {offer.creditsRequired}
-            </span>
-            <span className="text-gray-400 text-[9px] sm:text-xs tracking-wider font-normal mt-1">
-              credits
-            </span>
-          </div>
+      <div className="p-3 sm:p-5 flex flex-col justify-between flex-1">
+        <div>
+          {/* ── Ticket visual — blue-tinted ── */}
+          <div className="rounded-xl sm:rounded-2xl mb-3 sm:mb-5 flex flex-col items-center justify-between p-3 sm:p-5 relative w-full overflow-hidden border border-blue-100 bg-blue-50/30 h-[110px] sm:h-[160px]">
+            <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-blue-200/50 to-transparent" />
+            <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-blue-200/50 to-transparent" />
 
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-4 sm:w-3 sm:h-6 bg-white border-r border-gray-100 rounded-r-full" />
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-4 sm:w-3 sm:h-6 bg-white border-l border-gray-100 rounded-l-full" />
-        </div>
-
-        {/* Descriptive Typography Info Block */}
-        <div className="px-1 mb-4 sm:mb-5 flex flex-col gap-1.5">
-          <h2 className="text-gray-800 line-clamp-2 sm:line-clamp-1 group-hover:text-black transition-colors text-sm sm:text-[18px] font-medium leading-snug">
-            {offer.title}
-          </h2>
-          
-          <p className="text-gray-500 text-[10px] sm:text-xs font-normal">
-            {discountLabel} off
-          </p>
-          
-          <p className="text-gray-400 text-[9px] sm:text-[11px] font-normal line-clamp-1">
-            Via {offer.business?.name || "Official Brand"}
-          </p>
-
-          <hr className="border-gray-100 my-0.5" />
-
-          {/* Active Structural Expiry Indicators */}
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-1 text-gray-500 text-[9px] sm:text-[11px]">
-              <Hourglass size={11} className="text-gray-400" />
-              <span>Valid for {offer.expiryDays} days once claimed</span>
+            <div className="w-full flex items-center justify-between z-10">
+              <Ticket
+                className="w-3 h-3 sm:w-4 sm:h-4 text-[#3399FF] opacity-40"
+                strokeWidth={1.5}
+              />
             </div>
 
-            {formattedDeadline && (
-              <div className="flex items-center gap-1 text-amber-600 text-[9px] sm:text-[11px] font-medium">
-                <Calendar size={11} className="text-amber-500" />
-                <span>Offer ends: {formattedDeadline}</span>
+            <div className="text-center z-10 my-auto flex flex-col items-center">
+              <span className="text-[#134074] font-medium tracking-wide text-2xl sm:text-[36px] leading-none">
+                {offer.creditsRequired}
+              </span>
+              <span className="text-[#3399FF]/60 text-[9px] sm:text-xs tracking-wider font-normal mt-1">
+                credits
+              </span>
+            </div>
+
+            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-4 sm:w-3 sm:h-6 bg-white border-r border-blue-100 rounded-r-full" />
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-4 sm:w-3 sm:h-6 bg-white border-l border-blue-100 rounded-l-full" />
+          </div>
+
+          {/* ── Info block ── */}
+          <div className="px-1 mb-4 sm:mb-5 flex flex-col gap-1.5">
+            {/* Brand name — prominent, blue, uppercase */}
+            <p className="text-[#3399FF] text-[9px] sm:text-[11px] font-bold tracking-widest uppercase line-clamp-1">
+              {brandName}
+            </p>
+
+            <h2 className="text-gray-800 line-clamp-2 group-hover:text-black transition-colors text-sm sm:text-[17px] font-medium leading-snug">
+              {offer.title}
+            </h2>
+
+            {/* Discount — blue */}
+            <p className="text-[#3399FF] text-[10px] sm:text-xs font-semibold">
+              {discountLabel} off
+            </p>
+
+            <hr className="border-blue-50 my-0.5" />
+
+            {/* Expiry indicators */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-1 text-gray-500 text-[9px] sm:text-[11px]">
+                <Hourglass size={11} className="text-gray-400" />
+                <span>Valid for {offer.expiryDays} days once claimed</span>
+              </div>
+
+              {formattedDeadline && (
+                <div className="flex items-center gap-1 text-amber-600 text-[9px] sm:text-[11px] font-medium">
+                  <Calendar size={11} className="text-amber-500" />
+                  <span>Offer ends: {formattedDeadline}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Stock scarcity counter */}
+            {stockInfo !== null && (
+              <div className="mt-1 flex items-center gap-1.5">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span
+                    className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                      isLowStock ? "bg-red-400" : "bg-emerald-400"
+                    }`}
+                  />
+                  <span
+                    className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
+                      isLowStock ? "bg-red-500" : "bg-emerald-500"
+                    }`}
+                  />
+                </span>
+                <span
+                  className={`text-[10px] font-semibold tracking-wide ${
+                    isLowStock ? "text-red-500" : "text-emerald-600"
+                  }`}
+                >
+                  {isOut
+                    ? stockInfo.isMonthly
+                      ? "Sold out this month"
+                      : "Sold out"
+                    : `${stockInfo.remaining} ${
+                        stockInfo.remaining === 1 ? "voucher" : "vouchers"
+                      } left${stockInfo.isMonthly ? " this month" : ""}`}
+                </span>
               </div>
             )}
           </div>
-
-          {/* Live Scarcity Counter Block */}
-          {stockInfo !== null && (
-            <div className="mt-1 flex items-center gap-1.5">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isLowStock ? 'bg-red-400' : 'bg-emerald-400'}`}></span>
-                <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${isLowStock ? 'bg-red-500' : 'bg-emerald-500'}`}></span>
-              </span>
-              <span className={`text-[10px] font-semibold tracking-wide ${isLowStock ? 'text-red-500' : 'text-emerald-600'}`}>
-                {isOut 
-                  ? (stockInfo.isMonthly ? 'Sold out this month' : 'Sold out')
-                  : `${stockInfo.remaining} ${stockInfo.remaining === 1 ? 'voucher' : 'vouchers'} left${stockInfo.isMonthly ? ' this month' : ''}`}
-              </span>
-            </div>
-          )}
         </div>
-      </div>
 
-      <button
-        onClick={() => !isOut && onRedeem(offer)}
-        disabled={isOut}
-        className={`w-full text-white rounded-full py-2.5 sm:py-3.5 transition-transform font-medium text-[10px] sm:text-xs tracking-wide shadow-sm ${
-          isOut 
-            ? "bg-gray-300 cursor-not-allowed opacity-80" 
-            : "hover:scale-[1.01] active:scale-95"
-        }`}
-        style={isOut ? {} : { backgroundColor: "#134074" }}
-      >
-        {isOut ? "Sold Out" : "Redeem Reward"}
-      </button>
+        <button
+          onClick={() => !isOut && onRedeem(offer)}
+          disabled={isOut}
+          className={`w-full text-white rounded-full py-2.5 sm:py-3.5 transition-transform font-medium text-[10px] sm:text-xs tracking-wide shadow-sm ${
+            isOut
+              ? "bg-gray-300 cursor-not-allowed opacity-80"
+              : "hover:scale-[1.01] active:scale-95"
+          }`}
+          style={isOut ? {} : { backgroundColor: "#3399FF" }}
+        >
+          {isOut ? "Sold Out" : "Redeem Reward"}
+        </button>
+      </div>
     </div>
   );
 }
