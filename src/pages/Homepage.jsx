@@ -77,8 +77,8 @@ export default function Homepage() {
 
   const description = isLoggedIn ? (
     <>
-      Welcome back, {firstName}! Get free samples matched to your taste, share
-      honest feedback, and help brands build products you'll actually love.{" "}
+      Welcome back, {firstName}! Fill short surveys daily for Ruchi Credits that 
+      are directly redeemable for exciting rewards! Learn more.{" "}
       <a
         href="/faqs"
         className="underline hover:text-gray-900 transition-colors"
