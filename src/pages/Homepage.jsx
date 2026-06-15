@@ -78,7 +78,7 @@ export default function Homepage() {
   const description = isLoggedIn ? (
     <>
       Welcome back, {firstName}! Fill short surveys daily for Ruchi Credits that 
-      are directly redeemable for exciting rewards! Learn more.{" "}
+      are directly redeemable for exciting rewards!{" "}
       <a
         href="/faqs"
         className="underline hover:text-gray-900 transition-colors"
@@ -149,7 +149,7 @@ export default function Homepage() {
             >
               Quick Surveys
               <br />
-              to Claim Rewards
+              to Earn Credits
             </h1>
             <SurveyButton onClick={handleSurveyClick} label={isLoggedIn ? "Survey" : "Join Us"} />
           </AnimatedContent>

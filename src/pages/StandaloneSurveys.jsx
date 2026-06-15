@@ -122,7 +122,7 @@ const StandaloneSurveys = () => {
               className="text-neutral-600 leading-snug max-w-2xl"
               style={descriptionStyle}
             >
-              Share your thoughts, influence brands, and earn credits. Select a survey below to get started and unlock your rewards.
+              Share your thoughts and earn credits. Select a survey below to get started and unlock your rewards.
             </p>
           </AnimatedContent>
 
@@ -157,7 +157,7 @@ const StandaloneSurveys = () => {
                 No surveys right now
               </h3>
               <p className="text-neutral-600 mb-8" style={descriptionStyle}>
-                Check back soon! New standalone surveys tailored to your profile will appear here when they're published.
+                Check back soon! New surveys tailored to your profile will appear here when they're published.
               </p>
               <button
                 onClick={() => navigate('/profile')}
