@@ -126,7 +126,7 @@ export default function Homepage() {
                   lineHeight: 1.2, // Cleaned up the 0.7 overlap bug here too
                 }}
               >
-                2 minutes a day.
+                2 minute daily surveys.
               </h2>
               <h2
                 className="text-gray-900 mb-6"
