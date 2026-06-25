@@ -173,7 +173,6 @@ export default function Homepage() {
           </AnimatedContent>
 
         </div>
-
         {/* ── Mobile (below lg) ── */}
         <AnimatedContent
           direction="vertical"
