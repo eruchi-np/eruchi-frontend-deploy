@@ -12,7 +12,7 @@ const SurveyButton = ({ onClick, label = "Survey", fluid = false }) => (
         backgroundColor: "#3399FF",
         fontFamily: "'Inter', sans-serif",
         fontWeight: 500,
-        fontSize: fluid ? "clamp(18px, 4vw, 28px)" : "32px",
+        fontSize: fluid ? "clamp(20px, 4vw, 25px)" : "24px",
         height: "64px",
         width: fluid ? "100%" : "295px",
         paddingInline: "32px",

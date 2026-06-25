@@ -110,15 +110,48 @@ export default function Homepage() {
         {/* ── Desktop (lg+) ── */}
         <div className="hidden lg:grid lg:grid-cols-2 lg:gap-16 mb-12 items-start">
           
-          {/* Left Column Animation */}
+          {/* Left Column (Now Headlines & Button) */}
           <AnimatedContent
             direction="vertical"
             distance={40}
             duration={0.8}
-            className="min-w-0"
+            className="min-w-0 flex flex-col items-start"
+          >
+            <div className="text-left mb-8">
+              <h2
+                className="text-gray-900 mb-2"
+                style={{
+                  fontSize: "clamp(30px, 5vw, 45px)",
+                  fontWeight: 400,
+                  lineHeight: 1.2, // Cleaned up the 0.7 overlap bug here too
+                }}
+              >
+                2 minutes a day.
+              </h2>
+              <h2
+                className="text-gray-900 mb-6"
+                style={{
+                  fontSize: "clamp(36px, 8vw, 56px)",
+                  fontWeight: 600,
+                  lineHeight: 1.1,
+                }}
+              >
+                Discounts across Kathmandu.
+              </h2>
+            </div> 
+            
+          </AnimatedContent>
+
+          {/* Right Column (Now Descriptions) */}
+          <AnimatedContent
+            direction="vertical"
+            distance={40}
+            duration={0.8}
+            delay={0.15}
+            className="min-w-0 flex flex-col items-end w-full"
           >
             <div
-              className="flex items-center gap-3 mb-5 whitespace-nowrap"
+              className="flex items-center gap-3 mb-5 whitespace-nowrap justify-end w-full"
               style={{ fontSize: "clamp(28px, 3.2vw, 46px)", fontWeight: 400, lineHeight: 1.2 }}
             >
               <span className="text-gray-900">Survey</span>
@@ -128,31 +161,17 @@ export default function Homepage() {
               <span className="text-gray-900">Rewards</span>
             </div>
             <p
-              className="text-gray-700 leading-snug max-w-[560px]"
+              className="text-gray-700 leading-snug max-w-[560px] text-right"
               style={descriptionStyle}
             >
               {description}
             </p>
+              <br></br>
+              <br></br>
+            <SurveyButton onClick={handleSurveyClick} label={isLoggedIn ? "Survey" : "Claim Your Rewards"} />
+          
           </AnimatedContent>
 
-          {/* Right Column Animation (Slightly delayed for depth) */}
-          <AnimatedContent
-            direction="vertical"
-            distance={40}
-            duration={0.8}
-            delay={0.15}
-            className="min-w-0 flex flex-col items-end"
-          >
-            <h1
-              className="text-gray-900 text-right mb-8"
-              style={{ fontSize: "clamp(40px, 5vw, 50px)", fontWeight: 400, lineHeight: 1.1 }}
-            >
-              Quick Surveys
-              <br />
-              to Earn Credits
-            </h1>
-            <SurveyButton onClick={handleSurveyClick} label={isLoggedIn ? "Survey" : "Join Us"} />
-          </AnimatedContent>
         </div>
 
         {/* ── Mobile (below lg) ── */}
@@ -162,6 +181,29 @@ export default function Homepage() {
           duration={0.8}
           className="lg:hidden mb-8"
         >
+          {/* HEADLINES FIRST */}
+          <h2
+            className="text-gray-900 mb-2"
+            style={{
+              fontSize: "clamp(27px, 6vw, 35px)",
+              fontWeight: 400,
+              lineHeight: 1.2,
+            }}
+          >
+            2 minute daily surveys.
+          </h2>
+          <h1
+            className="text-gray-900 mb-6"
+            style={{
+              fontSize: "clamp(36px, 8vw, 56px)",
+              fontWeight: 600,
+              lineHeight: 1.1,
+            }}
+          >
+            Discounts across Kathmandu.
+          </h1>
+
+          {/* DESCRIPTIONS SECOND */}
           <p
             className="text-gray-900 mb-4"
             style={{
@@ -178,21 +220,10 @@ export default function Homepage() {
           >
             {description}
           </p>
-          <h1
-            className="text-gray-900 mb-6"
-            style={{
-              fontSize: "clamp(36px, 8vw, 56px)",
-              fontWeight: 400,
-              lineHeight: 1.1,
-            }}
-          >
-            Quick Surveys
-            <br />
-            to Claim Rewards
-          </h1>
+
           <div className="flex items-center gap-3">
             <div className="flex-1 [&>*>*:last-child]:hidden">
-              <SurveyButton onClick={handleSurveyClick} fluid label={isLoggedIn ? "Survey" : "Join Us"} />
+              <SurveyButton onClick={handleSurveyClick} fluid label={isLoggedIn ? "Survey" : "Claim Your Rewards"} />
             </div>         
           </div>
         </AnimatedContent>
