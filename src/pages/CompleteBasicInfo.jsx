@@ -60,7 +60,7 @@ const CompleteBasicInfo = () => {
       if (user.isProfileComplete) {
         navigate('/', { replace: true });
       } else {
-        navigate('/complete-profile', { replace: true });
+        navigate('/profile', { replace: true });
       }
     }
 
