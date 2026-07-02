@@ -1,35 +1,89 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+
+const STORAGE_KEY = 'demographics_draft_v1';
+
+const initialFormData = {
+  // Part 1: Sampler Profile
+  firstLanguage: '',
+  education: '',
+  maritalStatus: '',
+  occupation: '',
+
+  // Part 2: Address
+  municipality: '',
+  wardNumber: '',
+
+  // Part 3: Household & Durables
+  durableGoods: [],
+  mainHouseholdEarner: '',
+  earnerEducation: '',
+
+  // Part 4: Psychographics
+  selectedInterests: []
+};
+
+const initialCompletedSteps = {
+  step1: false,
+  step2: false,
+  step3: false,
+  step4: false
+};
+
+// Load any saved draft from localStorage. Falls back to defaults on any
+// error (corrupt JSON, storage disabled, etc.) so a bad draft never breaks
+// the wizard.
+const loadDraft = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed;
+  } catch (err) {
+    console.warn('Failed to parse saved demographics draft, ignoring it:', err);
+    return null;
+  }
+};
+
+const saveDraft = (formData, completedSteps, currentStep) => {
+  try {
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({ formData, completedSteps, currentStep })
+    );
+  } catch (err) {
+    // Non-fatal — e.g. private browsing / storage full. Wizard still works,
+    // it just won't survive a refresh.
+    console.warn('Failed to save demographics draft:', err);
+  }
+};
+
+export const clearDemographicsDraft = () => {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch (err) {
+    console.warn('Failed to clear demographics draft:', err);
+  }
+};
 
 const useDemographics = () => {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState({
-    // Part 1: Sampler Profile
-    firstLanguage: '',
-    education: '',
-    maritalStatus: '', 
-    occupation: '',
-    
-    // Part 2: Address
-    municipality: '',
-    wardNumber: '',
-    
-    // Part 3: Household & Durables
-    durableGoods: [],
-    mainHouseholdEarner: '',
-    earnerEducation: '',
-    
-    // Part 4: Psychographics - UPDATED FIELD NAME
-    selectedInterests: [] // Changed from 'interests' to match component
-  });
+  const draft = loadDraft();
 
+  const [currentStep, setCurrentStep] = useState(draft?.currentStep || 1);
+  const [formData, setFormData] = useState({
+    ...initialFormData,
+    ...(draft?.formData || {})
+  });
   const [completedSteps, setCompletedSteps] = useState({
-    step1: false,
-    step2: false,
-    step3: false,
-    step4: false
+    ...initialCompletedSteps,
+    ...(draft?.completedSteps || {})
   });
 
   const [errors, setErrors] = useState({});
+
+  // Persist to localStorage whenever the draft-relevant state changes.
+  useEffect(() => {
+    saveDraft(formData, completedSteps, currentStep);
+  }, [formData, completedSteps, currentStep]);
 
   // Validation rules for each step
   const validateStep = (step) => {
@@ -65,7 +119,6 @@ const useDemographics = () => {
         break;
 
       case 4:
-        // UPDATED: Check selectedInterests instead of interests
         if (!formData.selectedInterests || formData.selectedInterests.length < 3) {
           newErrors.selectedInterests = 'Please select at least 3 interests';
         }
@@ -81,12 +134,11 @@ const useDemographics = () => {
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
-      // Mark current step as completed
       setCompletedSteps(prev => ({
         ...prev,
         [`step${currentStep}`]: true
       }));
-      
+
       setCurrentStep(prev => prev + 1);
     }
   };
@@ -107,7 +159,6 @@ const useDemographics = () => {
       [field]: value
     }));
 
-    // Clear error for this field when user starts typing
     if (errors[field]) {
       setErrors(prev => ({
         ...prev,
@@ -115,11 +166,10 @@ const useDemographics = () => {
       }));
     }
 
-    // Special handling for conditional fields
     if (field === 'mainHouseholdEarner' && value === 'Me') {
       setFormData(prev => ({
         ...prev,
-        earnerEducation: '' // Clear earner education if user selects "Me"
+        earnerEducation: ''
       }));
     }
   };
@@ -155,9 +205,8 @@ const useDemographics = () => {
   };
 
   const canProceedToStep = (step) => {
-    // Allow going to any previous step, but for future steps require previous steps to be completed
     if (step <= currentStep) return true;
-    
+
     for (let i = 1; i < step; i++) {
       if (!isStepCompleted(i)) return false;
     }
@@ -173,27 +222,14 @@ const useDemographics = () => {
     };
   };
 
+  // Resets in-memory state AND clears the persisted draft. Call this after
+  // a successful final submit so the next visit starts fresh.
   const resetForm = () => {
-    setFormData({
-      firstLanguage: '',
-      education: '',
-      maritalStatus: '', 
-      occupation: '',
-      municipality: '',
-      wardNumber: '',
-      durableGoods: [],
-      mainHouseholdEarner: '',
-      earnerEducation: '',
-      selectedInterests: [] // UPDATED
-    });
-    setCompletedSteps({
-      step1: false,
-      step2: false,
-      step3: false,
-      step4: false
-    });
+    setFormData(initialFormData);
+    setCompletedSteps(initialCompletedSteps);
     setErrors({});
     setCurrentStep(1);
+    clearDemographicsDraft();
   };
 
   const isFormComplete = () => {
@@ -201,21 +237,15 @@ const useDemographics = () => {
   };
 
   const submitForm = async () => {
-    // Validate all steps before submission
     for (let step = 1; step <= 4; step++) {
       if (!validateStep(step)) {
-        setCurrentStep(step); // Go to the step with errors
+        setCurrentStep(step);
         return { success: false, error: 'Please complete all required fields' };
       }
     }
 
     try {
-      // Will handle API submission later
       console.log('Submitting form data:', formData);
-      
-      // Simulate API call
-      // const response = await demographicsAPI.submit(formData);
-      
       return { success: true, data: formData };
     } catch (error) {
       console.error('Error submitting form:', error);
@@ -229,7 +259,7 @@ const useDemographics = () => {
     formData,
     completedSteps,
     errors,
-    
+
     // Actions
     nextStep,
     prevStep,
@@ -238,7 +268,7 @@ const useDemographics = () => {
     updateArrayField,
     submitForm,
     resetForm,
-    
+
     // Validation & Status
     validateStep,
     isStepCompleted,

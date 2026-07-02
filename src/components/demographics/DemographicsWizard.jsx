@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import useDemographics from '../../hooks/useDemographics';
+import useDemographics, { clearDemographicsDraft } from '../../hooks/useDemographics';
 import Stepper, { Step } from '../layout/Stepper';
 import SamplerProfile from './steps/SamplerProfile';
 import AddressInfo from './steps/AddressInfo';
@@ -97,6 +97,9 @@ const DemographicsWizard = ({ onComplete }) => {
 
       if (response.data.success) {
         toast.success("You're in. Your first survey is ready. Takes under 2 minutes.");
+        // Clear the persisted draft now that the profile is saved server-side —
+        // otherwise a stale draft could resurrect old answers on a future visit.
+        clearDemographicsDraft();
         onComplete();
       }
     } catch (error) {
