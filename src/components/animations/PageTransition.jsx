@@ -19,7 +19,16 @@ function PageTransitionInner() {
     const offset = cfg.reverse ? -cfg.distance : cfg.distance;
 
     gsap.set(el, { [axis]: offset, opacity: 0 });
-    gsap.to(el, { [axis]: 0, opacity: 1, duration: cfg.duration, ease: cfg.ease, delay: cfg.delay });
+    gsap.to(el, {
+      [axis]: 0,
+      opacity: 1,
+      duration: cfg.duration,
+      ease: cfg.ease,
+      delay: cfg.delay,
+      onComplete: () => {
+        gsap.set(el, { clearProps: 'transform' });
+      }
+    });
 
     return () => gsap.killTweensOf(el);
   }, []);

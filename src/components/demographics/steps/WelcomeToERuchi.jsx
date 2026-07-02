@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 
 const WelcomeToERuchi = () => {
@@ -6,23 +7,21 @@ const WelcomeToERuchi = () => {
   const [dialogOpacityClass, setDialogOpacityClass] = useState('opacity-0');
 
   useEffect(() => {
-    // Trigger animation after component mounts
     setDialogOpacityClass('opacity-0');
     const timer = setTimeout(() => {
       setDialogOpacityClass('opacity-100');
     }, 50);
-
     return () => clearTimeout(timer);
   }, []);
 
   const handleContinue = () => {
     setDialogOpacityClass('opacity-0');
     setTimeout(() => {
-      navigate('/'); // Redirect to home page
+      navigate('/');
     }, 500);
   };
 
-  return (
+  return createPortal(
     <div
       className={`
         fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#3399ff] p-0
@@ -52,7 +51,8 @@ const WelcomeToERuchi = () => {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
