@@ -24,7 +24,7 @@ const schema = z.object({
 });
 
 const CompleteBasicInfo = () => {
-  const { user, refreshUser, loading: authLoading } = useAuth();  // ← Changed fetchUser → refreshUser
+  const { user, refreshUser, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
 
@@ -87,19 +87,12 @@ const CompleteBasicInfo = () => {
     }
 
     try {
-      console.log("[DEBUG] Auth method:", authMethod);
-      console.log("[DEBUG] Token value:", token);
-      console.log("[DEBUG] Preparing PUT to /users/me/basic-profile");
-
       const config = {
         withCredentials: true,
       };
 
       if (token && token !== 'USE_COOKIE_AUTH' && authMethod !== 'cookie') {
         config.headers = { Authorization: `Bearer ${token}` };
-        console.log("[DEBUG] Using Bearer token authentication");
-      } else {
-        console.log("[DEBUG] Using cookie-based authentication (no Bearer header)");
       }
 
       await axios.put(
@@ -113,12 +106,9 @@ const CompleteBasicInfo = () => {
       );
 
       toast.success("Basic information saved successfully!");
-      
-      // Refresh user data (this was crashing before)
-      await refreshUser();  // ← Changed here
 
-      // Optional: force navigation if needed
-      // navigate(user?.isProfileComplete ? '/' : '/complete-profile');
+      // Refresh user data
+      await refreshUser();
 
     } catch (err) {
       console.error("[ERROR] Failed to update basic profile:", err);
@@ -146,78 +136,101 @@ const CompleteBasicInfo = () => {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
-      </div>
+      <section className="py-20 bg-white text-black min-h-screen flex items-center justify-center">
+        <Loader2 className="w-10 h-10 animate-spin text-black" />
+      </section>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
-        <div className="px-8 py-10">
-          <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">
-            Complete Your Basic Profile
-          </h2>
-          <p className="text-center text-gray-600 mb-8">
-            We need a few more details to personalize your experience.
+    <section className="py-20 bg-white text-black">
+      <div className="flex justify-center items-center">
+        <div className="flex w-full rounded-lg lg:w-[600px] mx-5 space-y-12 flex-wrap flex-col">
+
+          <h1 className="text-[40px] lg:text-4xl font-bold leading-tight">
+            Just a few more details
+            <br />
+          </h1>
+          <p className="text-gray-600 text-lg -mt-8">
+            We need this to personalize your experience.
           </p>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Phone Number <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="tel"
-                {...register("phone")}
-                className={`w-full px-4 py-3 border ${errors.phone ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-                placeholder="98XXXXXXXX or +977..."
-              />
-              {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone.message}</p>}
+          <form className="grid grid-cols-1 space-y-7" onSubmit={handleSubmit(onSubmit)}>
+            <div className="grid grid-cols-1 space-y-6">
+
+              {/* Phone Number */}
+              <div>
+                <input
+                  type="tel"
+                  placeholder="Phone Number"
+                  {...register("phone")}
+                  className={`w-full text-lg font-medium outline-none p-4 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 ${
+                    errors.phone ? "border-red-500" : "border-gray-300 focus:border-black"
+                  }`}
+                />
+                {errors.phone && (
+                  <p className="text-sm text-red-500 mt-2 font-medium px-4">
+                    {errors.phone.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Date of Birth */}
+              <div>
+                <span className="block text-xs font-semibold text-gray-400 px-4 mb-[-4px]">Date of Birth</span>
+                <input
+                  type="date"
+                  {...register("dateOfBirth")}
+                  className={`w-full text-lg font-medium outline-none p-4 border-b-2 bg-transparent transition-all duration-200 ${
+                    errors.dateOfBirth ? "border-red-500" : "border-gray-300 focus:border-black"
+                  }`}
+                />
+                {errors.dateOfBirth && (
+                  <p className="text-sm text-red-500 mt-2 font-medium px-4">
+                    {errors.dateOfBirth.message}
+                  </p>
+                )}
+              </div>
+
+              {/* Gender Select */}
+              <div>
+                <span className="block text-xs font-semibold text-gray-400 px-4 mb-[-4px]">Gender</span>
+                <select
+                  {...register("gender")}
+                  className={`w-full text-lg font-medium outline-none p-4 border-b-2 bg-transparent transition-all duration-200 ${
+                    errors.gender ? "border-red-500" : "border-gray-300 focus:border-black"
+                  }`}
+                  defaultValue=""
+                >
+                  <option value="" disabled>Select Gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                  <option value="Prefer not to say">Prefer not to say</option>
+                </select>
+                {errors.gender && (
+                  <p className="text-sm text-red-500 mt-2 font-medium px-4">
+                    {errors.gender.message}
+                  </p>
+                )}
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date of Birth <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                {...register("dateOfBirth")}
-                className={`w-full px-4 py-3 border ${errors.dateOfBirth ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500`}
-              />
-              {errors.dateOfBirth && <p className="mt-1 text-sm text-red-600">{errors.dateOfBirth.message}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Gender <span className="text-red-500">*</span>
-              </label>
-              <select
-                {...register("gender")}
-                className={`w-full px-4 py-3 border ${errors.gender ? 'border-red-500' : 'border-gray-300'} rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white`}
-              >
-                <option value="">Select gender</option>
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-                <option value="Prefer not to say">Prefer not to say</option>
-              </select>
-              {errors.gender && <p className="mt-1 text-sm text-red-600">{errors.gender.message}</p>}
-            </div>
-
+            {/* Submit button */}
             <button
               type="submit"
-              disabled={submitting || authLoading}
-              className={`w-full py-3 px-4 font-medium rounded-lg text-white transition-colors ${
-                submitting || authLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+              className={`w-full mt-4 p-4 font-bold text-lg rounded-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-all duration-200 ${
+                submitting
+                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+                  : 'bg-black text-white hover:bg-gray-800 hover:shadow-lg transform hover:scale-[1.02]'
               }`}
+              disabled={submitting}
             >
               {submitting ? (
-                <span className="flex items-center justify-center">
+                <div className="flex justify-center items-center">
                   <Loader2 className="w-5 h-5 animate-spin mr-2" />
                   Saving...
-                </span>
+                </div>
               ) : (
                 'Save & Continue'
               )}
@@ -225,7 +238,7 @@ const CompleteBasicInfo = () => {
           </form>
         </div>
       </div>
-    </div>
+    </section>
   );
 };
 
