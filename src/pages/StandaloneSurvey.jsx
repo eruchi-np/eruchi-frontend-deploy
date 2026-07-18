@@ -127,10 +127,10 @@ const StandaloneSurvey = () => {
     <div className="min-h-screen bg-white pb-24" style={{ fontFamily: "'Inter', sans-serif" }}>
       <div className="max-w-3xl mx-auto px-4 py-16">
         <button
-          onClick={() => navigate("/standalone-surveys")}
+          onClick={() => navigate(-1)}
           className="flex items-center text-neutral-500 mb-8 hover:text-neutral-900 transition-colors"
         >
-          <ArrowLeft className="h-5 w-5 mr-2" /> Back to Surveys
+          <ArrowLeft className="h-5 w-5 mr-2" /> Back
         </button>
 
         <div className="mb-12">

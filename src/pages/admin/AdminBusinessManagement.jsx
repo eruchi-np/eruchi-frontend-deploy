@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { adminAPI } from '../../services/api';
 import {
   ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2, Calendar,
-  ShieldAlert, Eye, EyeOff, RefreshCw, Building2, KeyRound,
+  ShieldAlert, Eye, EyeOff, RefreshCw, Building2, KeyRound, Upload,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -71,6 +71,7 @@ export default function AdminBusinessManagement() {
   const [expandedBusinesses, setExpandedBusinesses] = useState({});
   const [businessOffers, setBusinessOffers]       = useState({});
   const [offersLoading, setOffersLoading]         = useState({});
+  const [logoUploading, setLogoUploading]         = useState({});
 
   // Voucher offer modal
   const [selectedBusinessForModal, setSelectedBusinessForModal] = useState(null);
@@ -126,6 +127,26 @@ export default function AdminBusinessManagement() {
     const isExpanded = !!expandedBusinesses[businessId];
     setExpandedBusinesses(prev => ({ ...prev, [businessId]: !isExpanded }));
     if (!isExpanded && !businessOffers[businessId]) fetchOffers(businessId);
+  };
+
+  // ── Logo actions ───────────────────────────────────────────────────────────
+
+  const handleLogoUpload = async (business, file) => {
+    if (!file) return;
+    try {
+      setLogoUploading(prev => ({ ...prev, [business._id]: true }));
+      const formData = new FormData();
+      formData.append('logo', file);
+      const res = await adminAPI.uploadBusinessLogo(business._id, formData);
+      const updated = res.data.data;
+      setBusinesses(prev => prev.map(b => (b._id === business._id ? updated : b)));
+      toast.success('Logo updated');
+    } catch (err) {
+      console.error(err);
+      toast.error(err.response?.data?.message || 'Failed to upload logo');
+    } finally {
+      setLogoUploading(prev => ({ ...prev, [business._id]: false }));
+    }
   };
 
   // ── Voucher offer actions ──────────────────────────────────────────────────
@@ -360,27 +381,54 @@ export default function AdminBusinessManagement() {
                 <div key={business._id} className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
                   {/* Business row */}
                   <div className="p-4 md:p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 flex-1">
-                      <div>
-                        <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Name</p>
-                        <p className="text-sm font-semibold text-gray-900 mt-0.5">{business.name}</p>
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="relative shrink-0">
+                        <div className="w-14 h-14 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center">
+                          {business.logo ? (
+                            <img src={business.logo} alt={`${business.name} logo`} className="w-full h-full object-contain" />
+                          ) : (
+                            <Building2 className="h-5 w-5 text-gray-300" />
+                          )}
+                        </div>
+                        <label
+                          htmlFor={`logo-upload-${business._id}`}
+                          className="absolute -bottom-1 -right-1 p-1 bg-white border border-gray-200 rounded-full shadow-sm cursor-pointer hover:bg-gray-50 transition-colors"
+                          title="Upload logo"
+                        >
+                          <Upload className="h-3 w-3 text-gray-600" />
+                        </label>
+                        <input
+                          id={`logo-upload-${business._id}`}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={!!logoUploading[business._id]}
+                          onChange={(e) => handleLogoUpload(business, e.target.files?.[0])}
+                        />
                       </div>
-                      <div>
-                        <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Email</p>
-                        <p className="text-sm text-gray-600 mt-0.5 break-all">{business.email}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Category / Phone</p>
-                        <p className="text-sm text-gray-600 mt-0.5">
-                          {business.category || 'N/A'} · {business.phone || 'N/A'}
-                        </p>
-                      </div>
-                      <div className="flex items-center md:justify-start">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          business.isVerified ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {business.isVerified ? 'Verified' : 'Unverified'}
-                        </span>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 flex-1">
+                        <div>
+                          <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Name</p>
+                          <p className="text-sm font-semibold text-gray-900 mt-0.5">{business.name}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Email</p>
+                          <p className="text-sm text-gray-600 mt-0.5 break-all">{business.email}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Category / Phone</p>
+                          <p className="text-sm text-gray-600 mt-0.5">
+                            {business.category || 'N/A'} · {business.phone || 'N/A'}
+                          </p>
+                        </div>
+                        <div className="flex items-center md:justify-start">
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                            business.isVerified ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                          }`}>
+                            {business.isVerified ? 'Verified' : 'Unverified'}
+                          </span>
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">

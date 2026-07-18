@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { businessAPI } from "../../services/api";
 import { useNavigate } from "react-router-dom";
-import { ScanLine } from "lucide-react";
+import { ScanLine, Upload } from "lucide-react";
 
 export default function BusinessDashboard() {
   const [loading, setLoading] = useState(true);
@@ -14,12 +14,15 @@ export default function BusinessDashboard() {
   const [vouchers, setVouchers] = useState([]);
   const [vouchersLoading, setVouchersLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("scans");
+  const [profile, setProfile] = useState(null);
+  const [logoUploading, setLogoUploading] = useState(false);
 
   const navigate = useNavigate();
 
   useEffect(() => {
     fetchDashboard();
     fetchVoucherOffers();
+    fetchProfile();
   }, []);
 
   const fetchDashboard = async () => {
@@ -49,6 +52,30 @@ export default function BusinessDashboard() {
     }
   };
 
+  const fetchProfile = async () => {
+    try {
+      const { data } = await businessAPI.getProfile();
+      setProfile(data.data || null);
+    } catch (error) {
+      console.error('Failed to load business profile', error);
+    }
+  };
+
+  const handleLogoUpload = async (file) => {
+    if (!file) return;
+    try {
+      setLogoUploading(true);
+      const formData = new FormData();
+      formData.append('logo', file);
+      const { data } = await businessAPI.uploadLogo(formData);
+      setProfile(data.data);
+    } catch (error) {
+      console.error('Failed to upload logo', error);
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await businessAPI.logout();
@@ -73,7 +100,33 @@ export default function BusinessDashboard() {
     <div className="min-h-screen bg-white p-4">
       <div className="max-w-4xl mx-auto">
         <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">Business Dashboard</h1>
+          <div className="flex items-center gap-4">
+            <div className="relative shrink-0">
+              <div className="w-12 h-12 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center">
+                {profile?.logo ? (
+                  <img src={profile.logo} alt="Business logo" className="w-full h-full object-contain" />
+                ) : (
+                  <span className="text-gray-300 text-[10px]">Logo</span>
+                )}
+              </div>
+              <label
+                htmlFor="business-logo-upload"
+                className="absolute -bottom-1 -right-1 p-1 bg-white border border-gray-200 rounded-full shadow-sm cursor-pointer hover:bg-gray-50 transition-colors"
+                title="Upload logo"
+              >
+                <Upload className="h-3 w-3 text-gray-600" />
+              </label>
+              <input
+                id="business-logo-upload"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={logoUploading}
+                onChange={(e) => handleLogoUpload(e.target.files?.[0])}
+              />
+            </div>
+            <h1 className="text-2xl font-bold">Business Dashboard</h1>
+          </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => navigate('/business/scan')}

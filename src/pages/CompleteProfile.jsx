@@ -7,6 +7,7 @@ const CompleteProfile = () => {
 
   const handleProfileComplete = () => {
     console.log('Profile completed successfully!');
+    window.dispatchEvent(new Event('profileComplete'));
     setProfileCompleted(true);
   };
 
