@@ -154,16 +154,16 @@ function VoucherCard({ offer, onRedeem }) {
           >
             {brandName}
           </span>
-          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105">
+          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105">
             {brandLogo ? (
               <img
                 src={brandLogo}
                 alt={`${brandName} logo`}
-                className="max-w-[65%] max-h-[65%] object-contain"
+                className="max-w-[80%] max-h-[80%] object-contain"
               />
             ) : (
               <span
-                className="font-semibold text-2xl sm:text-3xl tracking-tight select-none"
+                className="font-semibold text-3xl sm:text-4xl tracking-tight select-none"
                 style={{ color: palette.bg }}
               >
                 {brandName.charAt(0).toUpperCase()}
@@ -553,13 +553,6 @@ export default function Shop() {
 
         {/* Global Technical Footer Node */}
         <div className="mt-10 lg:mt-16 border-t border-gray-100 pt-8 text-center">
-          <p
-            className="text-gray-400 tracking-wide"
-            style={{ fontSize: "11px", fontWeight: 300 }}
-          >
-            Credits are added automatically after your activity is verified.
-            Voucher redemptions may take 3–5 business days to process
-          </p>
         </div>
       </div>
 

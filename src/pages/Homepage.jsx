@@ -185,7 +185,7 @@ export default function Homepage() {
                   className="inline-flex items-center justify-center px-4 rounded-full bg-blue-500 text-white align-middle mr-3"
                   style={{ height: "42px", fontSize: "14px", sm: { height: "58px", fontSize: "18px" }, fontWeight: 400, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", lineHeight: 1 }}
                 >
-                  At Eruchi
+                  At eRuchi
                 </span>
                 Two minute daily surveys. Discounts across Kathmandu.
               </h1>
@@ -206,7 +206,7 @@ export default function Homepage() {
                   className="px-7 rounded-full bg-white text-black hover:bg-gray-100 transition-colors flex items-center justify-center"
                   style={{ height: "58px", fontSize: "18px", fontWeight: 400, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", lineHeight: 1 }}
                 >
-                  Explore Surveys
+                  {isLoggedIn ? "Explore Surveys" : "Explore Rewards"}
                 </button>
                 <button
                   onClick={handleSurveyClick}
@@ -393,13 +393,13 @@ export default function Homepage() {
             <p className="text-center text-[10px] sm:text-xs tracking-[0.2em] uppercase text-gray-400 font-medium mb-4">
               Redeem your credits with our partners
             </p>
-            <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4">
+            <div className="flex flex-nowrap items-center justify-center gap-x-3 sm:gap-x-8">
               {PARTNER_LOGOS.map((partner, i) => (
                 <img
                   key={i}
                   src={partner.logo}
                   alt={partner.name}
-                  className="h-8 sm:h-10 w-auto object-contain grayscale opacity-60 hover:grayscale-0 hover:opacity-100 transition-all duration-300"
+                  className="h-6 sm:h-10 w-auto object-contain min-w-0 grayscale-0 opacity-100 sm:grayscale sm:opacity-60 sm:hover:grayscale-0 sm:hover:opacity-100 transition-all duration-300"
                 />
               ))}
             </div>
@@ -413,11 +413,8 @@ export default function Homepage() {
           <div className="max-w-[1314px] mx-auto px-4 sm:px-8 lg:px-10">
             <div className="text-center mb-12">
               <h2 className="text-gray-900 mb-3" style={headingStyle}>
-                Top <span className="text-blue-600">surveys</span> right now
+                Latest <span className="text-blue-600">surveys</span> right now
               </h2>
-              <p className="text-gray-600" style={{ fontSize: "clamp(15px, 1.5vw, 20px)", fontWeight: 300 }}>
-                Explore our collections of various goods curated to your taste.
-              </p>
             </div>
 
             {surveysLoading ? (

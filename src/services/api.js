@@ -23,12 +23,19 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401 && !error.config?.skipAuthRedirect) {
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('email');
-      localStorage.removeItem('username');
-      localStorage.removeItem('user_id');
-      localStorage.removeItem('auth_method');
-      window.location.href = '/login';
+      const isBusinessRequest = error.config?.url?.includes('/business');
+      if (isBusinessRequest) {
+        localStorage.removeItem('is_business');
+        localStorage.removeItem('business_name');
+        window.location.href = '/business/login';
+      } else {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('email');
+        localStorage.removeItem('username');
+        localStorage.removeItem('user_id');
+        localStorage.removeItem('auth_method');
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
