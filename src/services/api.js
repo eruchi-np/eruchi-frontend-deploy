@@ -22,7 +22,7 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    if (error.response?.status === 401 && !error.config?.skipAuthRedirect) {
       localStorage.removeItem('access_token');
       localStorage.removeItem('email');
       localStorage.removeItem('username');
@@ -42,7 +42,7 @@ export const authAPI = {
 };
 
 export const userAPI = {
-  getProfile: () => api.get('/users/me'),
+  getProfile: (config = {}) => api.get('/users/me', config),
   getCampaignHistory: () => api.get('/users/me/campaign-history'),
   deleteAccount: () => api.delete('/users/me'),
   updateBasicProfile: (data) => api.put('/users/me/basic-profile', data),

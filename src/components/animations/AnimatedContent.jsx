@@ -83,9 +83,20 @@ const AnimatedContent = ({
       onEnter: () => tl.play()
     });
 
+    if (st.progress > 0) {
+      tl.play();
+      st.kill();
+    }
+
+    // Recalculate trigger positions once images finish loading,
+    // since late image loads can shift layout and invalidate cached positions.
+    const handleLoad = () => ScrollTrigger.refresh();
+    window.addEventListener('load', handleLoad);
+
     return () => {
       st.kill();
       tl.kill();
+      window.removeEventListener('load', handleLoad);
     };
   }, [
     container,

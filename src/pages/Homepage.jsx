@@ -43,18 +43,18 @@ const VENDOR_POSTERS = [
 const HOW_IT_WORKS = [
   {
     number: "01",
-    title: "Reach out",
-    description: "Tell us what's happening. No referral required to start the conversation.",
+    title: "Register Now",
+    description: "Sign up and tell us a littlle about yourself.",
   },
   {
     number: "02",
-    title: "We review together",
-    description: "We confirm eligibility, required orders, and build a coordinated plan.",
+    title: "Earn Credits",
+    description: "Fill out short surveys and earn Ruchi Credits.",
   },
   {
     number: "03",
-    title: "Care begins",
-    description: "Support starts once every clinical and operational detail is in place.",
+    title: "Get Rewards",
+    description: "Explore our Rewards page and get easy, local discounts.",
   },
 ];
 

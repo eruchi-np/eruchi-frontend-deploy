@@ -291,11 +291,20 @@ export default function Shop() {
 
     const fetchData = async () => {
       try {
-        const [offersRes, profileRes] = await Promise.all([
+        const [offersResult, profileResult] = await Promise.allSettled([
           voucherAPI.getOffers(),
-          token ? userAPI.getProfile() : Promise.resolve(null),
+          token
+            ? userAPI.getProfile({ skipAuthRedirect: true })
+            : Promise.resolve(null),
         ]);
 
+        if (offersResult.status !== "fulfilled") {
+          console.error("Fetch Failure:", offersResult.reason);
+          setVoucherOffers([]);
+          return;
+        }
+
+        const offersRes = offersResult.value;
         const responseData = offersRes.data?.data || offersRes.data;
         const targetArray = Array.isArray(responseData) ? responseData : [];
 
@@ -303,15 +312,20 @@ export default function Shop() {
         const randomizedArray = shuffleArray(targetArray);
 
         setVoucherOffers(randomizedArray);
-        if (profileRes) {
+        if (profileResult.status === "fulfilled" && profileResult.value) {
+          const profileRes = profileResult.value;
           setUserCredits(
             profileRes.data?.data?.user?.credits ??
               profileRes.data?.user?.credits ??
               0
           );
+          } else if (profileResult.status === "rejected") {
+          // Stale/expired token — treat as guest, don't block the page
+          console.warn("Profile fetch failed, continuing as guest.");
         }
       } catch (err) {
         console.error("Fetch Failure:", err);
+        setVoucherOffers([]);
       }
     };
     fetchData();
