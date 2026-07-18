@@ -5,12 +5,14 @@ import QRCode from "react-qr-code";
 import { X, Loader2, CheckCircle2 } from "lucide-react";
 import { voucherAPI } from "../../services/api";
 import AnimatedContent from "../animations/AnimatedContent";
+import { VOUCHER_TERMS } from "../../constants/voucherTerms";
 
 export default function VoucherRedeemModal({ offer, userCredits, onClose, onSuccess }) {
   const [step, setStep] = useState("confirm");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [voucher, setVoucher] = useState(null);
+  const [agreed, setAgreed] = useState(false);
   const qrRef = useRef(null);
   const navigate = useNavigate();
 
@@ -269,11 +271,29 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
                 <span className="text-sm text-gray-500">{userCredits} credits</span>
               </div>
 
+              <details className="text-xs text-gray-500 border border-gray-100 rounded-2xl px-4 py-3 mb-4">
+                <summary className="cursor-pointer font-medium text-gray-600">Terms & Conditions</summary>
+                <ul className="mt-2 list-disc pl-4 space-y-1">
+                  {VOUCHER_TERMS.map((term, i) => (
+                    <li key={i}>{term}</li>
+                  ))}
+                </ul>
+              </details>
+              <label className="flex items-start gap-2 mb-4 text-xs text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={agreed}
+                  onChange={(e) => setAgreed(e.target.checked)}
+                  className="mt-0.5"
+                />
+                I have read and agree to the Terms & Conditions
+              </label>
+
               {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
 
               <button
                 onClick={handleRedeem}
-                disabled={notEnoughCredits || loading}
+                disabled={notEnoughCredits || loading || !agreed}
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-full text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
                 style={{ backgroundColor: "#3399FF" }}
               >

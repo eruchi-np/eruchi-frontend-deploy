@@ -77,6 +77,10 @@ export const adminAPI = {
   getScanLog: (params) => api.get('/admin/scan-log', { params }),
   deleteVoucherOffer: (id) => api.delete(`/admin/voucher-offers/${id}`),
   getVoucherWithToken: (id) => api.get(`/admin/vouchers/${id}`),
+  uploadBusinessLogo: (id, formData) =>
+  api.put(`/admin/businesses/${id}/logo`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
 };
 
 export const sepSurveyAPI = {
@@ -105,6 +109,11 @@ export const businessAPI = {
   getVoucherOffers: () => api.get('/business/voucher-offers'),
   previewScan: (voucherId, redemptionToken) =>
   api.get('/business/scan/preview', { params: { voucherId, redemptionToken } }),
+  getProfile: () => api.get('/business/profile'),
+  uploadLogo: (formData) =>
+    api.put('/business/profile/logo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 export default api;

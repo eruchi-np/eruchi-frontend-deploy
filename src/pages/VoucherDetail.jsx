@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import QRCode from "react-qr-code";
 import { ArrowLeft, Maximize2, Download } from "lucide-react";
 import { voucherAPI } from "../services/api";
+import { VOUCHER_TERMS } from "../constants/voucherTerms";
 
 export default function VoucherDetail() {
   const { id } = useParams();
@@ -288,6 +289,15 @@ export default function VoucherDetail() {
                 {snap.description}
               </p>
             )}
+
+            <details className="text-xs text-gray-500 border-t border-blue-50 mt-3 pt-3 text-left max-w-xs mx-auto">
+              <summary className="cursor-pointer font-medium text-gray-600 text-center">Terms & Conditions</summary>
+              <ul className="mt-2 list-disc pl-4 space-y-1">
+                {VOUCHER_TERMS.map((term, i) => (
+                  <li key={i}>{term}</li>
+                ))}
+              </ul>
+            </details>
           </div>
 
           {/* QR area */}

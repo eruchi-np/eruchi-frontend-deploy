@@ -170,6 +170,9 @@ export default function BusinessScan() {
                     ? `${result.data.discountValue}% off`
                     : `Rs. ${result.data.discountValue} off`}
                 </p>
+                {result.data.description && (
+                  <p className="text-sm text-gray-500 mt-2">{result.data.description}</p>
+                )}
                 <div className="flex gap-3 mt-4 justify-center">
                   <button
                     onClick={handleApprove}

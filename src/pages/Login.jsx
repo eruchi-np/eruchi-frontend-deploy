@@ -93,7 +93,7 @@ const Login = () => {
       localStorage.setItem('user_id', userData.id);
 
       window.dispatchEvent(new Event('authChange'));
-      toast.success("Login successful! Welcome back!");
+      toast.success("Login successful!");
       navigate('/');
 
     } catch (error) {
@@ -153,8 +153,6 @@ const Login = () => {
         <div className="flex justify-center items-center">
           <div className="flex w-full rounded-lg lg:w-[600px] mx-5 space-y-12 flex-wrap flex-col">
             <h1 className="text-[40px] lg:text-4x1 font-bold leading-tight">
-              Welcome Back!
-              <br />
               <span className="text-[38px] lg:text-4x1 font-bold text-black">
                 Please sign in to continue
               </span>

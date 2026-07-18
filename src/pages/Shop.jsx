@@ -1,17 +1,75 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronDown, Ticket, SearchX, Calendar, Hourglass } from "lucide-react";
+import {
+  ChevronDown,
+  SearchX,
+  Calendar,
+  Hourglass,
+} from "lucide-react";
 import { userAPI, voucherAPI } from "../services/api";
 import VoucherRedeemModal from "../components/widgets/VoucherRedeemModal";
 import SearchBar from "../components/widgets/SearchBar";
-import { useAuth } from '../context/AuthContext';
-import { toast } from 'react-hot-toast';
+import { useAuth } from "../context/AuthContext";
+import { toast } from "react-hot-toast";
 import AnimatedContent from "../components/animations/AnimatedContent";
 
+import vendorPoster1 from "../assets/poster-1.png";
+import vendorPoster2 from "../assets/poster-2.png";
+import vendorPoster3 from "../assets/poster-3.png";
+
+const VENDOR_POSTERS = [
+  { image: vendorPoster1, alt: "Vendor poster 1" },
+  { image: vendorPoster2, alt: "Vendor poster 2" },
+  { image: vendorPoster3, alt: "Vendor poster 3" },
+];
+
+
+// Matches the homepage heading style for visual cohesion
+const headingStyle = {
+  fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+  fontSize: "clamp(32px, 5vw, 58px)",
+  fontWeight: 500,
+  lineHeight: 1.1,
+};
+
 const descriptionStyle = {
-  fontSize: "clamp(16px, 1.5vw, 20px)",
+  fontSize: "clamp(15px, 1.5vw, 20px)",
   fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
   fontWeight: 300,
+};
+
+// Simple Durstenfeld shuffle utility
+const shuffleArray = (array) => {
+  const shuffled = [...array];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+};
+
+// Vibrant ticket palettes — bg, darker accent, and soft ray color
+const TICKET_PALETTES = [
+  { bg: "#00704A", accent: "#005C3C", text: "#FFFFFF" }, // green
+  { bg: "#E50914", accent: "#B8070F", text: "#FFFFFF" }, // red
+  { bg: "#1E88E5", accent: "#1565C0", text: "#FFFFFF" }, // blue
+  { bg: "#FB8C00", accent: "#EF6C00", text: "#FFFFFF" }, // orange
+  { bg: "#212121", accent: "#000000", text: "#FFFFFF" }, // black
+  { bg: "#EC407A", accent: "#D81B60", text: "#FFFFFF" }, // pink
+  { bg: "#6A1B9A", accent: "#4A148C", text: "#FFFFFF" }, // purple
+  { bg: "#00897B", accent: "#00695C", text: "#FFFFFF" }, // teal
+  { bg: "#3949AB", accent: "#283593", text: "#FFFFFF" }, // indigo
+  { bg: "#C62828", accent: "#8E0000", text: "#FFFFFF" }, // maroon
+];
+
+// Deterministic: same brand name → same color, always
+const getBrandPalette = (brandName = "") => {
+  let hash = 0;
+  for (let i = 0; i < brandName.length; i++) {
+    hash = (hash << 5) - hash + brandName.charCodeAt(i);
+    hash |= 0;
+  }
+  return TICKET_PALETTES[Math.abs(hash) % TICKET_PALETTES.length];
 };
 
 function VoucherCard({ offer, onRedeem }) {
@@ -33,7 +91,10 @@ function VoucherCard({ offer, onRedeem }) {
           ? offer.monthlyRedemptionLog[offer.monthlyRedemptionLog.length - 1]
           : null;
       return {
-        remaining: Math.max(0, offer.monthlyStock - (currentLog ? currentLog.count : 0)),
+        remaining: Math.max(
+          0,
+          offer.monthlyStock - (currentLog ? currentLog.count : 0)
+        ),
         isMonthly: true,
       };
     }
@@ -50,123 +111,144 @@ function VoucherCard({ offer, onRedeem }) {
   }, [offer.validUntil]);
 
   const isOut = stockInfo !== null && stockInfo.remaining === 0;
-  const isLowStock = stockInfo !== null && stockInfo.remaining <= 10;
+  const isLowStock = stockInfo !== null && !isOut && stockInfo.remaining <= 10;
   const brandName =
     offer.business?.brandName || offer.business?.name || "Official Brand";
+  const brandLogo = offer.business?.logo || offer.business?.logoUrl || null;
+  const palette = useMemo(() => getBrandPalette(brandName), [brandName]);
 
   return (
-    <div className="w-full h-full cursor-pointer bg-white rounded-[16px] sm:rounded-[24px] shadow-sm hover:shadow-md transition-shadow duration-300 flex flex-col justify-between group overflow-hidden border border-gray-100">
-      {/* ── Blue top accent strip ── */}
+    <div
+      onClick={() => !isOut && onRedeem(offer)}
+      role="button"
+      tabIndex={isOut ? -1 : 0}
+      aria-disabled={isOut}
+      onKeyDown={(e) => {
+        if (!isOut && (e.key === "Enter" || e.key === " ")) {
+          e.preventDefault();
+          onRedeem(offer);
+        }
+      }}
+      className={`w-full h-full bg-white flex flex-col group outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-2xl ${
+        isOut ? "cursor-not-allowed opacity-60" : "cursor-pointer"
+      }`}
+      >
+      {/* ── Ticket-style panel ── */}
+      <div
+        className="relative w-full aspect-square rounded-2xl overflow-hidden flex flex-col transition-all duration-300 group-hover:shadow-lg group-hover:-translate-y-1"
+        style={{ backgroundColor: palette.bg }}
+      >
+        {/* Decorative sunburst rays behind the logo */}
+        <div
+          className="absolute top-[8%] left-1/2 -translate-x-1/2 w-3/4 aspect-square rounded-full opacity-20 pointer-events-none"
+          style={{
+            background: `repeating-conic-gradient(${palette.accent} 0deg 12deg, transparent 12deg 24deg)`,
+          }}
+        />
 
-      <div className="p-3 sm:p-5 flex flex-col justify-between flex-1">
-        <div>
-          {/* ── Ticket visual — blue-tinted ── */}
-          <div className="rounded-xl sm:rounded-2xl mb-3 sm:mb-5 flex flex-col items-center justify-between p-3 sm:p-5 relative w-full overflow-hidden border border-blue-100 bg-blue-50/30 h-[110px] sm:h-[160px]">
-            <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-blue-200/50 to-transparent" />
-            <div className="absolute bottom-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-blue-200/50 to-transparent" />
-
-            <div className="w-full flex items-center justify-between z-10">
-              <Ticket
-                className="w-3 h-3 sm:w-4 sm:h-4 text-[#3399FF] opacity-40"
-                strokeWidth={1.5}
+        {/* Top: brand + logo */}
+        <div className="flex-[13] relative flex flex-col items-center justify-center gap-2 px-4">
+          <span
+            className="text-[10px] sm:text-xs font-semibold tracking-[0.25em] uppercase line-clamp-1"
+            style={{ color: palette.text, opacity: 0.9 }}
+          >
+            {brandName}
+          </span>
+          <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105">
+            {brandLogo ? (
+              <img
+                src={brandLogo}
+                alt={`${brandName} logo`}
+                className="max-w-[65%] max-h-[65%] object-contain"
               />
-            </div>
-
-            <div className="text-center z-10 my-auto flex flex-col items-center">
-              <span className="text-[#134074] font-medium tracking-wide text-2xl sm:text-[36px] leading-none">
-                {offer.creditsRequired}
+            ) : (
+              <span
+                className="font-semibold text-2xl sm:text-3xl tracking-tight select-none"
+                style={{ color: palette.bg }}
+              >
+                {brandName.charAt(0).toUpperCase()}
               </span>
-              <span className="text-[#3399FF]/60 text-[9px] sm:text-xs tracking-wider font-normal mt-1">
-                credits
-              </span>
-            </div>
-
-            <div className="absolute left-0 top-1/2 -translate-y-1/2 w-2 h-4 sm:w-3 sm:h-6 bg-white border-r border-blue-100 rounded-r-full" />
-            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-4 sm:w-3 sm:h-6 bg-white border-l border-blue-100 rounded-l-full" />
-          </div>
-
-          {/* ── Info block ── */}
-          <div className="px-1 mb-4 sm:mb-5 flex flex-col gap-1.5">
-            {/* Brand name — prominent, blue, uppercase */}
-            <p className="text-[#3399FF] text-[9px] sm:text-[11px] font-bold tracking-widest uppercase line-clamp-1">
-              {brandName}
-            </p>
-
-            <h2 className="text-gray-800 line-clamp-2 group-hover:text-black transition-colors text-sm sm:text-[17px] font-medium leading-snug">
-              {offer.title}
-            </h2>
-
-            {/* Discount — blue */}
-            <p className="text-[#3399FF] text-[10px] sm:text-xs font-semibold">
-              {discountLabel} off
-            </p>
-
-            <hr className="border-blue-50 my-0.5" />
-
-            {/* Expiry indicators */}
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-1 text-gray-500 text-[9px] sm:text-[11px]">
-                <Hourglass size={11} className="text-gray-400" />
-                <span>Valid for {offer.expiryDays} days once claimed</span>
-              </div>
-
-              {formattedDeadline && (
-                <div className="flex items-center gap-1 text-amber-600 text-[9px] sm:text-[11px] font-medium">
-                  <Calendar size={11} className="text-amber-500" />
-                  <span>Offer ends: {formattedDeadline}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Stock scarcity counter */}
-            {stockInfo !== null && (
-              <div className="mt-1 flex items-center gap-1.5">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span
-                    className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                      isLowStock ? "bg-red-400" : "bg-emerald-400"
-                    }`}
-                  />
-                  <span
-                    className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
-                      isLowStock ? "bg-red-500" : "bg-emerald-500"
-                    }`}
-                  />
-                </span>
-                <span
-                  className={`text-[10px] font-semibold tracking-wide ${
-                    isLowStock ? "text-red-500" : "text-emerald-600"
-                  }`}
-                >
-                  {isOut
-                    ? stockInfo.isMonthly
-                      ? "Sold out this month"
-                      : "Sold out"
-                    : `${stockInfo.remaining} ${
-                        stockInfo.remaining === 1 ? "voucher" : "vouchers"
-                      } left${stockInfo.isMonthly ? " this month" : ""}`}
-                </span>
-              </div>
             )}
           </div>
         </div>
 
-        <button
-          onClick={() => !isOut && onRedeem(offer)}
-          disabled={isOut}
-          className={`w-full text-white rounded-full py-2.5 sm:py-3.5 transition-transform font-medium text-[10px] sm:text-xs tracking-wide shadow-sm ${
-            isOut
-              ? "bg-gray-300 cursor-not-allowed opacity-80"
-              : "hover:scale-[1.01] active:scale-95"
-          }`}
-          style={isOut ? {} : { backgroundColor: "#3399FF" }}
-        >
-          {isOut ? "Sold Out" : "Redeem Reward"}
-        </button>
+        {/* Perforation row */}
+        <div className="relative flex items-center h-0 z-10">
+          <span className="absolute -left-3 w-6 h-6 bg-white rounded-full" />
+          <span className="absolute -right-3 w-6 h-6 bg-white rounded-full" />
+          <div className="w-full mx-6 border-t-2 border-dashed border-white/40" />
+        </div>
+
+        {/* Bottom: discount + redeem pill */}
+        <div className="flex-[9] relative flex flex-col items-center justify-center gap-2">
+          <div className="flex items-baseline gap-1.5">
+            <span
+              className="font-bold leading-none text-2xl sm:text-3xl"
+              style={{ color: palette.text }}
+            >
+              {discountLabel}
+            </span>
+            <span
+              className="text-xs sm:text-sm tracking-widest font-medium"
+              style={{ color: palette.text, opacity: 0.8 }}
+            >
+              OFF
+            </span>
+          </div>
+          <span
+            className="bg-white text-xs sm:text-sm font-semibold px-6 py-1.5 rounded-full shadow-sm transition-transform duration-300 group-hover:scale-105"
+            style={{ color: palette.accent }}
+          >
+            Redeem
+          </span>
+        </div>
+
+        {isOut && (
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] flex items-center justify-center rounded-2xl z-20">
+            <span className="text-white text-xs font-semibold tracking-widest uppercase">
+              Sold Out
+            </span>
+          </div>
+        )}
+
+        {!isOut && stockInfo !== null && isLowStock && (
+          <span className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 bg-white text-red-500 text-[9px] sm:text-[10px] font-semibold px-2 py-1 rounded-full shadow-sm z-10">
+            {stockInfo.remaining} left
+          </span>
+        )}
+      </div>
+
+      {/* ── Info ── */}
+      <div className="pt-3 sm:pt-4 flex flex-col gap-0.5">
+        <p className="text-gray-400 text-[9px] sm:text-[11px] font-medium tracking-wide uppercase line-clamp-1">
+          {brandName}
+        </p>
+
+        <h2 className="text-gray-900 line-clamp-1 text-sm sm:text-base font-medium leading-snug">
+          {offer.title}
+        </h2>
+
+        <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
+          {offer.creditsRequired} credits{" "}
+          <span className="text-gray-400">· {discountLabel} off</span>
+        </p>
+
+        <div className="flex items-center gap-1 text-gray-400 text-[10px] sm:text-[11px] mt-1.5">
+          <Hourglass size={10} />
+          <span>Valid {offer.expiryDays} days once claimed</span>
+        </div>
+
+        {formattedDeadline && (
+          <div className="flex items-center gap-1 text-gray-400 text-[10px] sm:text-[11px]">
+            <Calendar size={10} />
+            <span>Ends {formattedDeadline}</span>
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
 
 export default function Shop() {
   const { user } = useAuth();
@@ -174,7 +256,8 @@ export default function Shop() {
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [search, setSearch] = useState("");
   const [sortOrder, setSortOrder] = useState("default");
-  const [creditRange, setCreditRange] = useState("all");
+  const [category, setCategory] = useState("all");
+  const [posterIndex, setPosterIndex] = useState(0);
 
   const [voucherOffers, setVoucherOffers] = useState([]);
   const [userCredits, setUserCredits] = useState(0);
@@ -182,40 +265,65 @@ export default function Shop() {
   const navigate = useNavigate();
 
   const handleSelectOffer = (offer) => {
+    if (!user) {
+      toast.error("Please log in to redeem vouchers.");
+      navigate("/login");
+      return;
+    }
     if (!user?.isProfileComplete) {
-      toast.error('Complete your profile to redeem vouchers.');
+      toast.error("Complete your profile to redeem vouchers.");
       return;
     }
     setSelectedOffer(offer);
   };
 
+  // Auto-advance the spotlight deals carousel
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setPosterIndex((prev) => (prev + 1) % VENDOR_POSTERS.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     const token = localStorage.getItem("access_token");
-    const storedUser = localStorage.getItem("username");
-    if (!token || !storedUser) {
-      navigate("/login");
-      return;
-    }
     setReady(true);
 
     const fetchData = async () => {
       try {
         const [offersRes, profileRes] = await Promise.all([
           voucherAPI.getOffers(),
-          userAPI.getProfile(),
+          token ? userAPI.getProfile() : Promise.resolve(null),
         ]);
-        
+
         const responseData = offersRes.data?.data || offersRes.data;
         const targetArray = Array.isArray(responseData) ? responseData : [];
-        
-        setVoucherOffers(targetArray);
-        setUserCredits(profileRes.data?.data?.user?.credits ?? profileRes.data?.user?.credits ?? 0);
+
+        // Randomize the voucher collection once when loaded
+        const randomizedArray = shuffleArray(targetArray);
+
+        setVoucherOffers(randomizedArray);
+        if (profileRes) {
+          setUserCredits(
+            profileRes.data?.data?.user?.credits ??
+              profileRes.data?.user?.credits ??
+              0
+          );
+        }
       } catch (err) {
         console.error("Fetch Failure:", err);
       }
     };
     fetchData();
-  }, [navigate]);
+  }, []);
+
+  const categories = useMemo(() => {
+    const found = new Set();
+    voucherOffers.forEach((offer) => {
+      if (offer.business?.category) found.add(offer.business.category);
+    });
+    return Array.from(found).sort();
+  }, [voucherOffers]);
 
   const filteredCatalog = useMemo(() => {
     const q = search.toLowerCase().replace(/\s/g, "");
@@ -223,62 +331,119 @@ export default function Shop() {
     let vouchers = voucherOffers.map((offer, idx) => ({
       id: offer._id,
       credits: offer.creditsRequired,
-      searchPayload: `${offer.title || ""} ${offer.business?.name || ""} ${offer.creditsRequired || ""} ${offer.discountValue || ""}`.toLowerCase().replace(/\s/g, ""),
+      searchPayload: `${offer.title || ""} ${offer.business?.name || ""} ${
+        offer.creditsRequired || ""
+      } ${offer.discountValue || ""}`
+        .toLowerCase()
+        .replace(/\s/g, ""),
       originalData: offer,
-      index: idx
+      index: idx,
     }));
 
-    if (q) vouchers = vouchers.filter(item => item.searchPayload.includes(q));
+    vouchers = vouchers.filter((item) => {
+      const validUntil = item.originalData.validUntil;
+      if (!validUntil) return true;
+      return new Date(validUntil) >= new Date();
+    });
 
-    if (creditRange === "under100") {
-      vouchers = vouchers.filter(item => item.credits < 100);
-    } else if (creditRange === "100-500") {
-      vouchers = vouchers.filter(item => item.credits >= 100 && item.credits <= 500);
-    } else if (creditRange === "over500") {
-      vouchers = vouchers.filter(item => item.credits > 500);
+    if (q) vouchers = vouchers.filter((item) => item.searchPayload.includes(q));
+
+    if (category !== "all") {
+      vouchers = vouchers.filter(
+        (item) => item.originalData.business?.category === category
+      );
     }
 
     if (sortOrder === "asc") vouchers.sort((a, b) => a.credits - b.credits);
     if (sortOrder === "desc") vouchers.sort((a, b) => b.credits - a.credits);
 
     return vouchers;
-  }, [search, sortOrder, creditRange, voucherOffers]);
+  }, [search, sortOrder, category, voucherOffers]);
 
   if (!ready) return null;
 
   return (
-    <div className="min-h-screen bg-white" style={{ fontFamily: "'Inter', sans-serif" }}>
-      <div className="max-w-[1314px] mx-auto px-4 sm:px-8 lg:px-10 py-10 lg:py-16">
+    <div
+      className="min-h-screen bg-white"
+      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
+    >
+      {/* ── Spotlight deals carousel ── */}
+      <div className="relative overflow-hidden" style={{ height: "520px" }}>
+        {VENDOR_POSTERS.map((poster, i) => (
+          <div
+            key={i}
+            className="absolute inset-0 bg-cover bg-center transition-opacity duration-1000"
+            style={{
+              backgroundImage: `url(${poster.image})`,
+              opacity: i === posterIndex ? 1 : 0,
+            }}
+          />
+        ))}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
 
+        <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-10 flex items-end justify-between gap-6">
+          <div className="flex gap-2">
+            {VENDOR_POSTERS.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setPosterIndex(i)}
+                aria-label={`Show poster ${i + 1}`}
+                className={`w-2.5 h-2.5 rounded-full transition-colors ${
+                  i === posterIndex ? "bg-white" : "bg-white/40"
+                }`}
+              />
+            ))}
+          </div>
+
+          <div className="text-right max-w-[480px]">
+            <h2 className="text-white mb-2" style={headingStyle}>
+              Spotlight <span className="text-blue-400">deals</span> right now
+            </h2>
+            <p className="text-white/80 mb-5" style={descriptionStyle}>
+              Explore our collections of various goods curated to your taste.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div
+        id="rewards-catalog"
+        className="max-w-[1314px] mx-auto px-4 sm:px-8 lg:px-10 py-10 lg:py-16"
+      >
         {/* Header Block Section */}
         <div className="grid lg:grid-cols-[1fr_460px] gap-8 lg:gap-12 items-start justify-between border-b border-gray-100 pb-10 mb-10 lg:pb-12 lg:mb-12">
-          
-          <AnimatedContent direction="vertical" distance={40} duration={0.8} className="flex flex-col">
-            <h1
-              className="text-gray-900 mb-4"
-              style={{
-                fontSize: "clamp(36px, 5vw, 64px)",
-                fontWeight: 300,
-                lineHeight: 1.1,
-              }}
-            >
-              Rewards Shop.
+          <AnimatedContent
+            direction="vertical"
+            distance={40}
+            duration={0.8}
+            className="flex flex-col"
+          >
+            <h1 className="text-gray-900 mb-4" style={headingStyle}>
+              Rewards <span className="text-blue-600">Shop</span>.
             </h1>
             <p
-              className="text-gray-700 leading-snug text-justify max-w-xl"
+              className="text-gray-700 leading-snug max-w-xl"
               style={descriptionStyle}
             >
-              Exchange your earned credits for vouchers instantly. Complete surveys, build up your balance, and save securely on your favorite spots.
+              Exchange your earned credits for vouchers instantly. Complete
+              surveys, build up your balance, and save securely on your
+              favorite spots.
             </p>
           </AnimatedContent>
 
-          <AnimatedContent direction="vertical" distance={40} duration={0.8} delay={0.15} className="flex flex-col gap-4 w-full">
+          <AnimatedContent
+            direction="vertical"
+            distance={40}
+            duration={0.8}
+            delay={0.15}
+            className="flex flex-col gap-4 w-full"
+          >
             <SearchBar
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search rewards..."
             />
-            
+
             <div className="grid grid-cols-2 gap-3 w-full">
               <div className="relative">
                 <select
@@ -286,25 +451,33 @@ export default function Shop() {
                   onChange={(e) => setSortOrder(e.target.value)}
                   className="w-full pl-4 lg:pl-5 pr-10 py-3.5 lg:py-4 border border-gray-200 rounded-full text-sm lg:text-base text-gray-900 outline-none transition-colors focus:border-gray-300 bg-white appearance-none cursor-pointer"
                 >
-                  <option value="default">Ordering</option>
-                  <option value="asc">Low → High</option>
-                  <option value="desc">High → Low</option>
+                  <option value="default">Sort by</option>
+                  <option value="asc">Credits: Low to High</option>
+                  <option value="desc">Credits: High to Low</option>
                 </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                <ChevronDown
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                  size={16}
+                />
               </div>
 
               <div className="relative">
                 <select
-                  value={creditRange}
-                  onChange={(e) => setCreditRange(e.target.value)}
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
                   className="w-full pl-4 lg:pl-5 pr-10 py-3.5 lg:py-4 border border-gray-200 rounded-full text-sm lg:text-base text-gray-900 outline-none transition-colors focus:border-gray-300 bg-white appearance-none cursor-pointer"
                 >
-                  <option value="all">All Tiers</option>
-                  <option value="under100">&lt; 100</option>
-                  <option value="100-500">100 — 500</option>
-                  <option value="over500">&gt; 500</option>
+                  <option value="all">All categories</option>
+                  {categories.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                    </option>
+                  ))}
                 </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                <ChevronDown
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"
+                  size={16}
+                />
               </div>
             </div>
           </AnimatedContent>
@@ -312,41 +485,37 @@ export default function Shop() {
 
         {/* Catalog Layout Core Grid View */}
         {filteredCatalog.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6 items-stretch">
-            {filteredCatalog.map((item, index) => (
-              <AnimatedContent
-                key={item.id}
-                direction="vertical"
-                distance={30}
-                duration={0.6}
-                delay={0.1 + (index % 4) * 0.08}
-                className="w-full"
-              >
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-8 sm:gap-y-12 items-stretch">
+            {filteredCatalog.map((item) => (
+              <div key={item.id} className="w-full">
                 <VoucherCard
                   offer={item.originalData}
                   onRedeem={handleSelectOffer}
                 />
-              </AnimatedContent>
+              </div>
             ))}
           </div>
         ) : (
           <AnimatedContent direction="vertical" distance={30} duration={0.6}>
             <div className="text-center py-20 border-2 border-dashed border-gray-200 rounded-3xl bg-gray-50/50 max-w-2xl mx-auto px-4">
               <SearchX className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-gray-900 text-xl font-medium mb-2">No matching vouchers found</h3>
+              <h3 className="text-gray-900 text-xl font-medium mb-2">
+                No matching vouchers found
+              </h3>
               <p className="text-gray-500 text-sm max-w-sm mx-auto mb-6">
-                No active rewards align with your selected keywords or filtering restrictions. Try modifying parameters.
+                Nothing matches your search or filters right now. Try
+                clearing them to see all rewards.
               </p>
               <button
                 onClick={() => {
                   setSearch("");
-                  setCreditRange("all");
+                  setCategory("all");
                   setSortOrder("default");
                 }}
-                className="px-6 py-3 text-white rounded-full text-xs font-medium transition-transform hover:scale-105"
+                className="px-6 py-3 text-white rounded-full text-sm font-medium transition-opacity hover:opacity-90"
                 style={{ backgroundColor: "#134074" }}
               >
-                Reset Filter Settings
+                Clear filters
               </button>
             </div>
           </AnimatedContent>
@@ -354,7 +523,12 @@ export default function Shop() {
 
         {/* More Coming Soon Indicator */}
         {filteredCatalog.length > 0 && (
-          <AnimatedContent direction="vertical" distance={20} duration={0.6} delay={0.4}>
+          <AnimatedContent
+            direction="vertical"
+            distance={20}
+            duration={0.6}
+            delay={0.4}
+          >
             <div className="mt-12 sm:mt-16 text-center">
               <p className="text-gray-400 font-medium tracking-wide text-sm sm:text-base">
                 More coming soon
@@ -369,7 +543,8 @@ export default function Shop() {
             className="text-gray-400 tracking-wide"
             style={{ fontSize: "11px", fontWeight: 300 }}
           >
-            Credits are allocated through automated activity confirmation. Redemption processing windows span 3–5 operational cycles.
+            Credits are added automatically after your activity is verified.
+            Voucher redemptions may take 3–5 business days to process
           </p>
         </div>
       </div>

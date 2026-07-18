@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { sepSurveyAPI } from '../services/api';
 import { 
   Loader2, 
-  ArrowLeft, 
   Award, 
   AlertCircle, 
   SearchX,
@@ -15,8 +14,15 @@ import {
 import toast from 'react-hot-toast';
 import AnimatedContent from '../components/animations/AnimatedContent';
 
+const headingStyle = {
+  fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+  fontSize: "clamp(32px, 5vw, 58px)",
+  fontWeight: 500,
+  lineHeight: 1.1,
+};
+
 const descriptionStyle = {
-  fontSize: "clamp(16px, 1.5vw, 20px)",
+  fontSize: "clamp(15px, 1.5vw, 20px)",
   fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
   fontWeight: 300,
 };
@@ -103,17 +109,9 @@ const StandaloneSurveys = () => {
         {/* Header Section */}
         <div className="grid lg:grid-cols-[1fr_340px] gap-8 items-end justify-between border-b border-neutral-200 pb-12 mb-12">
           <AnimatedContent direction="vertical" distance={40} duration={0.8} className="flex flex-col">
-            <button
-              onClick={() => navigate('/profile')}
-              className="flex items-center text-neutral-500 hover:text-neutral-900 w-fit mb-6 transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5 mr-2" />
-              Back to Profile
-            </button>
-            
             <h1 
               className="text-neutral-900 mb-4"
-              style={{ fontSize: "clamp(40px, 5vw, 64px)", fontWeight: 300, lineHeight: 1.1 }}
+              style={headingStyle}
             >
               Available Surveys
             </h1>
@@ -122,7 +120,7 @@ const StandaloneSurveys = () => {
               className="text-neutral-600 leading-snug max-w-2xl"
               style={descriptionStyle}
             >
-              Share your thoughts and earn credits. Select a survey below to get started and unlock your rewards.
+              Share your thoughts, influence brands, and earn credits. Select a survey below to get started and unlock your rewards.
             </p>
           </AnimatedContent>
 
@@ -133,13 +131,13 @@ const StandaloneSurveys = () => {
                 <select
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value)}
-                  className="w-full pl-5 pr-12 py-4 border border-neutral-300 rounded-md text-base text-neutral-900 outline-none transition-colors focus:border-neutral-900 bg-white appearance-none cursor-pointer"
+                  className="w-full pl-4 lg:pl-5 pr-10 py-3.5 lg:py-4 border border-gray-200 rounded-full text-sm lg:text-base text-gray-900 outline-none transition-colors focus:border-gray-300 bg-white appearance-none cursor-pointer"
                 >
                   <option value="default">Default Ordering</option>
                   <option value="credits-desc">Reward: High → Low</option>
                   <option value="credits-asc">Reward: Low → High</option>
                 </select>
-                <ChevronDown className="absolute right-5 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none" size={18} />
+                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
               </div>
             </AnimatedContent>
           )}
@@ -157,7 +155,7 @@ const StandaloneSurveys = () => {
                 No surveys right now
               </h3>
               <p className="text-neutral-600 mb-8" style={descriptionStyle}>
-                Check back soon! New surveys tailored to your profile will appear here when they're published.
+                Check back soon! New standalone surveys tailored to your profile will appear here when they're published.
               </p>
               <button
                 onClick={() => navigate('/profile')}
