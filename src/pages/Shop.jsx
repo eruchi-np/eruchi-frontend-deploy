@@ -135,7 +135,7 @@ function VoucherCard({ offer, onRedeem }) {
       >
       {/* ── Ticket-style panel ── */}
       <div
-        className="relative w-full aspect-square rounded-2xl overflow-hidden flex flex-col transition-all duration-300 group-hover:shadow-lg group-hover:-translate-y-1"
+        className="relative w-full aspect-square rounded-2xl flex flex-col transition-all duration-300 group-hover:shadow-lg group-hover:-translate-y-1"
         style={{ backgroundColor: palette.bg }}
       >
         {/* Decorative sunburst rays behind the logo */}
@@ -149,12 +149,12 @@ function VoucherCard({ offer, onRedeem }) {
         {/* Top: brand + logo */}
         <div className="flex-[13] relative flex flex-col items-center justify-center gap-2 px-4">
           <span
-            className="text-[10px] sm:text-xs font-semibold tracking-[0.25em] uppercase line-clamp-1"
+           className="text-[8px] xs:text-[10px] sm:text-xs font-semibold tracking-[0.2em] sm:tracking-[0.25em] uppercase line-clamp-1"
             style={{ color: palette.text, opacity: 0.9 }}
           >
             {brandName}
           </span>
-          <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105">
+          <div className="w-[45%] max-w-24 aspect-square rounded-full bg-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105">
             {brandLogo ? (
               <img
                 src={brandLogo}
@@ -174,31 +174,31 @@ function VoucherCard({ offer, onRedeem }) {
 
         {/* Perforation row */}
         <div className="relative flex items-center h-0 z-10">
-          <span className="absolute -left-3 w-6 h-6 bg-white rounded-full" />
-          <span className="absolute -right-3 w-6 h-6 bg-white rounded-full" />
-          <div className="w-full mx-6 border-t-2 border-dashed border-white/40" />
-        </div>
+         <span className="absolute -left-2.5 w-5 h-5 bg-white rounded-full -translate-x-1/2" />
+         <span className="absolute -right-2.5 w-5 h-5 bg-white rounded-full translate-x-1/2" />
+         <div className="w-full mx-3 border-t-2 border-dashed border-white/40" />
+       </div>
 
         {/* Bottom: discount + redeem pill */}
-        <div className="flex-[9] relative flex flex-col items-center justify-center gap-2">
+        <div className="flex-[9] relative flex flex-col items-center justify-center gap-2 px-4">
           <div className="flex items-baseline gap-1.5">
             <span
-              className="font-bold leading-none text-2xl sm:text-3xl"
+              className="font-bold leading-none text-lg xs:text-xl sm:text-3xl"
               style={{ color: palette.text }}
             >
               {discountLabel}
             </span>
             <span
-              className="text-xs sm:text-sm tracking-widest font-medium"
+              className="text-[10px] xs:text-xs sm:text-sm tracking-widest font-medium"
               style={{ color: palette.text, opacity: 0.8 }}
             >
               OFF
             </span>
           </div>
           <span
-            className="bg-white text-xs sm:text-sm font-semibold px-6 py-1.5 rounded-full shadow-sm transition-transform duration-300 group-hover:scale-105"
-            style={{ color: palette.accent }}
-          >
+           className="bg-white text-[10px] xs:text-xs sm:text-sm font-semibold px-3 xs:px-4 sm:px-6 py-1 sm:py-1.5 rounded-full shadow-sm max-w-full transition-transform duration-300 group-hover:scale-105"
+             style={{ color: palette.accent }}
+           >
             Redeem
           </span>
         </div>
