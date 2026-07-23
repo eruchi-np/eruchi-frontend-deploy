@@ -23,7 +23,6 @@ const VENDOR_POSTERS = [
   { image: vendorPoster3, alt: "Vendor poster 3" },
 ];
 
-
 // Matches the homepage heading style for visual cohesion
 const headingStyle = {
   fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
@@ -249,7 +248,6 @@ function VoucherCard({ offer, onRedeem }) {
   );
 }
 
-
 export default function Shop() {
   const { user } = useAuth();
   const [ready, setReady] = useState(false);
@@ -258,9 +256,17 @@ export default function Shop() {
   const [sortOrder, setSortOrder] = useState("default");
   const [category, setCategory] = useState("all");
   const [posterIndex, setPosterIndex] = useState(0);
+  const [showIsland, setShowIsland] = useState(false);
 
   const [voucherOffers, setVoucherOffers] = useState([]);
   const [userCredits, setUserCredits] = useState(0);
+
+ // Trigger floating island entrance instantly on mount
+  useEffect(() => {
+    // A minimal 20ms delay allows the browser to register the initial hidden state before animating in
+    const timer = setTimeout(() => setShowIsland(true), 500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const navigate = useNavigate();
 
@@ -317,11 +323,12 @@ export default function Shop() {
           setUserCredits(
             profileRes.data?.data?.user?.credits ??
               profileRes.data?.user?.credits ??
+              user?.credits ??
               0
           );
-          } else if (profileResult.status === "rejected") {
-          // Stale/expired token — treat as guest, don't block the page
-          console.warn("Profile fetch failed, continuing as guest.");
+        } else if (profileResult.status === "rejected") {
+          setUserCredits(user?.credits || 0);
+          console.warn("Profile fetch failed, continuing with context state.");
         }
       } catch (err) {
         console.error("Fetch Failure:", err);
@@ -329,7 +336,7 @@ export default function Shop() {
       }
     };
     fetchData();
-  }, []);
+  }, [user]);
 
   const categories = useMemo(() => {
     const found = new Set();
@@ -378,9 +385,10 @@ export default function Shop() {
 
   return (
     <div
-      className="min-h-screen bg-white"
+      className="min-h-screen bg-white relative"
       style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
     >
+
       {/* ── Spotlight deals carousel ── */}
       <div className="relative overflow-hidden" style={{ height: "520px" }}>
         {VENDOR_POSTERS.map((poster, i) => (
@@ -553,6 +561,33 @@ export default function Shop() {
 
         {/* Global Technical Footer Node */}
         <div className="mt-10 lg:mt-16 border-t border-gray-100 pt-8 text-center">
+        </div>
+      </div>
+
+      {/* ── Floating Island Widget ── */}
+      <div 
+        onClick={() => {
+          if (!user) navigate("/login");
+        }}
+        className={`fixed bottom-20 right-6 sm:bottom-24 sm:right-10 z-40 transition-all duration-300 ease-out ${
+          !user ? "cursor-pointer" : ""
+        }`}
+        style={{
+          opacity: showIsland ? 1 : 0,
+          transform: showIsland ? "translateY(0) scale(1)" : "translateY(24px) scale(0.92)",
+          pointerEvents: showIsland ? "auto" : "none",
+        }}
+      >
+        <div 
+          className="flex flex-col items-center justify-center min-w-[110px] sm:min-w-[130px] px-6 py-3.5 rounded-full shadow-2xl transition-transform duration-300 hover:scale-[1.04]"
+          style={{ backgroundColor: "rgb(19, 64, 116)" }}
+        >
+          <span className="text-xl sm:text-2xl tracking-tight text-[#ffffff] leading-none mb-1">
+            {user ? userCredits : "LOGIN"}
+          </span>
+          <span className="text-[10px] sm:text-[11px] tracking-widest text-gray-300 uppercase leading-none">
+            {user ? "CREDITS" : "TO CLAIM"}
+          </span>
         </div>
       </div>
 

@@ -13,9 +13,8 @@ const CreateSepSurvey = () => {
     description: '',
     status: 'published',
     credits: 50,
-    isMandatory: false,
-    startDate: new Date().toISOString().split('T')[0],
-    endDate: '',
+    publishedAt: new Date().toISOString().split('T')[0],
+    availableDays: 7,
     questions: [
       {
         questionText: '',
@@ -120,7 +119,10 @@ const CreateSepSurvey = () => {
 
     if (!trimmedTitle) return toast.error('Survey title is required');
     if (!trimmedDesc) return toast.error('Description is required');
-    if (!formData.startDate) return toast.error('Start date is required');
+    if (!formData.publishedAt) return toast.error('Published date is required');
+    if (!formData.availableDays || Number(formData.availableDays) < 1) {
+      return toast.error('Available days must be at least 1');
+    }
 
     const emptyQuestions = formData.questions.filter(q => !q.questionText.trim());
     if (emptyQuestions.length) return toast.error('All questions must have text');
@@ -134,14 +136,18 @@ const CreateSepSurvey = () => {
     setLoading(true);
 
     try {
+      const availableDays = Number(formData.availableDays);
+      const derivedEndDate = new Date(formData.publishedAt);
+      derivedEndDate.setDate(derivedEndDate.getDate() + availableDays);
+
       const payload = {
         title: trimmedTitle,
         description: trimmedDesc,
         status: formData.status,
         credits: Number(formData.credits),
-        isMandatory: formData.isMandatory,
-        startDate: formData.startDate,
-        endDate: formData.endDate || null,
+        publishedAt: formData.publishedAt,
+        availableDays,
+        endDate: derivedEndDate.toISOString().split('T')[0],
         questions: formData.questions.map(q => {
           const base = {
             questionText: q.questionText.trim(),
@@ -171,7 +177,7 @@ const CreateSepSurvey = () => {
     }
   };
 
-  const getMinStartDate = () => new Date().toISOString().split('T')[0];
+  const getMinPublishedDate = () => new Date().toISOString().split('T')[0];
 
   const getQuestionTypeData = (type) => questionTypes.find(qt => qt.value === type);
 
@@ -267,13 +273,13 @@ const CreateSepSurvey = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Start Date <span className="text-red-500">*</span>
+                    Published Date <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="date"
-                    value={formData.startDate}
-                    onChange={e => handleInputChange('startDate', e.target.value)}
-                    min={getMinStartDate()}
+                    value={formData.publishedAt}
+                    onChange={e => handleInputChange('publishedAt', e.target.value)}
+                    min={getMinPublishedDate()}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     required
                   />
@@ -281,29 +287,18 @@ const CreateSepSurvey = () => {
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    End Date (optional)
+                    Available for (in days) <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={e => handleInputChange('endDate', e.target.value)}
-                    min={formData.startDate || getMinStartDate()}
+                    type="number"
+                    min="1"
+                    value={formData.availableDays}
+                    onChange={e => handleInputChange('availableDays', Number(e.target.value))}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="e.g., 7, 14, 30"
+                    required
                   />
                 </div>
-              </div>
-
-              <div className="flex items-center gap-3 pt-2">
-                <input
-                  type="checkbox"
-                  id="isMandatory"
-                  checked={formData.isMandatory}
-                  onChange={e => handleInputChange('isMandatory', e.target.checked)}
-                  className="h-5 w-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
-                />
-                <label htmlFor="isMandatory" className="text-sm font-semibold text-gray-900 cursor-pointer">
-                  Mandatory Survey (users must complete it)
-                </label>
               </div>
             </div>
           </div>

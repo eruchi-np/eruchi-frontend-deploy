@@ -5,9 +5,6 @@ import {
   ArrowLeft,
   Loader2,
   Award,
-  Clock,
-  AlertCircle,
-  CheckCircle,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import useSurveyTimer from "../hooks/userSurveyTimer";
@@ -75,6 +72,24 @@ const StandaloneSurvey = () => {
     });
   };
 
+  const redirectAfterSurvey = async () => {
+    try {
+      const res = await sepSurveyAPI.getAll();
+      const allSurveys = res.data?.data || res.data || [];
+      const remainingSurveys = allSurveys.filter(
+        (s) => (s._id || s.id) !== surveyId
+      );
+
+      if (remainingSurveys.length > 0) {
+        navigate("/surveys");
+      } else {
+        navigate("/profile");
+      }
+    } catch (err) {
+      navigate("/profile");
+    }
+  };
+
   const handleSubmit = async () => {
     if (!isComplete()) {
       toast.error("Please answer all questions");
@@ -86,27 +101,11 @@ const StandaloneSurvey = () => {
       const timingData = getTimingData();
       await sepSurveyAPI.submit(surveyId, responses, timingData);
       toast.success(`Completed! +${survey.credits} credits added`);
-      navigate("/profile");
+      await redirectAfterSurvey();
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to submit");
     } finally {
       setSubmitting(false);
-    }
-  };
-
-  const handleSkip = async () => {
-    if (survey.isMandatory) {
-      toast.error("This survey is mandatory");
-      return;
-    }
-    if (!confirm("Skip this optional survey? No credits awarded.")) return;
-
-    try {
-      await sepSurveyAPI.skip(surveyId);
-      toast.success("Survey skipped");
-      navigate("/profile");
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to skip");
     }
   };
 
@@ -141,15 +140,6 @@ const StandaloneSurvey = () => {
             <div className="flex items-center gap-2">
               <Award className="h-4 w-4" /> {survey.credits} Credits
             </div>
-            <div className="flex items-center gap-2">
-              {survey.isMandatory ? <AlertCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />} 
-              {survey.isMandatory ? "Mandatory" : "Optional"}
-            </div>
-            {survey.endDate && (
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4" /> Ends {new Date(survey.endDate).toLocaleDateString()}
-              </div>
-            )}
           </div>
         </div>
 
@@ -238,11 +228,11 @@ const StandaloneSurvey = () => {
           ))}
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 mt-16 pt-8 border-t border-neutral-100">
+        <div className="mt-16 pt-8 border-t border-neutral-100">
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="flex-1 text-white py-4 px-8 rounded-md font-medium hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+            className="w-full text-white py-4 px-8 rounded-md font-medium hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
             style={{ backgroundColor: "#134074" }}
           >
             {submitting ? (
@@ -251,16 +241,6 @@ const StandaloneSurvey = () => {
               "Submit & Earn Credits"
             )}
           </button>
-
-          {!survey.isMandatory && (
-            <button
-              onClick={handleSkip}
-              disabled={submitting}
-              className="px-8 py-4 border border-neutral-200 text-neutral-700 rounded-md font-medium hover:bg-neutral-50 transition-all"
-            >
-              Skip
-            </button>
-          )}
         </div>
       </div>
     </div>
