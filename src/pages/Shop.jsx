@@ -13,9 +13,9 @@ import { useAuth } from "../context/AuthContext";
 import { toast } from "react-hot-toast";
 import AnimatedContent from "../components/animations/AnimatedContent";
 
-import vendorPoster1 from "../assets/poster-1.png";
-import vendorPoster2 from "../assets/poster-2.png";
-import vendorPoster3 from "../assets/poster-3.png";
+import vendorPoster1 from "../assets/poster-1.webp";
+import vendorPoster2 from "../assets/poster-2.webp";
+import vendorPoster3 from "../assets/poster-3.webp";
 
 const VENDOR_POSTERS = [
   { image: vendorPoster1, alt: "Vendor poster 1" },

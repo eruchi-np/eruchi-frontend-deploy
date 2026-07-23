@@ -9,7 +9,7 @@ import { userAPI, sepSurveyAPI } from "../services/api";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-import heroBg from "../assets/eruchi-home-bg.png";
+import heroBg from "../assets/eruchi-home-bg.webp";
 
 import ujamaa from "../assets/logo-placeholder.png";
 import himalayanHoney from "../assets/himalayan-honey.png";
@@ -19,9 +19,9 @@ import ascend from "../assets/ascend.png";
 import logoPlaceholder from "../assets/logo-placeholder.png";
 import mamba from "../assets/mamba.png";
 
-import vendorPoster1 from "../assets/poster-1.png";
-import vendorPoster2 from "../assets/poster-2.png";
-import vendorPoster3 from "../assets/poster-3.png";
+import vendorPoster1 from "../assets/poster-1.webp";
+import vendorPoster2 from "../assets/poster-2.webp";
+import vendorPoster3 from "../assets/poster-3.webp";
 
 const HERO_BG = heroBg;
 
