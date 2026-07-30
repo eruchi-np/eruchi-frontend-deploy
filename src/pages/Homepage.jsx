@@ -307,8 +307,8 @@ export default function Homepage() {
                     <h2 className="text-2xl font-bold text-gray-900 text-center mb-1">
                       Join &amp; Start <span className="text-blue-600">Earning</span>
                     </h2>
-                    <p className="text-center text-xs tracking-wide text-gray-500 font-medium mb-6">
-                      50 POINTS WELCOME BONUS
+                    <p className="text-center text-s tracking-wide text-gray-500 font-medium mb-6">
+                      Local rewards are just a few steps away!
                     </p>
 
                     <div className="space-y-3">
