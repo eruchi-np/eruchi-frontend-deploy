@@ -9,7 +9,8 @@ import {
   ChevronDown,
   FileText,
   Calendar,
-  CheckSquare
+  CheckSquare,
+  Clock
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AnimatedContent from '../components/animations/AnimatedContent';
@@ -55,6 +56,11 @@ const StandaloneSurveys = () => {
     const now = new Date();
     
     let items = surveys.filter(survey => {
+      // Merchant-feedback surveys are pre-filtered correctly by the backend
+      // (based on SurveyAssignment status) — don't re-apply the public-pool
+      // publish-window checks to them here.
+      if (survey.isMerchantFeedback) return true;
+
       if (survey.status !== 'published') return false;
       if (survey.startDate && now < new Date(survey.startDate)) return false;
       if (survey.endDate && now > new Date(survey.endDate)) return false;
@@ -184,9 +190,18 @@ const StandaloneSurveys = () => {
                       <div className="w-12 h-12 rounded-md bg-neutral-50 border border-neutral-200 flex items-center justify-center shrink-0">
                         <FileText className="h-5 w-5 text-neutral-800" />
                       </div>
-                      <h2 className="text-neutral-900 font-semibold text-[18px] sm:text-[20px] leading-tight">
-                        {survey.title}
-                      </h2>
+                      <div>
+                        {survey.isMerchantFeedback && (
+                          <span className="inline-block mb-1.5 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                            {survey.feedbackBusinessName
+                              ? `Feedback for ${survey.feedbackBusinessName}`
+                              : 'Feedback requested'}
+                          </span>
+                        )}
+                        <h2 className="text-neutral-900 font-semibold text-[18px] sm:text-[20px] leading-tight">
+                          {survey.title}
+                        </h2>
+                      </div>
                     </div>
 
                     <p className="text-neutral-500 text-sm sm:text-base line-clamp-2 mb-6 min-h-[40px]">
@@ -194,7 +209,7 @@ const StandaloneSurveys = () => {
                     </p>
 
                     {/* Meta Indicators Grid */}
-                    <div className="grid grid-cols-2 gap-4 mb-6 pt-2">
+                    <div className={`grid ${survey.estimatedMinutes ? 'grid-cols-3' : 'grid-cols-2'} gap-4 mb-6 pt-2`}>
                       <div className="flex flex-col">
                         <div className="flex items-center gap-1.5 mb-1 text-neutral-800">
                           <Award className="h-4 w-4" />
@@ -221,6 +236,18 @@ const StandaloneSurveys = () => {
                         </div>
                         <span className="text-xs text-neutral-400 pl-[22px]">Remaining</span>
                       </div>
+
+                      {survey.estimatedMinutes && (
+                        <div className="flex flex-col">
+                          <div className="flex items-center gap-1.5 mb-1 text-neutral-800">
+                            <Clock className="h-4 w-4" />
+                            <span className="font-medium text-sm sm:text-base whitespace-nowrap">
+                              ~{survey.estimatedMinutes} min
+                            </span>
+                          </div>
+                          <span className="text-xs text-neutral-400 pl-[22px]">Est. Time</span>
+                        </div>
+                      )}
                     </div>
                   </div>
 

@@ -13,6 +13,7 @@ import VouchersCard from "../components/profile/VouchersCard";
 import NotificationsCard from "../components/profile/NotificationsCard";
 import SurveyHistoryCard from "../components/profile/SurveyHistoryCard";
 import DemographicsWizard from '../components/demographics/DemographicsWizard';
+import AdditionalProfileSurvey from '../components/demographics/AdditionalProfileSurvey';
 import { useAuth } from '../context/AuthContext';
 
 const Profile = () => {
@@ -24,6 +25,7 @@ const Profile = () => {
 
   const { refreshUser } = useAuth();
   const [showWizard, setShowWizard] = useState(false);
+  const [showAdditionalSurvey, setShowAdditionalSurvey] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -57,6 +59,12 @@ const Profile = () => {
     await refreshUser();
     setUser(prev => ({ ...prev, isProfileComplete: true }));
     setShowWizard(false);
+  };
+
+  const handleAdditionalProfileComplete = async () => {
+    await refreshUser();
+    setUser(prev => ({ ...prev, isAdditionalProfileComplete: true }));
+    setShowAdditionalSurvey(false);
   };
 
   if (loading)
@@ -167,6 +175,34 @@ const Profile = () => {
             ) : (
               <div className="w-full bg-white p-2 rounded-lg border border-gray-100">
                 <DemographicsWizard onComplete={handleProfileComplete} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Dynamic Additional Profile Action Banner (optional, non-blocking) */}
+        {!user.isAdditionalProfileComplete && (
+          <div className="rounded-xl border border-blue-100 bg-blue-50/20 p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            {!showAdditionalSurvey ? (
+              <>
+                <div>
+                  <h2 className="text-xs font-bold text-gray-900 uppercase tracking-wider">
+                    A Few More Questions
+                  </h2>
+                  <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                    Optional, but it helps us tailor surveys to you even better.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowAdditionalSurvey(true)}
+                  className="shrink-0 bg-[#102A43] text-white text-xs font-bold tracking-wide px-4 py-2.5 rounded-lg hover:opacity-95 transition-opacity"
+                >
+                  Answer Questions
+                </button>
+              </>
+            ) : (
+              <div className="w-full bg-white p-2 rounded-lg border border-gray-100">
+                <AdditionalProfileSurvey onComplete={handleAdditionalProfileComplete} />
               </div>
             )}
           </div>

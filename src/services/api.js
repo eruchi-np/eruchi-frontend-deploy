@@ -53,7 +53,8 @@ export const userAPI = {
   getCampaignHistory: () => api.get('/users/me/campaign-history'),
   deleteAccount: () => api.delete('/users/me'),
   updateBasicProfile: (data) => api.put('/users/me/basic-profile', data),
-  updateDemographics: (data) => api.put('/users/me/demographics', data)
+  updateDemographics: (data) => api.put('/users/me/demographics', data),
+  updateAdditionalProfile: (data) => api.put('/users/me/additional-profile', data),
 };
 
 export const campaignAPI = {

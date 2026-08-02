@@ -38,6 +38,7 @@ import VoucherDetail from './pages/VoucherDetail';
 import EditProfile from './pages/EditProfile';
 import Terms from './pages/Terms';
 import PrivacyPolicy from './pages/PrivacyPolicy';
+import CompleteAdditionalProfile from './pages/CompleteAdditionalProfile';
 
 // Admin
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -260,6 +261,15 @@ function App() {
               }
             />
           </Route>
+          
+          <Route
+            path="/additional-profile"
+            element={
+              <ProtectedRoute>
+                <CompleteAdditionalProfile />
+              </ProtectedRoute>
+            }
+          />
         </Routes>
 
         <Footer />

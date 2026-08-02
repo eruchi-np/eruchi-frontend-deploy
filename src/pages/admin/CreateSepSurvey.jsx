@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { sepSurveyAPI } from '../../services/api'; // ← Make sure this is exported in api.js
-import { ArrowLeft, Plus, Trash2, Save, Type, FileText, CheckSquare,Loader2, Sliders, AlertCircle, Eye, Settings as SettingsIcon, Clock, Calendar, Award } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Type, FileText, CheckSquare,Loader2, Sliders, AlertCircle, Eye, Settings as SettingsIcon, Clock, Calendar, Award, Users, Target } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const CreateSepSurvey = () => {
@@ -15,6 +15,8 @@ const CreateSepSurvey = () => {
     credits: 50,
     publishedAt: new Date().toISOString().split('T')[0],
     availableDays: 7,
+    estimatedMinutes: '',
+    visibility: 'public',
     questions: [
       {
         questionText: '',
@@ -39,6 +41,21 @@ const CreateSepSurvey = () => {
     { value: 'draft', label: 'Draft', color: 'bg-gray-100 text-gray-700 border-gray-200' },
     { value: 'published', label: 'Published', color: 'bg-green-100 text-green-700 border-green-200' },
     { value: 'archived', label: 'Archived', color: 'bg-orange-100 text-orange-700 border-orange-200' }
+  ];
+
+  const visibilityOptions = [
+    {
+      value: 'public',
+      label: 'Public',
+      icon: Users,
+      description: 'Shows up for every eligible user in the general survey list'
+    },
+    {
+      value: 'targeted',
+      label: 'Targeted',
+      icon: Target,
+      description: 'Hidden from the public list — only shows to users specifically assigned it (e.g. merchant feedback triggered after a voucher redemption)'
+    }
   ];
 
   const handleInputChange = (field, value) => {
@@ -123,6 +140,9 @@ const CreateSepSurvey = () => {
     if (!formData.availableDays || Number(formData.availableDays) < 1) {
       return toast.error('Available days must be at least 1');
     }
+    if (formData.estimatedMinutes !== '' && Number(formData.estimatedMinutes) < 1) {
+      return toast.error('Estimated time must be at least 1 minute');
+    }
 
     const emptyQuestions = formData.questions.filter(q => !q.questionText.trim());
     if (emptyQuestions.length) return toast.error('All questions must have text');
@@ -148,6 +168,8 @@ const CreateSepSurvey = () => {
         publishedAt: formData.publishedAt,
         availableDays,
         endDate: derivedEndDate.toISOString().split('T')[0],
+        estimatedMinutes: formData.estimatedMinutes !== '' ? Number(formData.estimatedMinutes) : null,
+        visibility: formData.visibility,
         questions: formData.questions.map(q => {
           const base = {
             questionText: q.questionText.trim(),
@@ -239,6 +261,46 @@ const CreateSepSurvey = () => {
                 />
               </div>
 
+              {/* Visibility selector */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  Visibility
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {visibilityOptions.map(opt => {
+                    const Icon = opt.icon;
+                    const isActive = formData.visibility === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => handleInputChange('visibility', opt.value)}
+                        className={`p-4 rounded-xl border-2 text-left transition-all ${
+                          isActive
+                            ? 'border-indigo-500 bg-indigo-50'
+                            : 'border-gray-200 hover:border-gray-300 bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <Icon className={`h-4 w-4 ${isActive ? 'text-indigo-600' : 'text-gray-500'}`} />
+                          <span className={`text-sm font-semibold ${isActive ? 'text-indigo-700' : 'text-gray-900'}`}>
+                            {opt.label}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 leading-snug">{opt.description}</p>
+                      </button>
+                    );
+                  })}
+                </div>
+                {formData.visibility === 'targeted' && (
+                  <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-start gap-1.5">
+                    <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                    This survey won't appear to anyone until it's attached to a voucher offer's feedback
+                    triggers and a user redeems a matching voucher.
+                  </p>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
@@ -299,6 +361,25 @@ const CreateSepSurvey = () => {
                     required
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center gap-1.5">
+                  <Clock className="h-4 w-4 text-gray-500" />
+                  Estimated Time to Complete (minutes)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={formData.estimatedMinutes}
+                  onChange={e => handleInputChange('estimatedMinutes', e.target.value)}
+                  className="w-full max-w-[200px] px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="e.g., 3"
+                />
+                <p className="text-xs text-gray-500 mt-1.5">
+                  Shown to users on the survey card (e.g. "~3 min") so they know what they're signing up for.
+                  Leave blank if unsure.
+                </p>
               </div>
             </div>
           </div>

@@ -1,14 +1,32 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Ticket, ChevronRight, ArrowLeft } from "lucide-react";
+import { Ticket, ArrowLeft } from "lucide-react";
 import { voucherAPI } from "../services/api";
 
 const TABS = ["active", "used", "expired"];
 
-const statusColors = {
-  active: "bg-green-100 text-green-700",
-  used: "bg-gray-100 text-gray-500",
-  expired: "bg-red-100 text-red-500",
+// Vibrant ticket palettes — bg, darker accent, and soft ray color
+const TICKET_PALETTES = [
+  { bg: "#00704A", accent: "#005C3C", text: "#FFFFFF" }, // green
+  { bg: "#E50914", accent: "#B8070F", text: "#FFFFFF" }, // red
+  { bg: "#1E88E5", accent: "#1565C0", text: "#FFFFFF" }, // blue
+  { bg: "#FB8C00", accent: "#EF6C00", text: "#FFFFFF" }, // orange
+  { bg: "#212121", accent: "#000000", text: "#FFFFFF" }, // black
+  { bg: "#EC407A", accent: "#D81B60", text: "#FFFFFF" }, // pink
+  { bg: "#6A1B9A", accent: "#4A148C", text: "#FFFFFF" }, // purple
+  { bg: "#00897B", accent: "#00695C", text: "#FFFFFF" }, // teal
+  { bg: "#3949AB", accent: "#283593", text: "#FFFFFF" }, // indigo
+  { bg: "#C62828", accent: "#8E0000", text: "#FFFFFF" }, // maroon
+];
+
+// Deterministic: same brand name → same color, always
+const getBrandPalette = (brandName = "") => {
+  let hash = 0;
+  for (let i = 0; i < brandName.length; i++) {
+    hash = (hash << 5) - hash + brandName.charCodeAt(i);
+    hash |= 0;
+  }
+  return TICKET_PALETTES[Math.abs(hash) % TICKET_PALETTES.length];
 };
 
 function getRelativeExpiry(expiresAt) {
@@ -21,43 +39,127 @@ function getRelativeExpiry(expiresAt) {
   return `Expires in ${days} days`;
 }
 
-function VoucherListItem({ voucher, onClick }) {
+function VoucherTicketCard({ voucher, onClick }) {
   const snap = voucher.offerSnapshot || {};
   const discountLabel =
     snap.discountType === "percentage"
-      ? `${snap.discountValue}% off`
-      : `Rs. ${snap.discountValue} off`;
+      ? `${snap.discountValue}%`
+      : `Rs. ${snap.discountValue}`;
+  const brandName = snap.brandName || snap.businessName || "Official Brand";
+  const brandLogo = snap.imageUrl || snap.brandLogo || null;
+  const palette = getBrandPalette(brandName);
+  const isUsed = voucher.status === "used";
+  const isExpired = voucher.status === "expired";
+  const isInactive = isUsed || isExpired;
 
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-4 p-4 bg-white rounded-2xl border border-gray-100 hover:border-gray-300 transition-colors text-left"
+      className="w-full flex flex-col text-left group outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-2xl"
     >
-      <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center shrink-0">
-        <Ticket size={20} className="text-gray-400" />
+      <div
+        className={`relative w-full aspect-square rounded-2xl flex flex-col transition-all duration-300 ${
+          isInactive
+            ? "grayscale opacity-70"
+            : "group-hover:shadow-lg group-hover:-translate-y-1"
+        }`}
+        style={{ backgroundColor: palette.bg }}
+      >
+        <div
+          className="absolute top-[8%] left-1/2 -translate-x-1/2 w-3/4 aspect-square rounded-full opacity-20 pointer-events-none"
+          style={{
+            background: `repeating-conic-gradient(${palette.accent} 0deg 12deg, transparent 12deg 24deg)`,
+          }}
+        />
+
+        <div className="flex-[13] relative flex flex-col items-center justify-center gap-2 px-4 min-w-0">
+          <span
+            className="w-full text-center truncate text-[8px] xs:text-[10px] sm:text-xs font-semibold tracking-[0.15em] sm:tracking-[0.2em] uppercase"
+            style={{ color: palette.text, opacity: 0.9 }}
+          >
+            {brandName}
+          </span>
+          <div className="w-[45%] max-w-24 aspect-square rounded-full bg-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105 shrink-0">
+            {brandLogo ? (
+              <img
+                src={brandLogo}
+                alt={`${brandName} logo`}
+                className="max-w-[80%] max-h-[80%] object-contain"
+              />
+            ) : (
+              <span
+                className="font-semibold text-3xl sm:text-4xl tracking-tight select-none"
+                style={{ color: palette.bg }}
+              >
+                {brandName.charAt(0).toUpperCase()}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="relative flex items-center h-0 z-10">
+          <span className="absolute -left-2.5 w-5 h-5 bg-white rounded-full -translate-x-1/2" />
+          <span className="absolute -right-2.5 w-5 h-5 bg-white rounded-full translate-x-1/2" />
+          <div className="w-full mx-3 border-t-2 border-dashed border-white/40" />
+        </div>
+
+        <div className="flex-[9] relative flex flex-col items-center justify-center gap-2 px-4 min-w-0">
+          <div className="flex items-baseline gap-1.5 max-w-full">
+            <span
+              className="font-bold leading-none text-base xs:text-lg sm:text-2xl truncate"
+              style={{ color: palette.text }}
+            >
+              {discountLabel}
+            </span>
+            <span
+              className="text-[10px] xs:text-xs sm:text-sm tracking-widest font-medium shrink-0"
+              style={{ color: palette.text, opacity: 0.8 }}
+            >
+              OFF
+            </span>
+          </div>
+          {!isInactive && (
+            <span
+              className="bg-white text-[10px] xs:text-xs sm:text-sm font-semibold px-3 xs:px-4 sm:px-6 py-1 sm:py-1.5 rounded-full shadow-sm max-w-full transition-transform duration-300 group-hover:scale-105"
+              style={{ color: palette.accent }}
+            >
+              View QR
+            </span>
+          )}
+        </div>
+
+        {isInactive && (
+          <div className="absolute inset-0 flex items-center justify-center rounded-2xl bg-black/40 z-20">
+            <span className="bg-white/95 text-gray-700 text-[10px] sm:text-xs font-semibold tracking-widest uppercase px-3 py-1.5 rounded-full shadow-sm">
+              {isUsed ? "Redeemed" : "Expired"}
+            </span>
+          </div>
+        )}
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-gray-900 truncate text-sm">
-          {snap.title || "Voucher"}
+
+      <div className="pt-3 flex flex-col gap-0.5 min-w-0">
+        <p className="text-gray-400 text-[9px] sm:text-[11px] font-medium tracking-wide uppercase truncate">
+          {brandName}
         </p>
-        <p className="text-xs text-gray-500 mt-0.5">{discountLabel}</p>
+        <h2 className="text-gray-900 truncate text-sm sm:text-base font-medium leading-snug">
+          {snap.title || "Voucher"}
+        </h2>
         {voucher.status === "active" && (
           <p className="text-xs text-green-600 mt-1">
             {getRelativeExpiry(voucher.expiresAt)}
           </p>
         )}
-        {voucher.status === "used" && voucher.usedAt && (
+        {isUsed && voucher.usedAt && (
           <p className="text-xs text-gray-400 mt-1">
             Used on {new Date(voucher.usedAt).toLocaleDateString()}
           </p>
         )}
-        {voucher.status === "expired" && (
+        {isExpired && (
           <p className="text-xs text-red-400 mt-1">
             Expired on {new Date(voucher.expiresAt).toLocaleDateString()}
           </p>
         )}
       </div>
-      <ChevronRight size={16} className="text-gray-300 shrink-0" />
     </button>
   );
 }
@@ -88,7 +190,7 @@ export default function Vouchers() {
       className="min-h-screen bg-gray-50 pb-24"
       style={{ fontFamily: "'Inter', sans-serif" }}
     >
-      <div className="max-w-lg mx-auto px-4 pt-10">
+      <div className="max-w-[1314px] mx-auto px-4 sm:px-8 lg:px-10 pt-10">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors mb-6"
@@ -140,13 +242,14 @@ export default function Vouchers() {
             )}
           </div>
         ) : (
-          <div className="flex flex-col gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-8 sm:gap-y-12 items-stretch">
             {vouchers.map((v) => (
-              <VoucherListItem
-                key={v._id}
-                voucher={v}
-                onClick={() => navigate(`/vouchers/${v._id}`)}
-              />
+              <div key={v._id} className="w-full">
+                <VoucherTicketCard
+                  voucher={v}
+                  onClick={() => navigate(`/vouchers/${v._id}`)}
+                />
+              </div>
             ))}
           </div>
         )}

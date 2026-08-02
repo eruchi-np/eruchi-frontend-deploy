@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { adminAPI } from '../../services/api';
+import { adminAPI, sepSurveyAPI } from '../../services/api';
 import {
   ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2, Calendar,
   ShieldAlert, Eye, EyeOff, RefreshCw, Building2, KeyRound, Upload,
+  MessageSquarePlus, X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -19,6 +20,20 @@ const CATEGORIES = [
   'Retail', 'Fashion', 'Electronics', 'Health & Beauty',
   'Entertainment', 'Fitness', 'Spa & Wellness', 'Hotel', 'Other',
 ];
+
+const TRIGGER_OPTIONS = [
+  { value: 'first_redemption', label: 'First time redeeming this merchant' },
+  { value: 'nth_redemption', label: 'Nth time redeeming this merchant' },
+  { value: 'every_redemption', label: 'Every redemption' },
+  { value: 'days_after_redemption', label: 'X days after redemption' },
+];
+
+const EMPTY_FEEDBACK_SURVEY_ROW = {
+  survey: '',
+  trigger: 'first_redemption',
+  triggerValue: '',
+  active: true,
+};
 
 const generatePassword = () => {
   const chars = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
@@ -38,6 +53,7 @@ const EMPTY_VOUCHER_FORM = {
   totalStock: '',
   validUntil: '',
   imageUrl: '',
+  feedbackSurveys: [],
 };
 
 const EMPTY_BUSINESS_FORM = {
@@ -78,6 +94,11 @@ export default function AdminBusinessManagement() {
   const [voucherForm, setVoucherForm]             = useState(EMPTY_VOUCHER_FORM);
   const [voucherModalError, setVoucherModalError] = useState('');
   const [voucherSubmitLoading, setVoucherSubmitLoading] = useState(false);
+
+  // Feedback survey picker (for the voucher offer modal)
+  const [availableSurveys, setAvailableSurveys]   = useState([]);
+  const [surveysLoading, setSurveysLoading]       = useState(false);
+  const [surveysLoaded, setSurveysLoaded]         = useState(false);
 
   // Add-business modal
   const [showAddBusinessModal, setShowAddBusinessModal] = useState(false);
@@ -129,6 +150,22 @@ export default function AdminBusinessManagement() {
     if (!isExpanded && !businessOffers[businessId]) fetchOffers(businessId);
   };
 
+  // Fetch the full survey list (admin sees everything, including drafts and
+  // targeted surveys) once, the first time the voucher offer modal is opened.
+  const fetchAvailableSurveys = async () => {
+    try {
+      setSurveysLoading(true);
+      const res = await sepSurveyAPI.getAvailable({ limit: 100 });
+      setAvailableSurveys(res.data.data || []);
+      setSurveysLoaded(true);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to load surveys for feedback picker');
+    } finally {
+      setSurveysLoading(false);
+    }
+  };
+
   // ── Logo actions ───────────────────────────────────────────────────────────
 
   const handleLogoUpload = async (business, file) => {
@@ -155,6 +192,7 @@ export default function AdminBusinessManagement() {
     setSelectedBusinessForModal(business);
     setVoucherForm(EMPTY_VOUCHER_FORM);
     setVoucherModalError('');
+    if (!surveysLoaded) fetchAvailableSurveys();
   };
 
   const closeVoucherModal = () => setSelectedBusinessForModal(null);
@@ -174,6 +212,31 @@ export default function AdminBusinessManagement() {
     }
   };
 
+  // ── Feedback survey row helpers ─────────────────────────────────────────────
+
+  const addFeedbackSurveyRow = () => {
+    setVoucherForm(f => ({
+      ...f,
+      feedbackSurveys: [...f.feedbackSurveys, { ...EMPTY_FEEDBACK_SURVEY_ROW }],
+    }));
+  };
+
+  const removeFeedbackSurveyRow = (index) => {
+    setVoucherForm(f => ({
+      ...f,
+      feedbackSurveys: f.feedbackSurveys.filter((_, i) => i !== index),
+    }));
+  };
+
+  const updateFeedbackSurveyRow = (index, key, value) => {
+    setVoucherForm(f => ({
+      ...f,
+      feedbackSurveys: f.feedbackSurveys.map((row, i) =>
+        i === index ? { ...row, [key]: value } : row
+      ),
+    }));
+  };
+
   const handleVoucherSubmit = async (e) => {
     e.preventDefault();
     if (!selectedBusinessForModal) return;
@@ -185,6 +248,26 @@ export default function AdminBusinessManagement() {
       setVoucherModalError('The calendar deadline must be set to a future date.');
       return;
     }
+
+    // Validate feedback survey rows before submitting
+    for (const row of voucherForm.feedbackSurveys) {
+      if (!row.survey) {
+        setVoucherModalError('Each feedback survey row needs a survey selected (or remove the row).');
+        return;
+      }
+      if ((row.trigger === 'nth_redemption' || row.trigger === 'days_after_redemption')) {
+        const n = Number(row.triggerValue);
+        if (!row.triggerValue || Number.isNaN(n) || n <= 0) {
+          setVoucherModalError(
+            row.trigger === 'nth_redemption'
+              ? 'Enter which redemption number (e.g. 2) for the "Nth time redeeming" trigger.'
+              : 'Enter how many days after redemption for the "X days after" trigger.'
+          );
+          return;
+        }
+      }
+    }
+
     setVoucherSubmitLoading(true);
     setVoucherModalError('');
     try {
@@ -200,6 +283,14 @@ export default function AdminBusinessManagement() {
         perUserMonthlyLimit: voucherForm.perUserMonthlyLimit !== '' ? Number(voucherForm.perUserMonthlyLimit) : null,
         totalStock:          voucherForm.totalStock !== '' ? Number(voucherForm.totalStock) : null,
         imageUrl:            voucherForm.imageUrl,
+        feedbackSurveys:     voucherForm.feedbackSurveys.map(row => ({
+          survey:       row.survey,
+          trigger:      row.trigger,
+          triggerValue: (row.trigger === 'nth_redemption' || row.trigger === 'days_after_redemption')
+            ? Number(row.triggerValue)
+            : null,
+          active:       row.active,
+        })),
       };
       const res = await adminAPI.createVoucherOffer(payload);
       toast.success('Voucher offer created successfully');
@@ -513,6 +604,15 @@ export default function AdminBusinessManagement() {
                                         ? `${offer.perUserMonthlyLimit}/user/month`
                                         : 'unlimited/user/month'}
                                     </span>
+                                    {offer.feedbackSurveys?.length > 0 && (
+                                      <>
+                                        <span>•</span>
+                                        <span className="bg-amber-50 text-amber-700 px-1.5 py-0.5 rounded text-[10px] flex items-center gap-0.5">
+                                          <MessageSquarePlus size={10} />
+                                          {offer.feedbackSurveys.length} feedback trigger{offer.feedbackSurveys.length !== 1 ? 's' : ''}
+                                        </span>
+                                      </>
+                                    )}
                                   </div>
                                   <div className="text-xs text-gray-400 mt-1 flex flex-wrap gap-x-2 items-center">
                                     {offer.monthlyStock != null && (
@@ -964,7 +1064,7 @@ export default function AdminBusinessManagement() {
       )}
 
       {/* ════════════════════════════════════════════════════════════════════
-          CREATE VOUCHER OFFER MODAL  (unchanged logic)
+          CREATE VOUCHER OFFER MODAL
       ════════════════════════════════════════════════════════════════════ */}
       {selectedBusinessForModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
@@ -1089,6 +1189,94 @@ export default function AdminBusinessManagement() {
                   {...vField('imageUrl')}
                   className={inputCls}
                 />
+              </div>
+
+              {/* ── Feedback Surveys section ── */}
+              <div className="pt-1">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-semibold text-gray-600 uppercase flex items-center gap-1.5">
+                    <MessageSquarePlus size={13} className="text-amber-600" />
+                    Merchant Feedback Surveys
+                  </label>
+                  <button
+                    type="button"
+                    onClick={addFeedbackSurveyRow}
+                    className="flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    Add trigger
+                  </button>
+                </div>
+
+                {voucherForm.feedbackSurveys.length === 0 ? (
+                  <p className="text-[11px] text-gray-400 bg-gray-50 border border-gray-100 rounded-lg p-2.5">
+                    None configured. Users who redeem this voucher won't be asked for feedback.
+                    Click "Add trigger" to send a survey automatically after redemption.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    {voucherForm.feedbackSurveys.map((row, index) => (
+                      <div key={index} className="p-2.5 bg-amber-50/40 border border-amber-100 rounded-lg flex flex-col gap-2">
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={row.survey}
+                            onChange={(e) => updateFeedbackSurveyRow(index, 'survey', e.target.value)}
+                            className={`${inputCls} bg-white text-xs flex-1`}
+                            disabled={surveysLoading}
+                          >
+                            <option value="">
+                              {surveysLoading ? 'Loading surveys…' : 'Select a survey'}
+                            </option>
+                            {availableSurveys.map((s) => (
+                              <option key={s._id} value={s._id}>
+                                {s.title}{s.visibility === 'targeted' ? '' : ' (public)'}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => removeFeedbackSurveyRow(index)}
+                            className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-white transition-colors shrink-0"
+                            title="Remove trigger"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={row.trigger}
+                            onChange={(e) => updateFeedbackSurveyRow(index, 'trigger', e.target.value)}
+                            className={`${inputCls} bg-white text-xs flex-1`}
+                          >
+                            {TRIGGER_OPTIONS.map((opt) => (
+                              <option key={opt.value} value={opt.value}>{opt.label}</option>
+                            ))}
+                          </select>
+
+                          {(row.trigger === 'nth_redemption' || row.trigger === 'days_after_redemption') && (
+                            <input
+                              type="number"
+                              min="1"
+                              placeholder={row.trigger === 'nth_redemption' ? 'e.g. 2' : 'e.g. 7 days'}
+                              value={row.triggerValue}
+                              onChange={(e) => updateFeedbackSurveyRow(index, 'triggerValue', e.target.value)}
+                              className={`${inputCls} text-xs w-24 shrink-0`}
+                            />
+                          )}
+                        </div>
+
+                        {!surveysLoading && availableSurveys.find(s => s._id === row.survey)?.visibility !== 'targeted' && row.survey && (
+                          <p className="text-[10px] text-amber-700">
+                            Heads up: this survey is <strong>public</strong> — it already shows to everyone.
+                            Consider using a "targeted" survey for merchant feedback so it stays private to
+                            the person who redeemed it.
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {voucherModalError && (

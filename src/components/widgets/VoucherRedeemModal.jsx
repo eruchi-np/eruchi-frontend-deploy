@@ -7,6 +7,30 @@ import { voucherAPI } from "../../services/api";
 import AnimatedContent from "../animations/AnimatedContent";
 import { VOUCHER_TERMS } from "../../constants/voucherTerms";
 
+// Vibrant ticket palettes — bg, darker accent, and soft ray color
+const TICKET_PALETTES = [
+  { bg: "#00704A", accent: "#005C3C", text: "#FFFFFF" }, // green
+  { bg: "#E50914", accent: "#B8070F", text: "#FFFFFF" }, // red
+  { bg: "#1E88E5", accent: "#1565C0", text: "#FFFFFF" }, // blue
+  { bg: "#FB8C00", accent: "#EF6C00", text: "#FFFFFF" }, // orange
+  { bg: "#212121", accent: "#000000", text: "#FFFFFF" }, // black
+  { bg: "#EC407A", accent: "#D81B60", text: "#FFFFFF" }, // pink
+  { bg: "#6A1B9A", accent: "#4A148C", text: "#FFFFFF" }, // purple
+  { bg: "#00897B", accent: "#00695C", text: "#FFFFFF" }, // teal
+  { bg: "#3949AB", accent: "#283593", text: "#FFFFFF" }, // indigo
+  { bg: "#C62828", accent: "#8E0000", text: "#FFFFFF" }, // maroon
+];
+
+// Deterministic: same brand name → same color, always
+const getBrandPalette = (brandName = "") => {
+  let hash = 0;
+  for (let i = 0; i < brandName.length; i++) {
+    hash = (hash << 5) - hash + brandName.charCodeAt(i);
+    hash |= 0;
+  }
+  return TICKET_PALETTES[Math.abs(hash) % TICKET_PALETTES.length];
+};
+
 export default function VoucherRedeemModal({ offer, userCredits, onClose, onSuccess }) {
   const [step, setStep] = useState("confirm");
   const [loading, setLoading] = useState(false);
@@ -41,174 +65,257 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
     const svg = qrRef.current?.querySelector("svg");
     if (!svg) return;
 
-    const PAD = 24;
     const CARD_W = 400;
+    const CX = CARD_W / 2;
     const RADIUS = 28;
-    const CX = PAD + CARD_W / 2;
-    const QR_SIZE = 190;
-    const lineMaxW = CARD_W - 64;
+    const QR_SIZE = 220;
 
-    // Pre-calculate description line count so canvas height is dynamic
-    let descLineCount = 0;
-    if (offer.description) {
-      const tempCtx = document.createElement("canvas").getContext("2d");
-      tempCtx.font = "12px system-ui, sans-serif";
-      const words = offer.description.split(" ");
+    const brandName = offer.business?.brandName || offer.business?.name || "Official Brand";
+    const brandLogoUrl =
+      offer.business?.brandLogo || offer.business?.logo || offer.business?.businessLogo || null;
+    const palette = getBrandPalette(brandName);
+
+    const wrapText = (ctx, text, maxWidth) => {
+      const words = text.split(" ");
+      const lines = [];
       let line = "";
       for (const word of words) {
         const test = line ? `${line} ${word}` : word;
-        if (tempCtx.measureText(test).width > lineMaxW && line) {
-          descLineCount++;
+        if (ctx.measureText(test).width > maxWidth && line) {
+          lines.push(line);
           line = word;
         } else {
           line = test;
         }
       }
-      if (line) descLineCount++;
+      if (line) lines.push(line);
+      return lines;
+    };
+
+    // ---- Header layout (branded colored header) ----
+    const HEADER_TOP_PAD = 30;
+    const LOGO_SIZE = 68;
+    const HEADER_BOTTOM_PAD = 26;
+    const TITLE_LINE_H = 28;
+
+    const measureCtx = document.createElement("canvas").getContext("2d");
+    measureCtx.font = "bold 24px system-ui, sans-serif";
+    const titleLines = wrapText(measureCtx, offer.title || "", CARD_W - 64);
+
+    const HEADER_H =
+      HEADER_TOP_PAD +
+      LOGO_SIZE +
+      16 + // logo -> brand gap
+      18 + // brand name line
+      4 + // brand -> title gap
+      titleLines.length * TITLE_LINE_H +
+      10 + // title -> discount gap
+      22 + // discount line
+      HEADER_BOTTOM_PAD;
+
+    // ---- Description box ----
+    const BOX_X = 32;
+    const BOX_W = CARD_W - 64;
+    const BOX_PAD_X = 16;
+    const BOX_PAD_Y = 12;
+    const DESC_LINE_H = 18;
+    const descInnerW = BOX_W - BOX_PAD_X * 2;
+
+    let descLines = [];
+    if (offer.description) {
+      measureCtx.font = "13px system-ui, sans-serif";
+      descLines = wrapText(measureCtx, offer.description, descInnerW);
     }
+    const descBoxH =
+      descLines.length > 0 ? descLines.length * DESC_LINE_H + BOX_PAD_Y * 2 : 0;
 
-    const descHeight = offer.description ? descLineCount * 17 + 28 : 0;
-    const CARD_H = 560 + descHeight;
-    const CANVAS_W = CARD_W + PAD * 2;
-    const CANVAS_H = CARD_H + PAD * 2;
+    // ---- Body layout ----
+    const BODY_PAD_TOP = 28;
+    const DIVIDER_GAP = 24;
+    const HINT_H = 40;
+    const EXPIRY_H = 24;
+    const BODY_BOTTOM_PAD = 30;
 
+    const CARD_H =
+      HEADER_H +
+      BODY_PAD_TOP +
+      (descBoxH > 0 ? descBoxH + 20 : 0) +
+      DIVIDER_GAP +
+      QR_SIZE +
+      HINT_H +
+      EXPIRY_H +
+      BODY_BOTTOM_PAD;
+
+    // Fetch brand logo
+    const logoImg = brandLogoUrl
+      ? await new Promise((resolve) => {
+          const img = new Image();
+          img.crossOrigin = "anonymous";
+          img.onload = () => resolve(img);
+          img.onerror = () => resolve(null);
+          img.src = brandLogoUrl;
+        })
+      : null;
+
+    // Serialize QR SVG → Image
     const svgStr = new XMLSerializer().serializeToString(svg);
     const svgUrl = URL.createObjectURL(
       new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" })
     );
     const qrImg = await new Promise((resolve) => {
       const img = new Image();
-      img.onload = () => {
-        URL.revokeObjectURL(svgUrl);
-        resolve(img);
-      };
+      img.onload = () => { URL.revokeObjectURL(svgUrl); resolve(img); };
       img.src = svgUrl;
     });
 
     const canvas = document.createElement("canvas");
-    canvas.width = CANVAS_W;
-    canvas.height = CANVAS_H;
+    canvas.width = CARD_W;
+    canvas.height = CARD_H;
     const ctx = canvas.getContext("2d");
+    ctx.textAlign = "center";
 
-    // Page background
-    ctx.fillStyle = "#f9fafb";
-    ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-
-    // Card background with shadow
     ctx.save();
-    ctx.shadowColor = "rgba(0,0,0,0.08)";
-    ctx.shadowBlur = 24;
-    ctx.shadowOffsetY = 6;
-    ctx.fillStyle = "#ffffff";
     ctx.beginPath();
-    ctx.moveTo(PAD + RADIUS, PAD);
-    ctx.lineTo(PAD + CARD_W - RADIUS, PAD);
-    ctx.arcTo(PAD + CARD_W, PAD, PAD + CARD_W, PAD + RADIUS, RADIUS);
-    ctx.lineTo(PAD + CARD_W, PAD + CARD_H - RADIUS);
-    ctx.arcTo(PAD + CARD_W, PAD + CARD_H, PAD + CARD_W - RADIUS, PAD + CARD_H, RADIUS);
-    ctx.lineTo(PAD + RADIUS, PAD + CARD_H);
-    ctx.arcTo(PAD, PAD + CARD_H, PAD, PAD + CARD_H - RADIUS, RADIUS);
-    ctx.lineTo(PAD, PAD + RADIUS);
-    ctx.arcTo(PAD, PAD, PAD + RADIUS, PAD, RADIUS);
-    ctx.closePath();
-    ctx.fill();
+    ctx.roundRect(0, 0, CARD_W, CARD_H, RADIUS);
+    ctx.clip();
+
+    // White body background
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, CARD_W, CARD_H);
+
+    // Colored header
+    ctx.fillStyle = palette.bg;
+    ctx.fillRect(0, 0, CARD_W, HEADER_H);
+
+    // Radial ray decoration (mirrors the on-screen sunburst)
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, CARD_W, HEADER_H);
+    ctx.clip();
+    const rayCX = CX;
+    const rayCY = HEADER_H * 0.15;
+    const rayR = CARD_W * 0.7;
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = palette.accent;
+    const segDeg = 12;
+    for (let deg = 0; deg < 360; deg += segDeg * 2) {
+      const start = (deg * Math.PI) / 180;
+      const end = ((deg + segDeg) * Math.PI) / 180;
+      ctx.beginPath();
+      ctx.moveTo(rayCX, rayCY);
+      ctx.arc(rayCX, rayCY, rayR, start, end);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
     ctx.restore();
 
-    ctx.textAlign = "center";
-    let y = PAD + 44;
+    let y = HEADER_TOP_PAD;
+
+    // Logo circle
+    ctx.fillStyle = "#ffffff";
+    ctx.beginPath();
+    ctx.arc(CX, y + LOGO_SIZE / 2, LOGO_SIZE / 2, 0, Math.PI * 2);
+    ctx.fill();
+    if (logoImg) {
+      const scale = Math.min(
+        (LOGO_SIZE * 0.7) / logoImg.width,
+        (LOGO_SIZE * 0.7) / logoImg.height
+      );
+      const lw = logoImg.width * scale;
+      const lh = logoImg.height * scale;
+      ctx.drawImage(logoImg, CX - lw / 2, y + LOGO_SIZE / 2 - lh / 2, lw, lh);
+    } else {
+      ctx.fillStyle = palette.bg;
+      ctx.font = "600 26px system-ui, sans-serif";
+      ctx.fillText(brandName.charAt(0).toUpperCase(), CX, y + LOGO_SIZE / 2 + 9);
+    }
+    y += LOGO_SIZE + 16;
 
     // Brand name
-    ctx.fillStyle = "#3399FF";
-    ctx.globalAlpha = 0.85;
-    ctx.font = "600 11px system-ui, sans-serif";
-    ctx.fillText(
-      (offer.business?.brandName || offer.business?.name || "").toUpperCase(),
-      CX,
-      y
-    );
-    ctx.globalAlpha = 1.0;
-    y += 32;
-
-    // Title (truncated if too wide)
-    ctx.fillStyle = "#111827";
-    ctx.font = "bold 22px system-ui, sans-serif";
-    let title = offer.title || "";
-    if (ctx.measureText(title).width > lineMaxW) {
-      while (ctx.measureText(title + "\u2026").width > lineMaxW)
-        title = title.slice(0, -1);
-      title += "\u2026";
-    }
-    ctx.fillText(title, CX, y);
-    y += 30;
-
-    // Discount
-    ctx.fillStyle = "#3399FF";
-    ctx.font = "600 15px system-ui, sans-serif";
-    ctx.fillText(discountLabel, CX, y);
-    y += 20;
-
-    // Description — word-wrapped
-    if (offer.description) {
-      ctx.fillStyle = "#6b7280";
-      ctx.font = "12px system-ui, sans-serif";
-      const words = offer.description.split(" ");
-      let line = "";
-      y += 12;
-      for (const word of words) {
-        const test = line ? `${line} ${word}` : word;
-        if (ctx.measureText(test).width > lineMaxW && line) {
-          ctx.fillText(line, CX, y);
-          line = word;
-          y += 17;
-        } else {
-          line = test;
-        }
-      }
-      if (line) {
-        ctx.fillText(line, CX, y);
-        y += 17;
-      }
-    }
-
-    y += 16;
-
-    // Divider
-    ctx.strokeStyle = "#f3f4f6";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(PAD, y);
-    ctx.lineTo(PAD + CARD_W, y);
-    ctx.stroke();
+    ctx.fillStyle = "#ffffff";
+    ctx.globalAlpha = 0.9;
+    ctx.font = "700 12px system-ui, sans-serif";
+    ctx.fillText(brandName.toUpperCase(), CX, y);
+    ctx.globalAlpha = 1;
     y += 22;
 
-    // QR code
-    const qrX = PAD + (CARD_W - QR_SIZE) / 2;
-    ctx.drawImage(qrImg, qrX, y, QR_SIZE, QR_SIZE);
+    // Title (wraps if long)
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 24px system-ui, sans-serif";
+    for (const line of titleLines) {
+      ctx.fillText(line, CX, y);
+      y += TITLE_LINE_H;
+    }
+    y += 6;
 
-    // Hint text
-    ctx.fillStyle = "#9ca3af";
-    ctx.font = "12px system-ui, sans-serif";
-    ctx.fillText("Show this QR to store staff to redeem", CX, y + QR_SIZE + 28);
+    // Discount
+    ctx.fillStyle = "#ffffff";
+    ctx.globalAlpha = 0.9;
+    ctx.font = "700 17px system-ui, sans-serif";
+    ctx.fillText(discountLabel, CX, y);
+    ctx.globalAlpha = 1;
+
+    // ---- Body content ----
+    y = HEADER_H + BODY_PAD_TOP;
+
+    if (descLines.length > 0) {
+      ctx.fillStyle = "#EFF6FF";
+      ctx.beginPath();
+      ctx.roundRect(BOX_X, y, BOX_W, descBoxH, 10);
+      ctx.fill();
+
+      ctx.fillStyle = "#4B5563";
+      ctx.font = "13px system-ui, sans-serif";
+      let ty = y + BOX_PAD_Y + 14;
+      for (const line of descLines) {
+        ctx.fillText(line, CX, ty);
+        ty += DESC_LINE_H;
+      }
+      y += descBoxH + 20;
+    }
+
+    // Divider
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(32, y);
+    ctx.lineTo(CARD_W - 32, y);
+    ctx.stroke();
+    y += DIVIDER_GAP;
+
+    // QR code
+    const qrX = (CARD_W - QR_SIZE) / 2;
+    ctx.drawImage(qrImg, qrX, y, QR_SIZE, QR_SIZE);
+    y += QR_SIZE;
+
+    // Hint
+    ctx.fillStyle = "#3399FF";
+    ctx.globalAlpha = 0.8;
+    ctx.font = "600 13px system-ui, sans-serif";
+    ctx.fillText("Show this QR to store staff to redeem", CX, y + 26);
+    ctx.globalAlpha = 1;
 
     // Expiry
     if (voucher.expiresAt) {
-      ctx.fillStyle = "#374151";
+      ctx.fillStyle = "#0f172a";
       ctx.font = "600 14px system-ui, sans-serif";
       ctx.fillText(
         `Expires ${new Date(voucher.expiresAt).toLocaleDateString(undefined, {
-          day: "numeric",
-          month: "short",
-          year: "numeric",
+          day: "numeric", month: "short", year: "numeric",
         })}`,
-        CX,
-        y + QR_SIZE + 52
+        CX, y + 50
       );
     }
 
-    // Voucher ID
-    ctx.fillStyle = "#d1d5db";
-    ctx.font = "10px system-ui, sans-serif";
-    ctx.fillText(`ID: ${voucher._id}`, CX, PAD + CARD_H - 20);
+    ctx.restore();
+
+    // Card border
+    ctx.strokeStyle = "#e2e8f0";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(0.5, 0.5, CARD_W - 1, CARD_H - 1, RADIUS);
+    ctx.stroke();
 
     const a = document.createElement("a");
     a.download = `voucher-${voucher._id}.png`;
