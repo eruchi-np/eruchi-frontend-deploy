@@ -134,7 +134,7 @@ export default function Homepage() {
 
   const handleSurveyClick = () => {
     trackEvent('cta_click', '/');
-    navigate(isLoggedIn ? "/standalone-surveys" : "/login");
+    navigate(isLoggedIn ? "/standalone-surveys" : "/shop");
   };
 
   const requireTerms = () => {
