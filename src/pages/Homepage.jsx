@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import SurveyButton from "../components/widgets/SurveyButton";
-import { ArrowRight, ArrowUpRight, Mail, Loader2, FileText, Award, Calendar, CheckSquare, AlertCircle } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Mail, Loader2, FileText, Award, Calendar, Clock } from "lucide-react";
 import AnimatedContent from "../components/animations/AnimatedContent";
 import { trackEvent } from "../utils/analytics";
 import { userAPI, sepSurveyAPI } from "../services/api";
@@ -134,7 +134,7 @@ export default function Homepage() {
 
   const handleSurveyClick = () => {
     trackEvent('cta_click', '/');
-    navigate(isLoggedIn ? "/standalone-surveys" : "/login");
+    navigate(isLoggedIn ? "/standalone-surveys" : "/shop");
   };
 
   const requireTerms = () => {
@@ -444,7 +444,8 @@ export default function Homepage() {
                         {survey.description}
                       </p>
 
-                      <div className="grid grid-cols-3 gap-4 mb-6 pt-2">
+                      {/* Meta Indicators Grid */}
+                      <div className={`grid ${survey.estimatedMinutes ? 'grid-cols-3' : 'grid-cols-2'} gap-4 mb-6 pt-2`}>
                         <div className="flex flex-col">
                           <div className="flex items-center gap-1.5 mb-1 text-neutral-800">
                             <Award className="h-4 w-4" />
@@ -457,27 +458,32 @@ export default function Homepage() {
 
                         <div className="flex flex-col">
                           <div className="flex items-center gap-1.5 mb-1 text-neutral-800">
-                            {survey.isMandatory ? (
-                              <AlertCircle className="h-4 w-4" />
-                            ) : (
-                              <CheckSquare className="h-4 w-4" />
-                            )}
-                            <span className="font-medium text-sm sm:text-base whitespace-nowrap">
-                              {survey.isMandatory ? "Mandatory" : "Optional"}
-                            </span>
-                          </div>
-                          <span className="text-xs text-neutral-400 pl-[22px]">Type</span>
-                        </div>
-
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-1.5 mb-1 text-neutral-800">
                             <Calendar className="h-4 w-4" />
                             <span className="font-medium text-sm sm:text-base whitespace-nowrap">
-                              {survey.endDate ? new Date(survey.endDate).toLocaleDateString() : "No Limit"}
+                              {survey.endDate
+                                ? (() => {
+                                    const daysLeft = Math.ceil(
+                                      (new Date(survey.endDate) - new Date()) / (1000 * 60 * 60 * 24)
+                                    );
+                                    return daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? 's' : ''}` : "Expired";
+                                  })()
+                                : "No Limit"}
                             </span>
                           </div>
-                          <span className="text-xs text-neutral-400 pl-[22px]">Deadline</span>
+                          <span className="text-xs text-neutral-400 pl-[22px]">Remaining</span>
                         </div>
+
+                        {survey.estimatedMinutes && (
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-1.5 mb-1 text-neutral-800">
+                              <Clock className="h-4 w-4" />
+                              <span className="font-medium text-sm sm:text-base whitespace-nowrap">
+                                ~{survey.estimatedMinutes} min
+                              </span>
+                            </div>
+                            <span className="text-xs text-neutral-400 pl-[22px]">Est. Time</span>
+                          </div>
+                        )}
                       </div>
                     </div>
 
