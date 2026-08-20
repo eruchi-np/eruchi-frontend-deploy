@@ -65,6 +65,7 @@ const StandaloneSurvey = () => {
 
   const isComplete = () => {
     return survey.questions.every((q) => {
+      if (q.isRequired === false) return true;
       const val = responses[q.questionText];
       if (q.questionType === "multiple_checkbox") return val?.length > 0;
       if (q.questionType === "slider") return true;
@@ -153,6 +154,9 @@ const StandaloneSurvey = () => {
             >
               <h3 className="text-lg font-medium text-neutral-900 mb-6">
                 {i + 1}. {q.questionText}
+                {q.isRequired === false && (
+                  <span className="ml-2 text-sm font-normal text-neutral-400">(optional)</span>
+                )}
               </h3>
 
               {q.questionType === "text_short" && (

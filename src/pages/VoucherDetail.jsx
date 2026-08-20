@@ -131,7 +131,7 @@ export default function VoucherDetail() {
     // ---- Body layout ----
     const BODY_PAD_TOP = 28;
     const DIVIDER_GAP = 24;
-    const HINT_H = 40;
+    const HINT_H = voucher.redemptionCode ? 66 : 40;
     const EXPIRY_H = 24;
     const BODY_BOTTOM_PAD = 30;
 
@@ -295,6 +295,15 @@ export default function VoucherDetail() {
     ctx.fillText("Show this QR to store staff to redeem", CX, y + 26);
     ctx.globalAlpha = 1;
 
+    if (voucher.redemptionCode) {
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "600 10px system-ui, sans-serif";
+      ctx.fillText("OR GIVE STAFF THIS CODE", CX, y + 44);
+      ctx.fillStyle = "#1e293b";
+      ctx.font = "bold 20px system-ui, sans-serif";
+      ctx.fillText(voucher.redemptionCode.split("").join(" "), CX, y + 66);
+    }
+
     // Expiry
     ctx.fillStyle = "#0f172a";
     ctx.font = "600 14px system-ui, sans-serif";
@@ -302,7 +311,7 @@ export default function VoucherDetail() {
       `Expires ${new Date(voucher.expiresAt).toLocaleDateString(undefined, {
         day: "numeric", month: "short", year: "numeric",
       })}`,
-      CX, y + 50
+      CX, y + (voucher.redemptionCode ? 90 : 50)
     );
 
     ctx.restore();
@@ -345,6 +354,7 @@ export default function VoucherDetail() {
   }
 
   const snap = voucher.offerSnapshot || {};
+  const publicSurveys = voucher.offer?.publicSurveys || snap.publicSurveys || [];
   const discountLabel =
     snap.discountType === "percentage"
       ? `${snap.discountValue}% off`
@@ -428,6 +438,27 @@ export default function VoucherDetail() {
               </p>
             )}
 
+            {/* Associated Public Surveys */}
+           {publicSurveys.length > 0 && (
+             <div className="mt-4 pt-3 border-t border-blue-50 text-left max-w-xs mx-auto">
+               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 text-center">
+                 Available Surveys
+               </p>
+               <div className="flex flex-col gap-2">
+                 {publicSurveys.map((survey) => (
+                   <button
+                     key={survey._id}
+                     onClick={() => navigate(`/surveys/${survey._id}`)}
+                     className="w-full px-3 py-2 rounded-xl bg-blue-50 text-[#3399FF] text-xs font-medium hover:bg-blue-100 transition-colors flex items-center justify-between"
+                   >
+                     <span className="truncate">{survey.title}</span>
+                     <span className="shrink-0 ml-2 font-bold">&rarr;</span>
+                   </button>
+                 ))}
+               </div>
+             </div>
+           )}
+
             <details className="text-xs text-gray-500 border-t border-blue-50 mt-3 pt-3 text-left max-w-xs mx-auto">
               <summary className="cursor-pointer font-medium text-gray-600 text-center">Terms & Conditions</summary>
               <ul className="mt-2 list-disc pl-4 space-y-1">
@@ -453,6 +484,16 @@ export default function VoucherDetail() {
                 <p className="text-xs text-[#3399FF] opacity-70 mt-4 text-center font-medium">
                   Show this QR to store staff to redeem
                 </p>
+                {voucher.redemptionCode && (
+                  <div className="mt-3 text-center">
+                    <p className="text-[10px] uppercase tracking-widest text-gray-400 font-semibold">
+                      Or give staff this code
+                    </p>
+                    <p className="text-2xl font-bold tracking-[0.3em] text-gray-800 mt-1">
+                      {voucher.redemptionCode}
+                    </p>
+                  </div>
+                )}
                 <p className="text-sm font-semibold text-slate-700 mt-1">
                   Expires{" "}
                   {new Date(voucher.expiresAt).toLocaleDateString(undefined, {

@@ -11,6 +11,8 @@ export default function BusinessScan() {
   const [result, setResult] = useState(RESULT_IDLE);
   const [loading, setLoading] = useState(false);
   const [scanError, setScanError] = useState(null);
+  const [mode, setMode] = useState("qr"); // "qr" | "code"
+  const [codeInput, setCodeInput] = useState("");
   const scannerRef = useRef(null);
   const html5QrcodeRef = useRef(null);
 
@@ -114,6 +116,40 @@ export default function BusinessScan() {
 
   const handleReset = () => {
     setResult(RESULT_IDLE);
+    setCodeInput("");
+  };
+
+  const handleCodeSubmit = async (e) => {
+    e.preventDefault();
+    const trimmed = codeInput.trim().toUpperCase();
+    if (trimmed.length !== 6) return;
+
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await businessAPI.previewScanByCode(trimmed);
+      setResult({
+        type: "pending",
+        voucherId: res.data.data.voucherId,
+        redemptionToken: res.data.data.redemptionToken,
+        data: res.data.data,
+      });
+    } catch (err) {
+      const status = err.response?.status;
+      const msg = err.response?.data?.message || "An error occurred";
+      if (status === 403) {
+        setResult({ type: "wrong_business", message: msg });
+      } else if (msg.startsWith("Voucher already used")) {
+        setResult({ type: "already_used", message: msg });
+      } else if (msg.startsWith("Voucher expired")) {
+        setResult({ type: "expired", message: msg });
+      } else {
+        setResult({ type: "invalid", message: msg });
+      }
+    } finally {
+      setLoading(false);
+      setCodeInput("");
+    }
   };
 
   return (
@@ -227,6 +263,26 @@ export default function BusinessScan() {
         {/* Scanner */}
         {!result && (
           <>
+          <div className="flex w-full rounded-full bg-gray-100 p-1">
+              <button
+                onClick={() => { setMode("qr"); setCodeInput(""); }}
+                className={`flex-1 py-2 rounded-full text-sm font-medium transition-colors ${
+                  mode === "qr" ? "bg-white shadow text-gray-900" : "text-gray-500"
+                }`}
+              >
+                Scan QR
+              </button>
+              <button
+                onClick={async () => { await stopScanner(); setMode("code"); }}
+                className={`flex-1 py-2 rounded-full text-sm font-medium transition-colors ${
+                  mode === "code" ? "bg-white shadow text-gray-900" : "text-gray-500"
+                }`}
+              >
+                Enter Code
+              </button>
+            </div>
+  
+            {mode === "qr" && (
             <div className="w-full bg-white rounded-2xl border border-gray-100 overflow-hidden">
               <div id="qr-reader" ref={scannerRef} className="w-full" />
               {!scannerActive && (
@@ -258,6 +314,39 @@ export default function BusinessScan() {
                 </div>
               )}
             </div>
+            )}
+
+            {mode === "code" && (
+              <form
+                onSubmit={handleCodeSubmit}
+                className="w-full bg-white rounded-2xl border border-gray-100 p-6 flex flex-col items-center gap-4"
+              >
+                <p className="text-sm text-gray-400 text-center">
+                  Ask the customer for the 6-character code on their voucher
+                </p>
+                <input
+                  value={codeInput}
+                  onChange={(e) =>
+                    setCodeInput(
+                      e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6)
+                    )
+                  }
+                  placeholder="ABC123"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  className="w-full text-center text-2xl font-bold tracking-[0.3em] uppercase border border-gray-200 rounded-xl py-3 focus:outline-none focus:border-gray-400"
+                  maxLength={6}
+                />
+                <button
+                  type="submit"
+                  disabled={loading || codeInput.length !== 6}
+                  className="w-full px-6 py-3 rounded-full bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors disabled:opacity-50"
+                >
+                  {loading ? "Checking..." : "Verify Code"}
+                </button>
+              </form>
+            )}
           </>
         )}
       </div>

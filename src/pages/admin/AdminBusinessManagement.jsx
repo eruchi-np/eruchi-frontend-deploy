@@ -22,15 +22,13 @@ const CATEGORIES = [
 ];
 
 const TRIGGER_OPTIONS = [
-  { value: 'first_redemption', label: 'First time redeeming this merchant' },
-  { value: 'nth_redemption', label: 'Nth time redeeming this merchant' },
-  { value: 'every_redemption', label: 'Every redemption' },
-  { value: 'days_after_redemption', label: 'X days after redemption' },
+  { value: 'every_redemption', label: 'Every redemption of this voucher' },
+  { value: 'days_after_redemption', label: 'X days after redeeming this voucher' },
 ];
 
 const EMPTY_FEEDBACK_SURVEY_ROW = {
   survey: '',
-  trigger: 'first_redemption',
+  trigger: 'every_redemption',
   triggerValue: '',
   active: true,
 };
@@ -48,12 +46,14 @@ const EMPTY_VOUCHER_FORM = {
   discountType: 'percentage',
   discountValue: '',
   creditsRequired: '',
+  approxValue: '',
   expiryDays: '',
   perUserMonthlyLimit: '5',
   totalStock: '',
   validUntil: '',
   imageUrl: '',
   feedbackSurveys: [],
+  publicSurveys: [],
 };
 
 const EMPTY_BUSINESS_FORM = {
@@ -115,6 +115,30 @@ export default function AdminBusinessManagement() {
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
   useEffect(() => { fetchBusinesses(); }, []);
+
+  const addPublicSurveyRow = () => {
+    setVoucherForm((prev) => ({
+      ...prev,
+      publicSurveys: [...(prev.publicSurveys || []), ''],
+    }));
+  };
+
+  const removePublicSurveyRow = (index) => {
+    setVoucherForm((prev) => ({
+      ...prev,
+      publicSurveys: (prev.publicSurveys || []).filter((_, i) => i !== index),
+    }));
+  };
+
+  const handlePublicSurveyChange = (index, value) => {
+    setVoucherForm((prev) => {
+      const updated = [...(prev.publicSurveys || [])];
+      updated[index] = value;
+      return { ...prev, publicSurveys: updated };
+    });
+  };
+
+  const updatePublicSurveyRow = handlePublicSurveyChange;
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
@@ -276,7 +300,10 @@ export default function AdminBusinessManagement() {
         title:               voucherForm.title,
         description:         voucherForm.description,
         discountType:        voucherForm.discountType,
-        discountValue:       Number(voucherForm.discountValue),
+        discountValue:       (voucherForm.discountType === 'percentage' || voucherForm.discountType === 'flat')
+          ? Number(voucherForm.discountValue)
+          : (voucherForm.discountType === 'free_item' ? (voucherForm.discountValue || undefined) : undefined),
+        approxValue:         voucherForm.approxValue !== '' ? Number(voucherForm.approxValue) : null,
         creditsRequired:     Number(voucherForm.creditsRequired),
         expiryDays:          Number(voucherForm.expiryDays),
         validUntil:          new Date(voucherForm.validUntil).toISOString(),
@@ -291,6 +318,7 @@ export default function AdminBusinessManagement() {
             : null,
           active:       row.active,
         })),
+        publicSurveys: (voucherForm.publicSurveys || []).filter(Boolean),
       };
       const res = await adminAPI.createVoucherOffer(payload);
       toast.success('Voucher offer created successfully');
@@ -1105,19 +1133,46 @@ export default function AdminBusinessManagement() {
                   <select {...vField('discountType')} className={`${inputCls} bg-white`}>
                     <option value="percentage">Percentage (%)</option>
                     <option value="flat">Flat (Rs.)</option>
+                    <option value="free_item">Free Item</option>
+                    <option value="value_combo">Value Combo</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Discount Value *</label>
-                  <input
-                    type="number"
-                    placeholder="Value"
-                    required
-                    min="0"
-                    {...vField('discountValue')}
-                    className={inputCls}
-                  />
-                </div>
+                {voucherForm.discountType !== 'value_combo' && (
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">
+                      Discount Value {voucherForm.discountType === 'free_item' ? '' : '*'}
+                    </label>
+                    {voucherForm.discountType === 'free_item' ? (
+                      <input
+                        type="text"
+                        placeholder="Item name (optional)"
+                        {...vField('discountValue')}
+                        className={inputCls}
+                      />
+                    ) : (
+                      <input
+                        type="number"
+                        placeholder="Value"
+                        required
+                        min="0"
+                        {...vField('discountValue')}
+                        className={inputCls}
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+              
+
+                            <div>
+                <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Approx. Value (Rs.)</label>
+                <input
+                  type="number"
+                  placeholder="Estimated savings shown to users"
+                  min="0"
+                  {...vField('approxValue')}
+                  className={inputCls}
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1278,6 +1333,62 @@ export default function AdminBusinessManagement() {
                   </div>
                 )}
               </div>
+
+              {/* ── Public Surveys section ── */}
+               <div className="pt-2">
+                 <div className="flex items-center justify-between mb-2">
+                   <label className="text-xs font-semibold text-gray-600 uppercase flex items-center gap-1.5">
+                     <MessageSquarePlus size={13} className="text-blue-600" />
+                     Public Surveys
+                   </label>
+                   <button
+                     type="button"
+                     onClick={addPublicSurveyRow}
+                     className="flex items-center gap-1 text-xs font-medium text-gray-600 hover:text-gray-900 transition-colors"
+                   >
+                     <Plus className="h-3.5 w-3.5" />
+                     Add public survey
+                   </button>
+                 </div>
+
+                 {(!voucherForm.publicSurveys || voucherForm.publicSurveys.length === 0) ? (
+                   <p className="text-[11px] text-gray-400 bg-gray-50 border border-gray-100 rounded-lg p-2.5">
+                     No public surveys attached. Click "Add public survey" to link feedback forms to this voucher.
+                   </p>
+                 ) : (
+                   <div className="flex flex-col gap-2">
+                     {voucherForm.publicSurveys.map((surveyId, index) => (
+                       <div key={index} className="p-2.5 bg-blue-50/30 border border-blue-100 rounded-lg flex items-center gap-2">
+                         <select
+                           value={surveyId}
+                           onChange={(e) => updatePublicSurveyRow(index, e.target.value)}
+                           className={`${inputCls} bg-white text-xs flex-1`}
+                           disabled={surveysLoading}
+                         >
+                           <option value="">
+                             {surveysLoading ? 'Loading surveys…' : 'Select a public survey'}
+                           </option>
+                           {availableSurveys
+                             .filter((s) => s.visibility !== 'targeted')
+                             .map((s) => (
+                               <option key={s._id} value={s._id}>
+                                 {s.title}
+                               </option>
+                             ))}
+                         </select>
+                         <button
+                           type="button"
+                           onClick={() => removePublicSurveyRow(index)}
+                           className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-white transition-colors shrink-0"
+                           title="Remove survey"
+                         >
+                           <X className="h-3.5 w-3.5" />
+                         </button>
+                       </div>
+                     ))}
+                   </div>
+                 )}
+               </div>
 
               {voucherModalError && (
                 <div className="p-2.5 bg-red-50 rounded-xl flex items-start gap-1.5 border border-red-100">

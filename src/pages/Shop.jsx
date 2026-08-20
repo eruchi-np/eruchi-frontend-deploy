@@ -75,7 +75,13 @@ function VoucherCard({ offer, onRedeem }) {
   const discountLabel =
     offer.discountType === "percentage"
       ? `${offer.discountValue}%`
+      : offer.discountType === "free_item"
+      ? (offer.discountValue ? `Free ${offer.discountValue}` : "Free")
+      : offer.discountType === "value_combo"
+      ? "Value Combo"
       : `Rs. ${offer.discountValue}`;
+
+  const showOffSuffix = offer.discountType === "percentage" || offer.discountType === "flat";
 
   const stockInfo = useMemo(() => {
     if (offer.totalStock !== null && offer.totalStock !== undefined) {
@@ -187,12 +193,14 @@ function VoucherCard({ offer, onRedeem }) {
             >
               {discountLabel}
             </span>
-            <span
-              className="text-[10px] xs:text-xs sm:text-sm tracking-widest font-medium"
-              style={{ color: palette.text, opacity: 0.8 }}
-            >
-              OFF
-            </span>
+            {showOffSuffix && (
+              <span
+                className="text-[10px] xs:text-xs sm:text-sm tracking-widest font-medium"
+                style={{ color: palette.text, opacity: 0.8 }}
+              >
+                OFF
+              </span>
+            )}
           </div>
           <span
            className="bg-white text-[10px] xs:text-xs sm:text-sm font-semibold px-3 xs:px-4 sm:px-6 py-1 sm:py-1.5 rounded-full shadow-sm max-w-full transition-transform duration-300 group-hover:scale-105"
@@ -229,8 +237,13 @@ function VoucherCard({ offer, onRedeem }) {
 
         <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
           {offer.creditsRequired} credits{" "}
-          <span className="text-gray-400">· {discountLabel} off</span>
+          <span className="text-gray-400">· {discountLabel}{showOffSuffix ? " off" : ""}</span>
         </p>
+        {offer.approxValue != null && (
+          <p className="text-gray-400 text-[10px] sm:text-[11px] mt-0.5">
+            Estimated savings Rs. {offer.approxValue}
+          </p>
+        )}
 
         <div className="flex items-center gap-1 text-gray-400 text-[10px] sm:text-[11px] mt-1.5">
           <Hourglass size={10} />

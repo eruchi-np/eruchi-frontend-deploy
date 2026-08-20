@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { userAPI, adminAPI, sepSurveyAPI } from "../../services/api";
-import { Users, Package, Plus, ArrowLeft, Award, Clock, X, Building2 } from "lucide-react";
+import { Users, Package, Plus, ArrowLeft, Award, Clock, X, Building2, FileText } from "lucide-react";
 import toast from "react-hot-toast";
 
 import StatsGrid from "./components/StatsGrid.jsx";
 import SurveyExports from "./components/SurveyExports.jsx";
 import UserManagement from "./components/UserManagement.jsx";
+import SurveyManagement from "./components/SurveyManagement.jsx";
 
 const NAVY = "#1B2A4A";
 
@@ -25,15 +26,16 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("users");
   const pageSize = 50;
 
+  const fetchSurveys = async () => {
+    try {
+      const res = await sepSurveyAPI.getAvailable();
+      setSurveys(res.data.data || []);
+    } catch (err) {
+      console.error("Failed to fetch surveys", err);
+    }
+  };
+
   useEffect(() => {
-    const fetchSurveys = async () => {
-      try {
-        const res = await sepSurveyAPI.getAvailable();
-        setSurveys(res.data.data || []);
-      } catch (err) {
-        console.error("Failed to fetch surveys", err);
-      }
-    };
     fetchSurveys();
   }, []);
 
@@ -234,6 +236,13 @@ const AdminDashboard = () => {
           >
             <Clock className="h-4 w-4" /> Survey Timer Export
           </button>
+          <button
+            onClick={() => setActiveTab("surveys")}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-colors shadow-sm"
+            style={activeTab === "surveys" ? { backgroundColor: NAVY, color: "white" } : { backgroundColor: "white", color: "#4b5563", border: "1px solid #e5e7eb" }}
+          >
+            <FileText className="h-4 w-4" /> Surveys
+          </button>
         </div>
 
         {/* View Switch Rendering */}
@@ -251,8 +260,10 @@ const AdminDashboard = () => {
             getStatusColor={getStatusColor}
             NAVY={NAVY}
           />
-        ) : (
+        ) : activeTab === "survey_exports" ? (
           <SurveyExports surveys={surveys} handleExportTimings={handleExportTimings} />
+        ) : (
+          <SurveyManagement surveys={surveys} refetchSurveys={fetchSurveys} NAVY={NAVY} />
         )}
       </div>
     </div>

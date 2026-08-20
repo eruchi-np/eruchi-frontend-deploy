@@ -229,6 +229,15 @@ function App() {
               }
             />
 
+            <Route
+             path="/admin/edit-sep-survey/:id"
+             element={
+               <ProtectedRoute>
+                 <CreateSepSurvey />
+               </ProtectedRoute>
+             }
+           />
+
             <Route path="/admin/businesses" element={<AdminBusinessManagement />} />
 
             {/* ==================== BUSINESS ROUTES ==================== */}
