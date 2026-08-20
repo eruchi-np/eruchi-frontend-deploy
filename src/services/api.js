@@ -51,7 +51,7 @@ export const authAPI = {
 export const userAPI = {
   getProfile: (config = {}) => api.get('/users/me', config),
   getCampaignHistory: () => api.get('/users/me/campaign-history'),
-  deleteAccount: () => api.delete('/users/me'),
+  deleteAccount: () => api.delete('/users/me/delete'),
   updateBasicProfile: (data) => api.put('/users/me/basic-profile', data),
   updateDemographics: (data) => api.put('/users/me/demographics', data),
   updateAdditionalProfile: (data) => api.put('/users/me/additional-profile', data),
@@ -98,6 +98,8 @@ export const sepSurveyAPI = {
   skip: (surveyId) => api.post(`/sepsurveys/${surveyId}/skip`),
   getHistory: (params = {}) => api.get('/sepsurveys/history', { params }),
   create: (data) => api.post('/sepsurveys', data),
+  update: (surveyId, data) => api.put(`/sepsurveys/${surveyId}`, data),
+  delete: (surveyId) => api.delete(`/sepsurveys/${surveyId}`),
   exportTimingsCSV: (surveyId) => api.get(`/sepsurveys/${surveyId}/timings/csv`, { responseType: 'blob' }),
 };
 
@@ -117,6 +119,8 @@ export const businessAPI = {
   getVoucherOffers: () => api.get('/business/voucher-offers'),
   previewScan: (voucherId, redemptionToken) =>
   api.get('/business/scan/preview', { params: { voucherId, redemptionToken } }),
+  previewScanByCode: (code) =>
+    api.get('/business/scan/preview-code', { params: { code } }),
   getProfile: () => api.get('/business/profile'),
   uploadLogo: (formData) =>
     api.put('/business/profile/logo', formData, {

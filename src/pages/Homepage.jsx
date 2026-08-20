@@ -1,8 +1,21 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import SurveyButton from "../components/widgets/SurveyButton";
-import { ArrowRight, ArrowUpRight, Mail, Loader2, FileText, Award, Calendar, CheckSquare, AlertCircle } from "lucide-react";
+import { 
+  ArrowRight, 
+  ArrowUpRight, 
+  Mail, 
+  Loader2, 
+  FileText, 
+  Award, 
+  Calendar, 
+  CheckSquare, 
+  AlertCircle, 
+  Flame,
+  MessageSquare,
+  Clock
+} from "lucide-react";
 import AnimatedContent from "../components/animations/AnimatedContent";
 import { trackEvent } from "../utils/analytics";
 import { userAPI, sepSurveyAPI } from "../services/api";
@@ -44,7 +57,7 @@ const HOW_IT_WORKS = [
   {
     number: "01",
     title: "Register Now",
-    description: "Sign up and tell us a littlle about yourself.",
+    description: "Sign up and tell us a little about yourself.",
   },
   {
     number: "02",
@@ -58,13 +71,229 @@ const HOW_IT_WORKS = [
   },
 ];
 
-// UPDATED: Font size dynamically scales from 32px on small viewports up to 58px on desktops
 const headingStyle = {
   fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
   fontSize: "clamp(32px, 5vw, 58px)",
   fontWeight: 500,
   lineHeight: 1.1,
 };
+
+/* --- Survey Card Helpers & Components --- */
+const TICKET_PALETTES = [
+  { bg: '#00704A', accent: '#005C3C' },
+  { bg: '#1E88E5', accent: '#1565C0' },
+  { bg: '#FB8C00', accent: '#EF6C00' },
+  { bg: '#6A1B9A', accent: '#4A148C' },
+  { bg: '#00897B', accent: '#00695C' },
+  { bg: '#3949AB', accent: '#283593' },
+  { bg: '#C62828', accent: '#8E0000' },
+  { bg: '#EC407A', accent: '#D81B60' },
+  { bg: '#212121', accent: '#000000' },
+];
+
+const getPalette = (seed = '') => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  return TICKET_PALETTES[Math.abs(hash) % TICKET_PALETTES.length];
+};
+
+const daysRemaining = (endDate) => {
+  if (!endDate) return null;
+  return Math.ceil((new Date(endDate) - new Date()) / (1000 * 60 * 60 * 24));
+};
+
+function MetaPill({ icon: Icon, label }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[11px] font-medium text-neutral-700 sm:text-xs">
+      <Icon className="h-3.5 w-3.5 text-neutral-500" />
+      {label}
+    </span>
+  );
+}
+
+function SurveyCard({ survey, onStart }) {
+  const palette = useMemo(
+    () => getPalette(survey.feedbackBusinessName || survey.title || survey._id),
+    [survey._id, survey.title, survey.feedbackBusinessName],
+  );
+
+  const left = daysRemaining(survey.endDate);
+  const isExpired = left !== null && left <= 0;
+  const isUrgent = left !== null && left > 0 && left <= 3;
+  const Icon = survey.isMerchantFeedback ? MessageSquare : FileText;
+
+  return (
+    <div
+      role="button"
+      tabIndex={isExpired ? -1 : 0}
+      aria-disabled={isExpired}
+      onClick={() => !isExpired && onStart(survey)}
+      onKeyDown={(e) => {
+        if (!isExpired && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onStart(survey);
+        }
+      }}
+      className={`group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#134074] ${
+        isExpired
+          ? 'cursor-not-allowed opacity-60'
+          : 'cursor-pointer hover:-translate-y-1 hover:border-neutral-300 hover:shadow-lg'
+      }`}
+    >
+      {/* ── Colored ticket header ── */}
+      <div
+        className="relative flex items-center gap-4 px-6 pb-8 pt-6 sm:px-8 overflow-hidden"
+        style={{ backgroundColor: palette.bg }}
+      >
+        <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white shadow-md transition-transform duration-300 group-hover:scale-105">
+          <Icon className="h-6 w-6" style={{ color: palette.bg }} />
+        </div>
+
+        <div className="relative min-w-0 flex-1">
+          {survey.isMerchantFeedback && (
+            <span className="mb-1.5 inline-block rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-sm">
+              {survey.feedbackBusinessName
+                ? `Feedback · ${survey.feedbackBusinessName}`
+                : 'Feedback requested'}
+            </span>
+          )}
+          <h2 className="line-clamp-2 text-[18px] font-semibold leading-tight text-white sm:text-[20px]">
+            {survey.title}
+          </h2>
+        </div>
+
+        {/* credits medallion */}
+        <div className="relative flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-full bg-white shadow-md z-10">
+          <span
+            className="text-lg font-bold leading-none"
+            style={{ color: palette.bg }}
+          >
+            {survey.credits}
+          </span>
+        </div>
+
+        {isUrgent && (
+          <span className="absolute right-4 top-3 rounded-full bg-white px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-red-500 shadow-sm z-10">
+            Ending soon
+          </span>
+        )}
+      </div>
+
+      {/* ── Perforation ── */}
+      <div className="relative z-10 flex h-0 items-center">
+        <span
+          className="absolute -left-2.5 h-5 w-5 -translate-x-1/2 rounded-full bg-white"
+          style={{ boxShadow: 'inset 0 0 0 1px rgb(229 229 229)' }}
+        />
+        <span
+          className="absolute -right-2.5 h-5 w-5 translate-x-1/2 rounded-full bg-white"
+          style={{ boxShadow: 'inset 0 0 0 1px rgb(229 229 229)' }}
+        />
+        <div className="mx-3 w-full border-t-2 border-dashed border-neutral-200" />
+      </div>
+
+      {/* ── Body ── */}
+      <div className="flex flex-1 flex-col justify-between px-6 pb-6 pt-7 sm:px-8">
+        <div>
+          <p className="mb-5 line-clamp-2 min-h-[40px] text-sm text-neutral-500 sm:text-base">
+            {survey.description}
+          </p>
+
+          <div className="mb-6 flex flex-wrap gap-2">
+            <MetaPill icon={Award} label={`${survey.credits} credits`} />
+            <MetaPill
+              icon={Calendar}
+              label={
+                left === null
+                  ? 'No deadline'
+                  : left > 0
+                    ? `${left} day${left !== 1 ? 's' : ''} left`
+                    : 'Expired'
+              }
+            />
+            {survey.estimatedMinutes && (
+              <MetaPill icon={Clock} label={`~${survey.estimatedMinutes} min`} />
+            )}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          disabled={isExpired}
+          onClick={(e) => {
+            e.stopPropagation();
+            onStart(survey);
+          }}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:self-end"
+          style={{ backgroundColor: palette.bg }}
+        >
+          {isExpired ? 'Closed' : 'Start survey'}
+          {!isExpired && (
+            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function SolidFlame({ className, style }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} style={style}>
+      <path
+        fill="currentColor"
+        d="M12 1.5c.6 2.6 2.2 4.2 3.9 5.8 2 1.9 4.1 4 4.1 7.4 0 4.3-3.6 7.8-8 7.8s-8-3.5-8-7.8c0-2.2 1-4 2.1-5.4.3-.4 1-.3 1.1.2.3 1.3 1 2.2 1.9 2.4-.4-3.6.9-7.4 2.9-10.4z"
+      />
+    </svg>
+  );
+}
+
+function StreakPill({ streak, onClick }) {
+  const active = streak > 0;
+  // last 7 days, most recent last
+  const days = Array.from({ length: 7 }, (_, i) => i < Math.min(streak, 7));
+
+  return (
+    <button
+      onClick={onClick}
+      aria-label={`${streak} day streak`}
+      className="mt-6 group inline-flex items-center gap-3 rounded-full border
+                 border-gray-200 bg-gray-50/80 pl-3 pr-4 py-2
+                 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+    >
+      <SolidFlame
+        className={active ? "text-orange-500" : "text-gray-300"}
+        style={{ width: 22, height: 22 }}
+      />
+
+      <span className="flex items-baseline gap-1.5">
+        <span
+          className="text-[17px] font-bold leading-none tabular-nums"
+          style={{ color: active ? "#134074" : "#9CA3AF" }}
+        >
+          {streak}
+        </span>
+        <span className="text-[13px] font-medium text-gray-500 leading-none">
+          day streak
+        </span>
+      </span>
+
+      <span className="flex items-center gap-1 pl-1 border-l border-gray-200 ml-1">
+        {days.map((filled, i) => (
+          <span
+            key={i}
+            className={`h-1.5 w-1.5 rounded-full ${
+              filled ? "bg-orange-400" : "bg-gray-200"
+            }`}
+          />
+        ))}
+      </span>
+    </button>
+  );
+}
 
 export default function Homepage() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -73,6 +302,8 @@ export default function Homepage() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [posterIndex, setPosterIndex] = useState(0);
   const [credits, setCredits] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [showStreakDialog, setShowStreakDialog] = useState(false);
   const [surveys, setSurveys] = useState([]);
   const [surveysLoading, setSurveysLoading] = useState(false);
   const navigate = useNavigate();
@@ -97,7 +328,6 @@ export default function Homepage() {
     };
   }, []);
 
-  // Auto-advance the vendor poster carousel
   useEffect(() => {
     const interval = setInterval(() => {
       setPosterIndex((prev) => (prev + 1) % VENDOR_POSTERS.length);
@@ -105,7 +335,6 @@ export default function Homepage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Fetch credits + available surveys once the user is logged in
   useEffect(() => {
     if (!isLoggedIn) return;
 
@@ -113,7 +342,10 @@ export default function Homepage() {
       try {
         const res = await userAPI.getProfile();
         const userData = res?.data?.data?.user;
-        if (userData) setCredits(userData.credits ?? 0);
+        if (userData) {
+          setCredits(userData.credits ?? 0);
+          setStreak(userData.streakCount ?? 0);
+        }
       } catch (err) {
         console.error('Failed to load profile credits:', err);
       }
@@ -177,13 +409,13 @@ export default function Homepage() {
         style={{ backgroundImage: `url(${HERO_BG})`, minHeight: "650px" }}
       >
         <div className="max-w-[1150px] mx-auto px-4 sm:px-8 lg:px-10 w-full flex-1 flex flex-col">
-          <div className="grid lg:grid-cols-[1fr_440px] gap-10 lg:gap-12 flex-1 items-end">
-            {/* Left column — Vertically centered within its space */}
-            <AnimatedContent direction="vertical" distance={40} duration={0.8} className="my-auto py-8 flex flex-col justify-center">
+          <div className="grid lg:grid-cols-[1fr_440px] gap-8 lg:gap-12 flex-1 items-stretch lg:items-end">
+            {/* Left column */}
+            <AnimatedContent direction="vertical" distance={40} duration={0.8} className="my-auto py-6 lg:py-8 flex flex-col justify-center">
               <h1 className="text-white mb-6" style={headingStyle}>
                 <span
                   className="inline-flex items-center justify-center px-4 rounded-full bg-blue-500 text-white align-middle mr-3"
-                  style={{ height: "42px", fontSize: "14px", sm: { height: "58px", fontSize: "18px" }, fontWeight: 400, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", lineHeight: 1 }}
+                  style={{ height: "42px", fontSize: "14px", fontWeight: 400, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", lineHeight: 1 }}
                 >
                   At eRuchi
                 </span>
@@ -219,24 +451,24 @@ export default function Homepage() {
               </div>
             </AnimatedContent>
 
-            {/* Right column — signup / welcome card touching bottom */}
+            {/* Right column — edge-to-edge flush card on mobile */}
             <AnimatedContent
               direction="vertical"
               distance={40}
               duration={0.8}
               delay={0.15}
-              className="w-full flex flex-col self-stretch"
+              className="w-[calc(100%+2rem)] -mx-4 sm:mx-0 sm:w-full sm:max-w-md sm:mx-auto lg:max-w-none flex flex-col self-stretch mt-4 lg:mt-0"
             >
               <div
-                className={`bg-white p-8 lg:p-10 w-full flex-1 rounded-t-3xl rounded-b-none ${
-                  isLoggedIn ? "flex flex-col justify-center" : ""
+                className={`bg-white p-6 sm:p-8 lg:p-10 w-full flex-1 rounded-t-3xl rounded-b-none shadow-lg lg:shadow-none ${
+                  isLoggedIn ? "flex flex-col justify-between" : ""
                 }`}
               >
                 {isLoggedIn ? (
-                  <div className="flex flex-col justify-between h-full py-2">
+                  <div className="flex flex-col justify-center h-full py-2">
                     {/* Greeting */}
                     <div className="text-center">
-                      <h2 className="text-2xl font-bold text-gray-900">
+                      <h2 className="text-2xl lg:text-3xl font-bold text-gray-900">
                         Welcome back{firstName ? `, ${firstName}` : ""}
                       </h2>
                       <p
@@ -252,27 +484,23 @@ export default function Homepage() {
                     </div>
 
                     {/* Credit balance */}
-                    <div className="my-8 flex flex-col items-center text-center py-6">
+                    <div className="mt-8 lg:mt-10 flex flex-col items-center text-center">
                       <p
-                        style={{
-                          fontSize: "80px",
-                          fontWeight: 700,
-                          lineHeight: 1,
-                          color: "#134074",
-                        }}
+                        className="text-[72px] sm:text-[80px] lg:text-[96px] font-bold leading-none tracking-tight"
+                        style={{ color: "#134074" }}
                       >
                         {credits}
                       </p>
                       <p
                         className="text-gray-400 mt-2"
-                        style={{ fontSize: "14px", fontWeight: 400, letterSpacing: "0.1em" }}
+                        style={{ fontSize: "14px", fontWeight: 400, letterSpacing: "0.15em" }}
                       >
                         CREDITS
                       </p>
                     </div>
 
                     {/* Actions */}
-                    <div className="space-y-3">
+                    <div className="space-y-3 mt-8 lg:mt-10">
                       <button
                         onClick={() => navigate("/standalone-surveys")}
                         className="w-full text-white hover:opacity-90 transition-all flex items-center justify-center rounded-full"
@@ -386,8 +614,8 @@ export default function Homepage() {
         </div>
       </div>
 
-      {/* ── Trusted partners strip ── */}
-      <div className="bg-white py-6 lg:py-8">
+      {/* ── Trusted partners strip (Desktop only) ── */}
+      <div className="hidden lg:block bg-white py-6 lg:py-8">
         <div className="max-w-[1150px] mx-auto px-4 sm:px-8 lg:px-10">
           <AnimatedContent direction="vertical" distance={30} duration={0.7}>
             <p className="text-center text-[10px] sm:text-xs tracking-[0.2em] uppercase text-gray-400 font-medium mb-4">
@@ -426,71 +654,11 @@ export default function Homepage() {
             ) : (
               <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
                 {surveys.map((survey) => (
-                  <div
+                  <SurveyCard
                     key={survey._id}
-                    className="p-6 sm:p-8 w-full bg-white flex flex-col justify-between rounded-xl border border-neutral-200 hover:border-neutral-900 hover:shadow-sm transition-all"
-                  >
-                    <div>
-                      <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
-                        <div className="w-12 h-12 rounded-md bg-neutral-50 border border-neutral-200 flex items-center justify-center shrink-0">
-                          <FileText className="h-5 w-5 text-neutral-800" />
-                        </div>
-                        <h3 className="text-neutral-900 font-semibold text-[18px] sm:text-[20px] leading-tight">
-                          {survey.title}
-                        </h3>
-                      </div>
-
-                      <p className="text-neutral-500 text-sm sm:text-base line-clamp-2 mb-6 min-h-[40px]">
-                        {survey.description}
-                      </p>
-
-                      <div className="grid grid-cols-3 gap-4 mb-6 pt-2">
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-1.5 mb-1 text-neutral-800">
-                            <Award className="h-4 w-4" />
-                            <span className="font-medium text-sm sm:text-base whitespace-nowrap">
-                              {survey.credits} Credits
-                            </span>
-                          </div>
-                          <span className="text-xs text-neutral-400 pl-[22px]">Reward</span>
-                        </div>
-
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-1.5 mb-1 text-neutral-800">
-                            {survey.isMandatory ? (
-                              <AlertCircle className="h-4 w-4" />
-                            ) : (
-                              <CheckSquare className="h-4 w-4" />
-                            )}
-                            <span className="font-medium text-sm sm:text-base whitespace-nowrap">
-                              {survey.isMandatory ? "Mandatory" : "Optional"}
-                            </span>
-                          </div>
-                          <span className="text-xs text-neutral-400 pl-[22px]">Type</span>
-                        </div>
-
-                        <div className="flex flex-col">
-                          <div className="flex items-center gap-1.5 mb-1 text-neutral-800">
-                            <Calendar className="h-4 w-4" />
-                            <span className="font-medium text-sm sm:text-base whitespace-nowrap">
-                              {survey.endDate ? new Date(survey.endDate).toLocaleDateString() : "No Limit"}
-                            </span>
-                          </div>
-                          <span className="text-xs text-neutral-400 pl-[22px]">Deadline</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end mt-2 pt-5 border-t border-neutral-100">
-                      <button
-                        onClick={() => navigate(`/standalone-survey/${survey._id}`)}
-                        className="text-white py-3 px-6 rounded-md font-medium transition-all hover:opacity-90 active:scale-[0.98] text-sm w-full sm:w-auto"
-                        style={{ backgroundColor: "#134074" }}
-                      >
-                        Start Survey
-                      </button>
-                    </div>
-                  </div>
+                    survey={survey}
+                    onStart={(s) => navigate(`/standalone-survey/${s._id}`)}
+                  />
                 ))}
               </div>
             )}
@@ -587,7 +755,7 @@ export default function Homepage() {
         </div>
       </div>
 
-      {/* ── Buffer clearance area for the bottom nav bar on mobile devices ── */}
+      {/* ── Buffer clearance area ── */}
       <div className="h-24 lg:hidden" />
     </div>
   );

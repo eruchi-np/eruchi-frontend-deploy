@@ -44,7 +44,12 @@ function VoucherTicketCard({ voucher, onClick }) {
   const discountLabel =
     snap.discountType === "percentage"
       ? `${snap.discountValue}%`
+      : snap.discountType === "free_item"
+      ? (snap.discountValue ? `Free ${snap.discountValue}` : "Free")
+      : snap.discountType === "value_combo"
+      ? "Value Combo"
       : `Rs. ${snap.discountValue}`;
+  const showOffSuffix = snap.discountType === "percentage" || snap.discountType === "flat";
   const brandName = snap.brandName || snap.businessName || "Official Brand";
   const brandLogo = snap.imageUrl || snap.brandLogo || null;
   const palette = getBrandPalette(brandName);
@@ -111,12 +116,14 @@ function VoucherTicketCard({ voucher, onClick }) {
             >
               {discountLabel}
             </span>
-            <span
-              className="text-[10px] xs:text-xs sm:text-sm tracking-widest font-medium shrink-0"
-              style={{ color: palette.text, opacity: 0.8 }}
-            >
-              OFF
-            </span>
+            {showOffSuffix && (
+              <span
+                className="text-[10px] xs:text-xs sm:text-sm tracking-widest font-medium shrink-0"
+                style={{ color: palette.text, opacity: 0.8 }}
+              >
+                OFF
+              </span>
+            )}
           </div>
           {!isInactive && (
             <span
@@ -144,6 +151,11 @@ function VoucherTicketCard({ voucher, onClick }) {
         <h2 className="text-gray-900 truncate text-sm sm:text-base font-medium leading-snug">
           {snap.title || "Voucher"}
         </h2>
+        {snap.approxValue != null && (
+          <p className="text-gray-400 text-[10px] sm:text-[11px] mt-0.5">
+            Estimated savings Rs. {snap.approxValue}
+          </p>
+        )}
         {voucher.status === "active" && (
           <p className="text-xs text-green-600 mt-1">
             {getRelativeExpiry(voucher.expiresAt)}

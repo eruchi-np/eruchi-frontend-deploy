@@ -1,6 +1,6 @@
 // src/pages/admin/CreateSepSurvey.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { sepSurveyAPI } from '../../services/api'; // ← Make sure this is exported in api.js
 import { ArrowLeft, Plus, Trash2, Save, Type, FileText, CheckSquare,Loader2, Sliders, AlertCircle, Eye, Settings as SettingsIcon, Clock, Calendar, Award, Users, Target } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -13,10 +13,11 @@ const CreateSepSurvey = () => {
     description: '',
     status: 'published',
     credits: 50,
-    publishedAt: new Date().toISOString().split('T')[0],
+    publishedAt: new Date().toISOString().slice(0, 16),
     availableDays: 7,
     estimatedMinutes: '',
     visibility: 'public',
+    validityDays: 7,
     questions: [
       {
         questionText: '',
@@ -24,10 +25,63 @@ const CreateSepSurvey = () => {
         options: [],
         maxSelections: 1,
         minValue: 0,
-        maxValue: 5
+        maxValue: 5,
+        isRequired: true
       }
     ]
   });
+
+  const { surveyId } = useParams();
+  const isEditMode = Boolean(surveyId);
+  const [initialLoading, setInitialLoading] = useState(isEditMode);
+  const [editLocked, setEditLocked] = useState(false);
+
+  useEffect(() => {
+    if (!isEditMode) return;
+
+    const fetchSurvey = async () => {
+      try {
+        const res = await sepSurveyAPI.getById(surveyId);
+        const survey = res.data.data;
+
+        const minutesSinceCreation = (Date.now() - new Date(survey.createdAt).getTime()) / (1000 * 60);
+        if (minutesSinceCreation > 15) {
+          setEditLocked(true);
+          toast.error('This survey can no longer be edited (edit window is 15 minutes after creation).');
+          return;
+        }
+
+        const startDate = survey.startDate ? new Date(survey.startDate) : new Date();
+        const endDate = survey.endDate ? new Date(survey.endDate) : null;
+        const availableDays = endDate
+          ? Math.max(1, Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)))
+          : 7;
+
+        setFormData({
+          title: survey.title || '',
+          description: survey.description || '',
+          status: survey.status || 'published',
+          credits: survey.credits ?? 50,
+          publishedAt: startDate.toISOString().slice(0, 16),
+          availableDays,
+          estimatedMinutes: survey.estimatedMinutes ?? '',
+          visibility: survey.visibility || 'public',
+          validityDays: survey.validityDays ?? 7,
+          questions: survey.questions?.length ? survey.questions : [
+            { questionText: '', questionType: 'text_short', options: [], maxSelections: 1, minValue: 0, maxValue: 5 }
+          ]
+        });
+      } catch (err) {
+        console.error('Failed to load survey for editing', err);
+        toast.error('Failed to load survey');
+        navigate('/admin');
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+
+    fetchSurvey();
+  }, [isEditMode, surveyId, navigate]);
 
   const questionTypes = [
     { value: 'text_short', label: 'Short Text', icon: Type, description: 'Brief text response' },
@@ -144,6 +198,10 @@ const CreateSepSurvey = () => {
       return toast.error('Estimated time must be at least 1 minute');
     }
 
+    if (formData.visibility === 'targeted' && (!formData.validityDays || Number(formData.validityDays) < 1)) {
+      return toast.error('Validity days must be at least 1');
+    }
+
     const emptyQuestions = formData.questions.filter(q => !q.questionText.trim());
     if (emptyQuestions.length) return toast.error('All questions must have text');
 
@@ -159,21 +217,25 @@ const CreateSepSurvey = () => {
       const availableDays = Number(formData.availableDays);
       const derivedEndDate = new Date(formData.publishedAt);
       derivedEndDate.setDate(derivedEndDate.getDate() + availableDays);
+      // setDate preserves hours/minutes from formData.publishedAt automatically,
+      // so derivedEndDate already lands on the same time-of-day as startDate.
 
       const payload = {
         title: trimmedTitle,
         description: trimmedDesc,
         status: formData.status,
         credits: Number(formData.credits),
-        publishedAt: formData.publishedAt,
+        startDate: new Date(formData.publishedAt).toISOString(),
         availableDays,
-        endDate: derivedEndDate.toISOString().split('T')[0],
+        endDate: derivedEndDate.toISOString(),
         estimatedMinutes: formData.estimatedMinutes !== '' ? Number(formData.estimatedMinutes) : null,
         visibility: formData.visibility,
+        validityDays: Number(formData.validityDays),
         questions: formData.questions.map(q => {
           const base = {
             questionText: q.questionText.trim(),
-            questionType: q.questionType
+            questionType: q.questionType,
+            isRequired: q.isRequired !== false
           };
           if (['single_checkbox', 'multiple_checkbox'].includes(q.questionType)) {
             base.options = q.options.map(o => o.trim()).filter(Boolean);
@@ -187,8 +249,13 @@ const CreateSepSurvey = () => {
         })
       };
 
-      await sepSurveyAPI.create(payload); // ← Add this method in api.js (see below)
-      toast.success('Standalone survey created successfully!');
+      if (isEditMode) {
+        await sepSurveyAPI.update(surveyId, payload);
+        toast.success('Survey updated successfully!');
+      } else {
+        await sepSurveyAPI.create(payload);
+        toast.success('Standalone survey created successfully!');
+      }
       navigate('/admin');
     } catch (err) {
       console.error('Create sep survey error:', err);
@@ -199,9 +266,37 @@ const CreateSepSurvey = () => {
     }
   };
 
-  const getMinPublishedDate = () => new Date().toISOString().split('T')[0];
+  const getMinPublishedDate = () => new Date().toISOString().slice(0, 16);
 
   const getQuestionTypeData = (type) => questionTypes.find(qt => qt.value === type);
+
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
+
+  if (editLocked) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+        <div className="bg-white rounded-2xl border border-gray-200 p-10 max-w-md text-center">
+          <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-4" />
+          <h2 className="text-lg font-bold text-gray-900 mb-2">Edit window closed</h2>
+          <p className="text-sm text-gray-600 mb-6">
+            This survey can only be edited within 15 minutes of creation. That window has passed.
+          </p>
+          <button
+            onClick={() => navigate('/admin')}
+            className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -216,8 +311,8 @@ const CreateSepSurvey = () => {
               <ArrowLeft className="h-5 w-5 text-gray-600" />
             </button>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Create Standalone Survey</h1>
-              <p className="text-sm text-gray-500">Independent survey (not tied to a campaign)</p>
+              <h1 className="text-2xl font-bold text-gray-900">{isEditMode ? 'Edit Standalone Survey' : 'Create Standalone Survey'}</h1>
+              <p className="text-sm text-gray-500">{isEditMode ? 'Editable for 15 minutes after creation' : 'Independent survey (not tied to a campaign)'}</p>
             </div>
           </div>
         </div>
@@ -301,6 +396,26 @@ const CreateSepSurvey = () => {
                 )}
               </div>
 
+              {formData.visibility === 'targeted' && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Validity After Being Sent (days) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={formData.validityDays}
+                    onChange={e => handleInputChange('validityDays', Number(e.target.value))}
+                    className="w-full max-w-[200px] px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    required
+                  />
+                  <p className="text-xs text-gray-500 mt-1.5">
+                    Timer starts when the survey email is actually sent to a user (e.g. after they claim
+                    an offer), not when this survey is created or attached to a voucher.
+                  </p>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
@@ -338,7 +453,7 @@ const CreateSepSurvey = () => {
                     Published Date <span className="text-red-500">*</span>
                   </label>
                   <input
-                    type="date"
+                    type="datetime-local"
                     value={formData.publishedAt}
                     onChange={e => handleInputChange('publishedAt', e.target.value)}
                     min={getMinPublishedDate()}
@@ -421,6 +536,18 @@ const CreateSepSurvey = () => {
                             </div>
                           )}
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleQuestionChange(idx, 'isRequired', q.isRequired === false)}
+                          className={`inline-flex items-center px-3 py-1 rounded-lg border text-xs font-semibold mb-4 transition-colors ${
+                            q.isRequired === false
+                              ? 'bg-gray-50 border-gray-200 text-gray-500'
+                              : 'bg-red-50 border-red-200 text-red-700'
+                          }`}
+                        >
+                          {q.isRequired === false ? 'Optional' : 'Required'}
+                        </button>
 
                         <input
                           type="text"
@@ -666,12 +793,12 @@ const CreateSepSurvey = () => {
                   {loading ? (
                     <>
                       <Loader2 className="h-5 w-5 animate-spin" />
-                      Creating...
+                      {isEditMode ? 'Saving...' : 'Creating...'}
                     </>
                   ) : (
                     <>
                       <Save className="h-5 w-5" />
-                      Create Survey
+                      {isEditMode ? 'Save Changes' : 'Create Survey'}
                     </>
                   )}
                 </button>
