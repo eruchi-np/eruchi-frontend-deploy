@@ -154,10 +154,13 @@ const Profile = () => {
       className="min-h-screen bg-white overflow-x-hidden"
       style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
     >
-      {/* ── Hero — mirrors Homepage.jsx hero treatment ── */}
+      {/* ── Hero — gradient background ── */}
       <div
-        className="bg-cover bg-center flex flex-col justify-between pt-10 lg:pt-16 pb-0"
-        style={{ backgroundImage: `url(${heroBg})`, minHeight: "560px" }}
+        className="flex flex-col justify-between pt-10 lg:pt-16 pb-0"
+        style={{
+          background: "linear-gradient(to bottom, #d9ecff 0%, #3399ff 45%)",
+          minHeight: "560px",
+        }}
       >
         <div className="max-w-[1150px] mx-auto px-4 sm:px-8 lg:px-10 w-full flex-1 flex flex-col">
           <div className="grid lg:grid-cols-[1fr_440px] gap-10 lg:gap-12 flex-1 items-end">
@@ -172,7 +175,7 @@ const Profile = () => {
                 {user.role === "admin" && (
                   <button
                     onClick={() => navigate("/admin")}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium border border-white/30 bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-white/20"
+                    className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium border border-white/30 bg-[#134074] text-white backdrop-blur-sm transition-colors hover:bg-white/20"
                   >
                     <ShieldCheck size={15} />
                     Admin
@@ -180,27 +183,27 @@ const Profile = () => {
                 )}
                 <button
                   onClick={handleLogout}
-                  className="flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold bg-white text-gray-900 shadow-lg transition-all hover:bg-red-50 hover:text-red-600 active:scale-[0.98]"
+                  className="flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold bg-[#134074] text-white shadow-lg transition-all hover:bg-red-50 hover:text-red-600 active:scale-[0.98]"
                 >
                   <LogOut size={16} />
                   Sign out
                 </button>
               </div>
 
-              <h1 className="text-white mb-6" style={headingStyle}>
-                Hey, <span className="text-white">{firstName}</span>.
+              <h1 className="text-[#134074] mb-6" style={headingStyle}>
+                Hey, <span className="text-[#134074]">{firstName}</span>.
               </h1>
 
               <p
-                className="text-white/80 leading-snug max-w-[480px] mb-6"
+                className="text-[#134074]/80 leading-snug max-w-[480px] mb-6"
                 style={descriptionStyle}
               >
-                Manage your credits, vouchers, and survey activity — all in
+                Manage your credits, vouchers, and survey activity all in
                 one place.
               </p>
 
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-white/50 font-light">
-                <span className="text-white/80 font-normal">{user.email}</span>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-[#134074]/50 font-light">
+                <span className="text-[#134074]/80 font-normal">{user.email}</span>
                 {user.phone && (
                   <>
                     <span>·</span>
@@ -369,41 +372,7 @@ const Profile = () => {
         )}
 
         {/* ── Vouchers + Survey history, side by side ── */}
-        {/* ── Stats strip (reference: "Your Overall Progress") ── */}
-        <AnimatedContent direction="vertical" distance={30} duration={0.6}>
-          <section className="mb-8 lg:mb-10">
-            <h2 className="text-gray-900 text-xl sm:text-2xl font-medium mb-5">
-              Your <span className="text-blue-600">progress</span>
-            </h2>
-
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              {[
-                { label: "Surveys Completed", value: user.totalSurveys ?? 0 },
-                { label: "Credits Balance", value: localCredits ?? 0 },
-                { label: "Active Vouchers", value: user.activeVouchers ?? 0 },
-                {
-                  label: "Member Since",
-                  value: new Date(user.createdAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    year: "numeric",
-                  }),
-                },
-              ].map((s) => (
-                <div
-                  key={s.label}
-                  className="rounded-2xl border border-gray-100 bg-gray-50/60 px-5 py-5 flex flex-col justify-between min-h-[104px]"
-                >
-                  <p className="text-2xl sm:text-[28px] font-semibold leading-none text-gray-900">
-                    {s.value}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-3 leading-tight">
-                    {s.label}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </section>
-        </AnimatedContent>
+        
 
         {/* ── Vouchers + Activity: equal-height cards, headers inside ── */}
         <div className="grid lg:grid-cols-2 gap-6 lg:gap-8 items-stretch">
