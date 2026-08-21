@@ -33,20 +33,8 @@ export default function VouchersCard() {
   }, [activeTab]);
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
-      <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-        <div>
-          <p className="font-semibold text-gray-900 text-sm">My Vouchers</p>
-          <p className="text-xs text-gray-400 mt-0.5">Your redeemed vouchers</p>
-        </div>
-        <button
-          onClick={() => navigate('/vouchers')}
-          className="text-xs text-blue-600 font-medium hover:text-blue-700 transition-colors"
-        >
-          View all
-        </button>
-      </div>
-      <div className="flex gap-2 px-5 pb-4">
+    <div className="bg-white">
+      <div className="flex gap-2 px-5 pt-4 pb-4">
         {TABS.map((tab) => (
           <button
             key={tab}
