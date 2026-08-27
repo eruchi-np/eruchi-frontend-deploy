@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import toast, { Toaster } from "react-hot-toast";
@@ -59,8 +59,17 @@ import PageTransition from './components/animations/PageTransition';
 
 function RouteChangeHandler() {
   const location = useLocation();
+  const isFirstLoad = useRef(true);
+
   useEffect(() => {
     toast.dismiss();
+    if (isFirstLoad.current) {
+      isFirstLoad.current = false;
+      return;
+    }
+    if (typeof window.fbq === 'function') {
+      window.fbq('track', 'PageView');
+    }
   }, [location.pathname]);
   return null;
 }
