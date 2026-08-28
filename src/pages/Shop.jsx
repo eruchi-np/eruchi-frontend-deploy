@@ -365,7 +365,7 @@ export default function Shop() {
     let vouchers = voucherOffers.map((offer, idx) => ({
       id: offer._id,
       credits: offer.creditsRequired,
-      searchPayload: `${offer.title || ""} ${offer.business?.name || ""} ${
+      searchPayload: `${offer.title || ""} ${offer.business?.brandName || ""} ${
         offer.creditsRequired || ""
       } ${offer.discountValue || ""}`
         .toLowerCase()
