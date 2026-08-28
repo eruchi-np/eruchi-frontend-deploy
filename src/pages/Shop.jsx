@@ -121,6 +121,11 @@ function VoucherCard({ offer, onRedeem, onViewStore }) {
     offer.business?.brandName || offer.business?.name || "Official Brand";
   const brandLogo = offer.business?.logo || offer.business?.logoUrl || null;
   const palette = useMemo(() => getBrandPalette(brandName), [brandName]);
+  const businessId = offer.business?._id;
+  const openStore = (e) => {
+    e.stopPropagation();
+    if (businessId) onViewStore?.(businessId);
+  };
 
   return (
     <div
@@ -151,15 +156,24 @@ function VoucherCard({ offer, onRedeem, onViewStore }) {
           }}
         />
 
-        {/* Top: brand + logo */}
+        {/* Top: brand + logo — opens store profile (description, hours, etc.) */}
         <div className="flex-[13] relative flex flex-col items-center justify-center gap-2 px-4">
-          <span
-           className="text-[8px] xs:text-[10px] sm:text-xs font-semibold tracking-[0.2em] sm:tracking-[0.25em] uppercase line-clamp-1"
+          <button
+            type="button"
+            onClick={openStore}
+            disabled={!businessId}
+            className="text-[8px] xs:text-[10px] sm:text-xs font-semibold tracking-[0.2em] sm:tracking-[0.25em] uppercase line-clamp-1 max-w-full underline-offset-2 hover:underline disabled:no-underline disabled:cursor-default"
             style={{ color: palette.text, opacity: 0.9 }}
           >
             {brandName}
-          </span>
-          <div className="w-[45%] max-w-24 aspect-square rounded-full bg-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105">
+          </button>
+          <button
+            type="button"
+            onClick={openStore}
+            disabled={!businessId}
+            className="w-[45%] max-w-24 aspect-square rounded-full bg-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105 disabled:cursor-default"
+            aria-label={`View ${brandName} store`}
+          >
             {brandLogo ? (
               <img
                 src={brandLogo}
@@ -174,7 +188,7 @@ function VoucherCard({ offer, onRedeem, onViewStore }) {
                 {brandName.charAt(0).toUpperCase()}
               </span>
             )}
-          </div>
+          </button>
         </div>
 
         {/* Perforation row */}
@@ -227,9 +241,14 @@ function VoucherCard({ offer, onRedeem, onViewStore }) {
 
       {/* ── Info ── */}
       <div className="pt-3 sm:pt-4 flex flex-col gap-0.5">
-        <p className="text-gray-400 text-[9px] sm:text-[11px] font-medium tracking-wide uppercase line-clamp-1">
+        <button
+          type="button"
+          onClick={openStore}
+          disabled={!businessId}
+          className="text-gray-400 text-[9px] sm:text-[11px] font-medium tracking-wide uppercase line-clamp-1 text-left hover:text-gray-700 disabled:hover:text-gray-400"
+        >
           {brandName}
-        </p>
+        </button>
 
         <h2 className="text-gray-900 line-clamp-1 text-sm sm:text-base font-medium leading-snug">
           {offer.title}

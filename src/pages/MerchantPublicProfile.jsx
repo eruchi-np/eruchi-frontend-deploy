@@ -112,9 +112,14 @@ export default function MerchantPublicProfile() {
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-widest text-gray-400">{business.category || 'Merchant'}</p>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mt-0.5 break-words">{displayName}</h1>
-            {business.description && <p className="text-sm text-gray-600 mt-2">{business.description}</p>}
           </div>
         </div>
+
+        {business.description ? (
+          <p className="text-sm sm:text-base text-gray-600 leading-relaxed mb-6 whitespace-pre-wrap">
+            {business.description}
+          </p>
+        ) : null}
 
         <div className="flex flex-col gap-2 text-sm text-gray-600 mb-8">
           {business.address && (
