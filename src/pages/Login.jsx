@@ -149,13 +149,11 @@ const Login = () => {
 
   return (
     <>
-      <section className="py-20 bg-white text-black">
-        <div className="flex justify-center items-center">
-          <div className="flex w-full rounded-lg lg:w-[600px] mx-5 space-y-12 flex-wrap flex-col">
-            <h1 className="text-[40px] lg:text-4x1 font-bold leading-tight">
-              <span className="text-[38px] lg:text-4x1 font-bold text-black">
-                Please sign in to continue
-              </span>
+      <section className="py-10 sm:py-16 pb-28 bg-white text-black">
+        <div className="flex justify-center items-center px-4">
+          <div className="flex w-full max-w-lg mx-auto space-y-8 sm:space-y-12 flex-col">
+            <h1 className="text-3xl sm:text-4xl font-bold leading-tight text-black">
+              Please sign in to continue
             </h1>
 
             {/* Tab switcher */}
@@ -189,7 +187,7 @@ const Login = () => {
                 <button
                   type="button"
                   onClick={handleGoogleLogin}
-                  className="w-full p-4 font-bold text-lg rounded-2xl border-2 border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-all duration-200 flex items-center justify-center gap-3"
+                  className="w-full p-3 sm:p-4 font-bold text-base sm:text-lg rounded-2xl border-2 border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-all duration-200 flex items-center justify-center gap-3"
                 >
                   <svg className="w-6 h-6" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />

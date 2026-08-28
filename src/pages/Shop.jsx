@@ -26,9 +26,9 @@ const VENDOR_POSTERS = [
 // Matches the homepage heading style for visual cohesion
 const headingStyle = {
   fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-  fontSize: "clamp(32px, 5vw, 58px)",
+  fontSize: "clamp(28px, 8vw, 58px)",
   fontWeight: 500,
-  lineHeight: 1.1,
+  lineHeight: 1.15,
 };
 
 const descriptionStyle = {
@@ -71,7 +71,7 @@ const getBrandPalette = (brandName = "") => {
   return TICKET_PALETTES[Math.abs(hash) % TICKET_PALETTES.length];
 };
 
-function VoucherCard({ offer, onRedeem }) {
+function VoucherCard({ offer, onRedeem, onViewStore }) {
   const discountLabel =
     offer.discountType === "percentage"
       ? `${offer.discountValue}%`
@@ -256,6 +256,19 @@ function VoucherCard({ offer, onRedeem }) {
             <span>Ends {formattedDeadline}</span>
           </div>
         )}
+
+        {offer.business?._id && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewStore?.(offer.business._id);
+            }}
+            className="mt-2 text-[11px] sm:text-xs font-medium text-blue-600 hover:text-blue-800 text-left"
+          >
+            View store
+          </button>
+        )}
       </div>
     </div>
   );
@@ -398,12 +411,12 @@ export default function Shop() {
 
   return (
     <div
-      className="min-h-screen bg-white relative"
+      className="min-h-screen bg-white relative overflow-x-hidden"
       style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
     >
 
       {/* ── Spotlight deals carousel ── */}
-      <div className="relative overflow-hidden" style={{ height: "520px" }}>
+      <div className="relative overflow-hidden h-[280px] sm:h-[400px] lg:h-[520px]">
         {VENDOR_POSTERS.map((poster, i) => (
           <div
             key={i}
@@ -416,7 +429,7 @@ export default function Shop() {
         ))}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
 
-        <div className="absolute bottom-0 left-0 right-0 p-6 sm:p-10 flex items-end justify-between gap-6">
+        <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-10 flex flex-col-reverse sm:flex-row sm:items-end justify-between gap-3 sm:gap-6">
           <div className="flex gap-2">
             {VENDOR_POSTERS.map((_, i) => (
               <button
@@ -430,7 +443,7 @@ export default function Shop() {
             ))}
           </div>
 
-          <div className="text-right max-w-[480px]">
+          <div className="text-left sm:text-right max-w-full sm:max-w-[480px]">
             <h2 className="text-white mb-2" style={headingStyle}>
               Spotlight <span className="text-blue-400">deals</span> right now
             </h2>
@@ -526,6 +539,7 @@ export default function Shop() {
                 <VoucherCard
                   offer={item.originalData}
                   onRedeem={handleSelectOffer}
+                  onViewStore={(businessId) => navigate(`/shop/merchant/${businessId}`)}
                 />
               </div>
             ))}
@@ -582,7 +596,7 @@ export default function Shop() {
         onClick={() => {
           if (!user) navigate("/login");
         }}
-        className={`fixed bottom-20 right-6 sm:bottom-24 sm:right-10 z-40 transition-all duration-300 ease-out ${
+        className={`fixed bottom-24 right-4 sm:bottom-24 sm:right-10 z-40 transition-all duration-300 ease-out ${
           !user ? "cursor-pointer" : ""
         }`}
         style={{

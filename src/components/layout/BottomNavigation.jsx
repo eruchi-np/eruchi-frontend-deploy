@@ -1,29 +1,17 @@
 import React from 'react';
-import { Home, HelpCircle, User, ClipboardList, ShoppingBag, QrCode, LayoutDashboard, LogOut } from 'lucide-react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { businessAPI } from '../../services/api';
+import { Home, HelpCircle, User, ClipboardList, ShoppingBag, QrCode, LayoutDashboard, Store } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const BusinessBottomNavigation = () => {
   const location = useLocation();
-  const navigate = useNavigate();
-
-  const handleLogout = async () => {
-    try {
-      await businessAPI.logout();
-      localStorage.removeItem('is_business');
-      localStorage.removeItem('business_name');
-      navigate('/login');
-    } catch (error) {
-      console.error(error);
-    }
-  };
 
   const isDashboard = location.pathname === '/business/dashboard';
   const isScan = location.pathname === '/business/scan';
+  const isProfile = location.pathname.startsWith('/business/profile') || location.pathname.startsWith('/business/vouchers');
 
   return (
-    <nav className="fixed block md:hidden rounded-lg bottom-0 z-50 left-0 right-0 bg-white border-t border-gray-200 px-6 py-2">
+    <nav className="fixed block md:hidden bottom-0 z-50 left-0 right-0 bg-white border-t border-gray-200 px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
       <ul className="flex justify-between items-end">
         <Link to="/business/dashboard">
           <li className="flex flex-col items-center pb-1">
@@ -43,15 +31,14 @@ const BusinessBottomNavigation = () => {
           </li>
         </Link>
 
-        <li className="flex flex-col items-center pb-1">
-          <button
-            onClick={handleLogout}
-            className="p-1 rounded-full text-gray-500 focus:outline-none"
-          >
-            <LogOut size={24} />
-          </button>
-          <span className="text-xs mt-1 text-gray-500">Logout</span>
-        </li>
+        <Link to="/business/profile">
+          <li className="flex flex-col items-center pb-1">
+            <button className={`p-1 rounded-full focus:outline-none ${isProfile ? 'text-blue-600' : 'text-gray-500'}`}>
+              <Store size={24} />
+            </button>
+            <span className={`text-xs mt-1 ${isProfile ? 'text-blue-600' : 'text-gray-500'}`}>Profile</span>
+          </li>
+        </Link>
       </ul>
     </nav>
   );
@@ -75,10 +62,10 @@ const BottomNavigation = () => {
   ];
 
   return (
-    <nav className="fixed block md:hidden rounded-lg bottom-0 z-50 left-0 right-0 bg-white border-t border-gray-400 px-4 py-2">
-      <ul className="flex justify-between items-center">
+    <nav className="fixed block md:hidden bottom-0 z-50 left-0 right-0 bg-white border-t border-gray-400 px-1 sm:px-3 pt-1.5 pb-[max(0.4rem,env(safe-area-inset-bottom))]">
+      <ul className="flex justify-between items-center gap-0.5">
         {navItems.filter(item => !item.requiresProfile || user?.isProfileComplete).map((item) => (
-          <Link key={item.path} to={item.path}>
+          <Link key={item.path} to={item.path} className="min-w-0 flex-1">
             <NavItem
               icon={item.icon}
               label={item.label}
@@ -93,13 +80,13 @@ const BottomNavigation = () => {
 
 const NavItem = ({ icon, label, isActive }) => {
   return (
-    <li className="flex flex-col bg-white text-black items-center">
+    <li className="flex flex-col bg-white text-black items-center min-w-0">
       <button className={`p-1 rounded-full focus:outline-none focus:ring-2 focus:ring-gray-200 ${
         isActive ? 'text-blue-600' : 'text-gray-600 hover:bg-gray-100'
       }`}>
         {icon}
       </button>
-      <span className={`text-xs mt-1 ${isActive ? 'text-blue-600' : 'text-gray-600'}`}>
+      <span className={`text-[10px] sm:text-xs mt-0.5 truncate max-w-full px-0.5 ${isActive ? 'text-blue-600' : 'text-gray-600'}`}>
         {label}
       </span>
     </li>

@@ -13,8 +13,9 @@ const BusinessAccessGuard = () => {
   useEffect(() => {
     const isBusiness = localStorage.getItem('is_business') === 'true';
     const onBusinessRoute = location.pathname.startsWith('/business');
+    const onPublicMerchantPage = location.pathname.startsWith('/shop/merchant');
 
-    if (isBusiness && !onBusinessRoute) {
+    if (isBusiness && !onBusinessRoute && !onPublicMerchantPage) {
       navigate('/business/dashboard', { replace: true });
     }
   }, [location.pathname, navigate]);

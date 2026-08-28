@@ -226,7 +226,7 @@ const ForBusiness = () => {
             style={{ maxWidth: "480px", maxHeight: "90vh", backgroundColor: "white" }}
           >
             {/* Modal Header */}
-            <div className="px-8 py-6" style={{ backgroundColor: "#134074" }}>
+            <div className="px-5 sm:px-8 py-6" style={{ backgroundColor: "#134074" }}>
               <h2 className="text-white" style={{ fontSize: "24px", fontWeight: 700 }}>
                 Partner with eRuchi
               </h2>
@@ -245,7 +245,7 @@ const ForBusiness = () => {
 
             {/* Modal Body */}
             {status === "success" ? (
-              <div className="px-8 py-10 text-center">
+              <div className="px-5 sm:px-8 py-10 text-center">
                 <div
                   className="mx-auto mb-4 flex items-center justify-center rounded-full"
                   style={{ width: "64px", height: "64px", backgroundColor: "#4A9EF5" }}
@@ -269,7 +269,7 @@ const ForBusiness = () => {
                 </button>
               </div>
             ) : (
-              <div className="px-8 py-6 flex flex-col gap-4">
+              <div className="px-5 sm:px-8 py-6 flex flex-col gap-4">
                 {[
                   { label: "Business Name", name: "businessName", type: "text", placeholder: "Your Company Name" },
                   { label: "Phone Number", name: "phone", type: "tel", placeholder: "+977 98XXXXXXXX" },

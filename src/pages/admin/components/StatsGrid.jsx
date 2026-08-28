@@ -2,7 +2,7 @@ import React from "react";
 
 const StatsGrid = ({ stats, NAVY }) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-8">
       {stats.map((stat, index) => (
         <div
           key={index}

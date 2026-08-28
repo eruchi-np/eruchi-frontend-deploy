@@ -302,23 +302,23 @@ const CreateSepSurvey = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-6 py-6">
-          <div className="flex items-center gap-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
               onClick={() => navigate('/admin')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
             >
               <ArrowLeft className="h-5 w-5 text-gray-600" />
             </button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{isEditMode ? 'Edit Standalone Survey' : 'Create Standalone Survey'}</h1>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{isEditMode ? 'Edit Standalone Survey' : 'Create Standalone Survey'}</h1>
               <p className="text-sm text-gray-500">{isEditMode ? 'Editable for 15 minutes after creation' : 'Independent survey (not tied to a campaign)'}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-28">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Basic Info */}
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -765,7 +765,7 @@ const CreateSepSurvey = () => {
           </div>
 
           {/* Submit Bar */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 sticky bottom-0 shadow-lg">
+          <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 sticky bottom-16 md:bottom-0 shadow-lg">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
                 <h3 className="text-lg font-bold text-gray-900">

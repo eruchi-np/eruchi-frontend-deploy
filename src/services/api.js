@@ -122,10 +122,14 @@ export const businessAPI = {
   previewScanByCode: (code) =>
     api.get('/business/scan/preview-code', { params: { code } }),
   getProfile: () => api.get('/business/profile'),
+  updateProfile: (data) => api.put('/business/profile', data),
   uploadLogo: (formData) =>
     api.put('/business/profile/logo', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  createVoucherOffer: (data) => api.post('/business/voucher-offers', data),
+  updateVoucherOffer: (id, data) => api.put(`/business/voucher-offers/${id}`, data),
+  getPublicProfile: (id) => api.get(`/business/public/${id}`),
 };
 
 export default api;

@@ -22,7 +22,7 @@ const NotificationsCard = () => (
           })}
         </div>
         <div className="text-[13px] text-[#6B7A8A] leading-relaxed">
-          Start exploring campaigns and earn credits.
+          Start exploring and earn credits.
         </div>
       </div>
     </div>

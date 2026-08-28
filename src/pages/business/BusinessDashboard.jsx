@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { businessAPI } from "../../services/api";
 import { useNavigate } from "react-router-dom";
-import { ScanLine, Upload } from "lucide-react";
+import { ScanLine, Upload, Plus, Pencil, Store } from "lucide-react";
 
 export default function BusinessDashboard() {
   const [loading, setLoading] = useState(true);
@@ -97,10 +97,10 @@ export default function BusinessDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-4">
+    <div className="min-h-screen bg-white p-4 pb-28">
       <div className="max-w-4xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <div className="relative shrink-0">
               <div className="w-12 h-12 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center">
                 {profile?.logo ? (
@@ -125,9 +125,16 @@ export default function BusinessDashboard() {
                 onChange={(e) => handleLogoUpload(e.target.files?.[0])}
               />
             </div>
-            <h1 className="text-2xl font-bold">Business Dashboard</h1>
+            <h1 className="text-lg sm:text-2xl font-bold leading-tight min-w-0">Dashboard</h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+            <button
+              onClick={() => navigate('/business/profile')}
+              className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium hover:bg-gray-50"
+            >
+              <Store size={16} />
+              Profile
+            </button>
             <button
               onClick={() => navigate('/business/scan')}
               className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors"
@@ -137,7 +144,7 @@ export default function BusinessDashboard() {
             </button>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 rounded-lg bg-black text-white"
+              className="px-3 sm:px-4 py-2 rounded-lg bg-black text-white text-sm"
             >
               Logout
             </button>
@@ -147,12 +154,12 @@ export default function BusinessDashboard() {
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="border rounded-xl p-4">
             <p className="text-sm text-gray-500">Total Scans</p>
-            <p className="text-3xl font-bold">{stats.totalScans}</p>
+            <p className="text-2xl sm:text-3xl font-bold">{stats.totalScans}</p>
           </div>
 
           <div className="border rounded-xl p-4">
             <p className="text-sm text-gray-500">Successful Scans</p>
-            <p className="text-3xl font-bold">{stats.successfulScans}</p>
+            <p className="text-2xl sm:text-3xl font-bold">{stats.successfulScans}</p>
           </div>
         </div>
 
@@ -189,7 +196,7 @@ export default function BusinessDashboard() {
                   {stats.recentScans.map((scan, index) => (
                     <div
                       key={index}
-                      className="p-4 border-b last:border-b-0 flex items-center justify-between"
+                      className="p-4 border-b last:border-b-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
                     >
                       <div>
                         <p className="font-medium">{scan.outcome || "Unknown"}</p>
@@ -217,26 +224,47 @@ export default function BusinessDashboard() {
 
           {activeTab === "offers" && (
             <>
+              <div className="p-4 border-b flex justify-end">
+                <button
+                  onClick={() => navigate('/business/vouchers/new')}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700"
+                >
+                  <Plus size={16} />
+                  Add voucher
+                </button>
+              </div>
               {vouchersLoading ? (
                 <div className="p-4 text-gray-400 text-sm">Loading...</div>
               ) : vouchers.length === 0 ? (
-                <div className="p-4 text-gray-500">No voucher offers yet.</div>
+                <div className="p-4 text-gray-500">No voucher offers yet. Add one to show it in the shop.</div>
               ) : (
                 <div>
                   {vouchers.map((offer) => (
-                    <div key={offer._id} className="p-4 border-b last:border-b-0 flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-gray-900">{offer.title}</p>
+                    <div key={offer._id} className="p-4 border-b last:border-b-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-gray-900 break-words">{offer.title}</p>
                         <p className="text-sm text-gray-500">
-                          {offer.discountType === 'percentage' ? `${offer.discountValue}% off` : `Rs. ${offer.discountValue} off`}
+                          {offer.discountType === 'percentage' ? `${offer.discountValue}% off`
+                            : offer.discountType === 'free_item' ? (offer.discountValue ? `Free ${offer.discountValue}` : 'Free item')
+                            : offer.discountType === 'value_combo' ? 'Value combo'
+                            : `Rs. ${offer.discountValue} off`}
                           {' · '}{offer.creditsRequired} credits · {offer.expiryDays}d expiry
                         </p>
                       </div>
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        offer.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        {offer.status}
-                      </span>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          offer.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {offer.status}
+                        </span>
+                        <button
+                          onClick={() => navigate(`/business/vouchers/${offer._id}/edit`)}
+                          className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50"
+                          title="Edit voucher"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>

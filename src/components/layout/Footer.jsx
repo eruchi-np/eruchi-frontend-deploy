@@ -7,7 +7,7 @@ const Footer = () => {
 
   return (
     <footer className="border-t border-gray-100 bg-white font-['Inter']">
-      <div className="max-w-[940px] mx-auto px-6 py-8 md:py-10">
+      <div className="max-w-[940px] mx-auto px-4 sm:px-6 py-8 md:py-10">
 
         {/* Mobile layout: compact stacked */}
         <div className="flex flex-col gap-6 md:hidden">
@@ -159,7 +159,7 @@ const Footer = () => {
       </div>
 
       {/* Spacer so footer clears the fixed BottomNavigation on mobile */}
-      <div className="h-16 md:hidden" />
+      <div className="h-[calc(5.25rem+env(safe-area-inset-bottom))] md:hidden" />
     </footer>
   );
 };

@@ -85,7 +85,7 @@ const UserManagement = ({
     <>
       {selectedUsers.length > 0 && (
         <div className="text-white rounded-2xl p-4 mb-6 shadow-lg animate-in fade-in slide-in-from-top-4 duration-200" style={{ backgroundColor: NAVY }}>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
                 <Check className="h-5 w-5" />
@@ -143,7 +143,7 @@ const UserManagement = ({
       )}
 
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
-        <div className="border-b border-gray-200 p-6">
+        <div className="border-b border-gray-200 p-4 sm:p-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
               <h2 className="text-xl font-bold text-gray-900 mb-1">User Management</h2>
@@ -231,7 +231,7 @@ const UserManagement = ({
             </div>
           ) : (
             filteredUsers.map((user) => (
-              <div key={user._id} className="p-6 hover:bg-gray-50/70 transition-colors">
+              <div key={user._id} className="p-4 sm:p-6 hover:bg-gray-50/70 transition-colors">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div className="flex items-center gap-4 flex-1 min-w-0">
                     {user.activeCampaign?.status && (
@@ -253,7 +253,7 @@ const UserManagement = ({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-4 lg:gap-6">
+                  <div className="flex items-center gap-3 sm:gap-4 lg:gap-6 flex-wrap">
                     <div className="flex items-center gap-3">
                       {user.activeCampaign?.status ? (
                         <div className="flex items-center gap-2">

@@ -17,7 +17,7 @@ import {
   Clock
 } from "lucide-react";
 import AnimatedContent from "../components/animations/AnimatedContent";
-import { trackEvent } from "../utils/analytics";
+import { trackEvent } from "../utils/visitorEvents";
 import { userAPI, sepSurveyAPI } from "../services/api";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -73,19 +73,31 @@ const HOW_IT_WORKS = [
 
 const headingStyle = {
   fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-  fontSize: "clamp(32px, 5vw, 58px)",
+  fontSize: "clamp(28px, 8vw, 58px)",
   fontWeight: 500,
-  lineHeight: 1.1,
+  lineHeight: 1.15,
 };
 
 /* --- Survey Card Helpers & Components --- */
-/* --- blue #3399ff --- */
-const BLUE_PALETTES = [
-  { bg: '#3399ff' }, // Base #3399ff
+const TICKET_PALETTES = [
+  { bg: '#00704A', accent: '#005C3C' },
+  { bg: '#1E88E5', accent: '#1565C0' },
+  { bg: '#FB8C00', accent: '#EF6C00' },
+  { bg: '#6A1B9A', accent: '#4A148C' },
+  { bg: '#00897B', accent: '#00695C' },
+  { bg: '#3949AB', accent: '#283593' },
+  { bg: '#C62828', accent: '#8E0000' },
+  { bg: '#EC407A', accent: '#D81B60' },
+  { bg: '#212121', accent: '#000000' },
 ];
 
-const getPaletteForIndex = (index) => {
-  return BLUE_PALETTES[index % BLUE_PALETTES.length];
+const getPalette = (seed = '') => {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash = (hash << 5) - hash + seed.charCodeAt(i);
+    hash |= 0;
+  }
+  return TICKET_PALETTES[Math.abs(hash) % TICKET_PALETTES.length];
 };
 
 const daysRemaining = (endDate) => {
@@ -102,10 +114,10 @@ function MetaPill({ icon: Icon, label }) {
   );
 }
 
-function SurveyCard({ survey, index = 0, onStart }) {
+function SurveyCard({ survey, onStart }) {
   const palette = useMemo(
-    () => getPaletteForIndex(index),
-    [index],
+    () => getPalette(survey.feedbackBusinessName || survey.title || survey._id),
+    [survey._id, survey.title, survey.feedbackBusinessName],
   );
 
   const left = daysRemaining(survey.endDate);
@@ -133,7 +145,7 @@ function SurveyCard({ survey, index = 0, onStart }) {
     >
       {/* ── Colored ticket header ── */}
       <div
-        className="relative flex items-center gap-4 px-6 pb-8 pt-6 sm:px-8 overflow-hidden"
+        className="relative flex items-center gap-3 sm:gap-4 px-4 pb-6 pt-5 sm:px-8 sm:pb-8 sm:pt-6 overflow-hidden"
         style={{ backgroundColor: palette.bg }}
       >
         <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white shadow-md transition-transform duration-300 group-hover:scale-105">
@@ -153,9 +165,21 @@ function SurveyCard({ survey, index = 0, onStart }) {
           </h2>
         </div>
 
-        
+        {/* credits medallion */}
+        <div className="relative flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-full bg-white shadow-md z-10">
+          <span
+            className="text-lg font-bold leading-none"
+            style={{ color: palette.bg }}
+          >
+            {survey.credits}
+          </span>
+        </div>
 
-        
+        {isUrgent && (
+          <span className="absolute right-4 top-3 rounded-full bg-white px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-red-500 shadow-sm z-10">
+            Ending soon
+          </span>
+        )}
       </div>
 
       {/* ── Perforation ── */}
@@ -168,11 +192,11 @@ function SurveyCard({ survey, index = 0, onStart }) {
           className="absolute -right-2.5 h-5 w-5 translate-x-1/2 rounded-full bg-white"
           style={{ boxShadow: 'inset 0 0 0 1px rgb(229 229 229)' }}
         />
-        
+        <div className="mx-3 w-full border-t-2 border-dashed border-neutral-200" />
       </div>
 
       {/* ── Body ── */}
-      <div className="flex flex-1 flex-col justify-between px-6 pb-6 pt-7 sm:px-8">
+      <div className="flex flex-1 flex-col justify-between px-4 pb-5 pt-5 sm:px-8 sm:pb-6 sm:pt-7">
         <div>
           <p className="mb-5 line-clamp-2 min-h-[40px] text-sm text-neutral-500 sm:text-base">
             {survey.description}
@@ -342,7 +366,7 @@ export default function Homepage() {
 
   const handleSurveyClick = () => {
     trackEvent('cta_click', '/');
-    navigate(isLoggedIn ? "/standalone-surveys" : "/shop");
+    navigate(isLoggedIn ? "/standalone-surveys" : "/login");
   };
 
   const requireTerms = () => {
@@ -381,8 +405,8 @@ export default function Homepage() {
     >
       {/* ── Hero ── */}
       <div
-        className="bg-cover bg-center flex flex-col justify-between pt-10 lg:pt-16 pb-0"
-        style={{ backgroundImage: `url(${HERO_BG})`, minHeight: "650px" }}
+        className="bg-cover bg-center flex flex-col justify-between pt-8 sm:pt-10 lg:pt-16 pb-0 min-h-[480px] sm:min-h-[560px] lg:min-h-[650px]"
+        style={{ backgroundImage: `url(${HERO_BG})` }}
       >
         <div className="max-w-[1150px] mx-auto px-4 sm:px-8 lg:px-10 w-full flex-1 flex flex-col">
           <div className="grid lg:grid-cols-[1fr_440px] gap-8 lg:gap-12 flex-1 items-stretch lg:items-end">
@@ -408,13 +432,21 @@ export default function Homepage() {
                 </a>
               </p>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={handleSurveyClick}
-                  className="px-7 rounded-full bg-white text-black hover:bg-gray-100 transition-colors flex items-center justify-center"
-                  style={{ height: "58px", fontSize: "18px", fontWeight: 400, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", lineHeight: 1 }}
+                  className="px-5 sm:px-7 rounded-full bg-white text-black hover:bg-gray-100 transition-colors flex items-center justify-center"
+                  style={{ height: "52px", fontSize: "16px", fontWeight: 400, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", lineHeight: 1 }}
                 >
                   {isLoggedIn ? "Explore Surveys" : "Explore Rewards"}
+                </button>
+                <button
+                  onClick={handleSurveyClick}
+                  aria-label="Explore surveys"
+                  className="rounded-full bg-black text-white flex items-center justify-center hover:bg-gray-800 transition-colors shrink-0"
+                  style={{ height: "52px", width: "52px" }}
+                >
+                  <ArrowUpRight className="w-5 h-5" />
                 </button>
               </div>
             </AnimatedContent>
@@ -563,7 +595,7 @@ export default function Homepage() {
                       <label htmlFor="homepage-terms" className="text-xs text-gray-500 leading-snug">
                         I agree to the{" "}
                         <a href="/terms" className="text-blue-600 hover:underline">Terms of Use</a>{" "}
-                        and to receive marketing email messages from Eruchi, and I accept the{" "}
+                        and to receive marketing email messages from eRuchi, and I accept the{" "}
                         <a href="/privacy-policy" className="text-blue-600 hover:underline">Privacy Policy</a>.
                       </label>
                     </div>
@@ -609,7 +641,7 @@ export default function Homepage() {
           <div className="max-w-[1314px] mx-auto px-4 sm:px-8 lg:px-10">
             <div className="text-center mb-12">
               <h2 className="text-gray-900 mb-3" style={headingStyle}>
-                Latest <span className="text-[#3399ff]">surveys</span> right now
+                Latest <span className="text-blue-600">surveys</span> right now
               </h2>
             </div>
 
@@ -621,11 +653,10 @@ export default function Homepage() {
               <p className="text-center text-gray-500">No surveys available right now.</p>
             ) : (
               <div className="grid gap-6 grid-cols-1 lg:grid-cols-2">
-                {surveys.map((survey, idx) => (
+                {surveys.map((survey) => (
                   <SurveyCard
                     key={survey._id}
                     survey={survey}
-                    index={idx}
                     onStart={(s) => navigate(`/standalone-survey/${s._id}`)}
                   />
                 ))}
@@ -671,53 +702,59 @@ export default function Homepage() {
               <div className="flex items-center justify-end gap-3">
                 <button
                   onClick={handleSurveyClick}
+                  aria-label="Explore rewards"
+                  className="w-11 h-11 rounded-full bg-white text-black flex items-center justify-center hover:bg-gray-100 transition-colors"
+                >
+                  <ArrowRight className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={handleSurveyClick}
                   className="px-6 py-3 rounded-full bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
                 >
                   Explore Rewards
                 </button>
-              </div> 
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── How it works (Logged out only)── */}
-      {!isLoggedIn && (
-        <div className="relative overflow-hidden flex items-center py-16 lg:py-20" style={{ minHeight: "605px" }}>
-          <div
-            className="absolute inset-0 bg-cover bg-center"
-            style={{ backgroundImage: `url(${heroBg})` }}
-          />
-          <div className="relative max-w-[1200px] mx-auto px-4 sm:px-8 lg:px-10 w-full">
-            <AnimatedContent direction="vertical" distance={30} duration={0.7}>
-              <h2 className="text-white text-center mb-14" style={headingStyle}>
-                How it works
-              </h2>
-            </AnimatedContent>
+      {/* ── How it works ── */}
+      <div className="relative overflow-hidden flex items-center py-16 lg:py-20" style={{ minHeight: "605px" }}>
+        <div
+          className="absolute inset-0 bg-cover bg-center"
+          style={{ backgroundImage: `url(${heroBg})` }}
+        />
+        <div className="relative max-w-[1200px] mx-auto px-4 sm:px-8 lg:px-10 w-full">
+          <AnimatedContent direction="vertical" distance={30} duration={0.7}>
+            <h2 className="text-white text-center mb-14" style={headingStyle}>
+              How it works
+            </h2>
+          </AnimatedContent>
 
-            <div className="grid sm:grid-cols-3 gap-10 sm:gap-6">
-              {HOW_IT_WORKS.map((step, i) => (
-                <AnimatedContent
-                  key={step.number}
-                  direction="vertical"
-                  distance={40}
-                  duration={0.7}
-                  delay={0.15 * i}
-                  className={`text-center px-4 ${i > 0 ? "sm:border-l sm:border-white/20" : ""}`}
-                >
-                  <p className="text-white/60 font-light mb-3" style={{ fontSize: "clamp(36px, 4vw, 56px)" }}>
-                    {step.number}
-                  </p>
-                  <h3 className="text-white font-semibold text-lg mb-2">{step.title}</h3>
-                  <p className="text-blue-100/80 text-sm leading-relaxed max-w-[280px] mx-auto">
-                    {step.description}
-                  </p>
-                </AnimatedContent>
-              ))}
-            </div>
+          <div className="grid sm:grid-cols-3 gap-10 sm:gap-6">
+            {HOW_IT_WORKS.map((step, i) => (
+              <AnimatedContent
+                key={step.number}
+                direction="vertical"
+                distance={40}
+                duration={0.7}
+                delay={0.15 * i}
+                className={`text-center px-4 ${i > 0 ? "sm:border-l sm:border-white/20" : ""}`}
+              >
+                <p className="text-white/60 font-light mb-3" style={{ fontSize: "clamp(36px, 4vw, 56px)" }}>
+                  {step.number}
+                </p>
+                <h3 className="text-white font-semibold text-lg mb-2">{step.title}</h3>
+                <p className="text-blue-100/80 text-sm leading-relaxed max-w-[280px] mx-auto">
+                  {step.description}
+                </p>
+              </AnimatedContent>
+            ))}
           </div>
         </div>
-      )}
+      </div>
+
       {/* ── Buffer clearance area ── */}
       <div className="h-24 lg:hidden" />
     </div>

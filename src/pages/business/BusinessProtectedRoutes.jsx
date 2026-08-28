@@ -28,7 +28,7 @@ const BusinessProtectedRoute = ({ children }) => {
   }
 
   if (status === 'unauthed') {
-    return <Navigate to="/business/login" state={{ from: location }} replace />;
+    return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   return children;

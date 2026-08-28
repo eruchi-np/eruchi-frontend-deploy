@@ -69,7 +69,7 @@ const SurveyManagement = ({ surveys, refetchSurveys, NAVY }) => {
         {surveys.map((survey) => {
           const editable = isEditable(survey.createdAt);
           return (
-            <div key={survey._id} className="px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div key={survey._id} className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-semibold text-gray-900 truncate">{survey.title}</h3>

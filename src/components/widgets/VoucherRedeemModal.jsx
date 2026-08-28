@@ -332,7 +332,7 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
         direction="vertical"
         distance={35}
         duration={0.4}
-        className="bg-white max-w-sm w-full rounded-3xl p-7 mx-4 shadow-xl pointer-events-auto cursor-default"
+        className="bg-white max-w-sm w-full rounded-3xl p-5 sm:p-7 mx-4 shadow-xl pointer-events-auto cursor-default max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div key={step}>

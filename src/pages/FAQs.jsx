@@ -54,11 +54,11 @@ const faqCategories = [
 const allFaqs = faqCategories.flatMap((cat) => cat.faqs);
 
 const FAQCard = ({ faq }) => (
-    <div className="p-8 w-full bg-white flex flex-col rounded-2xl border-2 border-gray-200 hover:border-blue-500 hover:shadow-lg transition-all">
-        <h2 className="text-2xl font-semibold text-gray-900 mb-4">
+    <div className="p-5 sm:p-8 w-full bg-white flex flex-col rounded-2xl border-2 border-gray-200 hover:border-blue-500 hover:shadow-lg transition-all">
+        <h2 className="text-lg sm:text-2xl font-semibold text-gray-900 mb-3 sm:mb-4">
             {faq.question}
         </h2>
-        <p className="text-base text-gray-700 leading-relaxed">{faq.answer}</p>
+        <p className="text-sm sm:text-base text-gray-700 leading-relaxed">{faq.answer}</p>
     </div>
 );
 
@@ -79,13 +79,13 @@ const FAQs = () => {
     );
 
     return (
-        <section className="py-20 bg-gray-50 text-black min-h-screen">
+        <section className="py-10 sm:py-20 bg-gray-50 text-black min-h-screen pb-28">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex flex-col gap-16">
+                <div className="flex flex-col gap-10 sm:gap-16">
                     
                     {/* Header Section Animation */}
-                    <AnimatedContent direction="vertical" distance={40} duration={0.8} className="flex flex-col space-y-8">
-                        <h1 className="text-6xl font-light text-gray-900">
+                    <AnimatedContent direction="vertical" distance={40} duration={0.8} className="flex flex-col space-y-6 sm:space-y-8">
+                        <h1 className="text-3xl sm:text-5xl lg:text-6xl font-light text-gray-900">
                             Frequently Asked Questions
                         </h1>
                         <p className="text-lg text-gray-600 leading-relaxed max-w-3xl text-justify">
@@ -128,7 +128,7 @@ const FAQs = () => {
                         <div className="flex flex-col gap-12">
                             {faqCategories.map((cat) => (
                                 <div key={cat.category}>
-                                    <h2 className="text-3xl font-bold text-gray-800 mb-6 pb-3 border-b-2 border-gray-200">
+                                    <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-6 pb-3 border-b-2 border-gray-200">
                                         {cat.category}
                                     </h2>
                                     <div className="grid grid-cols-1 gap-5">
@@ -152,8 +152,8 @@ const FAQs = () => {
 
                     {/* Bottom Contact Section Animation */}
                     <AnimatedContent direction="vertical" distance={40} duration={0.8} threshold={0.15}>
-                        <div className="bg-blue-50 rounded-3xl p-8 border-2 border-blue-200 text-center">
-                            <h3 className="text-2xl font-bold text-gray-900 mb-3">
+                        <div className="bg-blue-50 rounded-3xl p-5 sm:p-8 border-2 border-blue-200 text-center">
+                            <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">
                                 Still have questions?
                             </h3>
                             <p className="text-lg text-gray-600 mb-6">

@@ -160,7 +160,7 @@ const DemographicsWizard = ({ onComplete }) => {
         backButtonText="Back"
         nextButtonText="Next"
         nextButtonProps={{
-          className: `px-8 py-3 text-base font-semibold text-white rounded-lg shadow-sm transition-all duration-200 border-none outline-none active:scale-95 ${
+          className: `px-5 sm:px-8 py-3 text-base font-semibold text-white rounded-lg shadow-sm transition-all duration-200 border-none outline-none active:scale-95 ${
             currentStep === 4 ? 'bg-green-600 hover:bg-green-700' : 'bg-blue-600 hover:bg-blue-700'
           }`
         }}

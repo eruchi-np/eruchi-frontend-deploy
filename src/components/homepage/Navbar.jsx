@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { Menu, X, Loader2 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
@@ -11,10 +11,22 @@ const Navbar = () => {
   const [isBusiness, setIsBusiness] = useState(false)
 
   const { user: authUser } = useAuth()
+  const location = useLocation()
 
   const toggleDrawer = () => {
     setIsDrawerOpen(!isDrawerOpen)
   }
+
+  useEffect(() => {
+    setIsDrawerOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    document.body.style.overflow = isDrawerOpen ? 'hidden' : ''
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [isDrawerOpen])
 
   useEffect(() => {
     const updateNavbar = () => {
@@ -69,13 +81,19 @@ const Navbar = () => {
   if (isBusiness) {
     return (
       <nav className="rounded-lg border-b z-50 p-2.5 top-0 bg-white sticky">
-        <div className="flex items-center mx-4 h-[60px]">
-          <img
-            src="/logo.png"
-            width={135}
-            height={60}
-            alt="eruchi_icon"
-          />
+        <div className="flex items-center justify-between mx-3 sm:mx-4 h-[52px] sm:h-[60px]">
+          <Link to="/business/dashboard" className="min-w-0">
+            <img
+              src="/LogoEarlyAccess.png"
+              className="h-9 sm:h-[52px] w-auto"
+              alt="eRuchi"
+            />
+          </Link>
+          <div className="hidden md:flex items-center gap-4 text-sm font-medium text-gray-700">
+            <Link to="/business/dashboard" className="hover:text-gray-900">Dashboard</Link>
+            <Link to="/business/scan" className="hover:text-gray-900">Scan</Link>
+            <Link to="/business/profile" className="hover:text-gray-900">Profile</Link>
+          </div>
         </div>
       </nav>
     )
@@ -84,16 +102,16 @@ const Navbar = () => {
   // ── Regular navbar ────────────────────────────────────────────────────────
   return (
     <nav className="rounded-lg border-b z-50 p-2.5 top-0 bg-white sticky">
-      <div className="flex justify-between items-center mx-4">
+      <div className="flex justify-between items-center mx-3 sm:mx-4 min-w-0">
         {/* Logo */}
-        <div className="cursor-pointer">
+        <div className="cursor-pointer min-w-0 shrink">
           <Link to="/">
-            <img src="/logo.png" width={135} height={60} alt="eruchi_icon" />
+            <img src="/LogoEarlyAccess.png" className="h-9 sm:h-[52px] w-auto" alt="eRuchi" />
           </Link>
         </div>
 
         {/* Desktop Navigation */}
-        <div className="hidden md:flex gap-8 items-center">
+        <div className="hidden md:flex gap-4 lg:gap-8 items-center text-sm lg:text-base">
           <Link to="/">
             <span className="uppercase cursor-pointer font-semibold hover:text-blue-600 transition-colors">Home</span>
           </Link>
@@ -128,7 +146,7 @@ const Navbar = () => {
             </Link>
           </div>
         ) : (
-          <div className="hidden lg:flex">
+          <div className="hidden md:flex">
             <Link to="/login">
               <span className="uppercase cursor-pointer font-semibold hover:text-blue-600 transition-colors">Login</span>
             </Link>
@@ -143,14 +161,14 @@ const Navbar = () => {
 
       {/* Mobile Drawer */}
       {isDrawerOpen && (
-        <div className="fixed top-0 right-0 w-full h-full transition-all fade-in-5 bg-white shadow-lg z-50 p-6">
+        <div className="fixed inset-0 w-full h-[100dvh] overflow-y-auto transition-all fade-in-5 bg-white shadow-lg z-50 p-5 sm:p-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))]">
           <div className="flex justify-between border-b-2 pb-5 w-full items-center mb-6">
             <h2 className="text-2xl font-bold text-gray-900">Menu</h2>
             <button onClick={toggleDrawer} className="hover:bg-gray-100 p-2 rounded-lg transition-colors">
               <X className="w-7 h-7 text-black" />
             </button>
           </div>
-          <nav className="flex transition-all h-full relative fade-in-5 flex-col gap-6">
+          <nav className="flex transition-all fade-in-5 flex-col gap-4 min-h-0">
             <Link
               to="/"
               onClick={toggleDrawer}
@@ -211,11 +229,13 @@ const Navbar = () => {
             )}
           </nav>
           {!isAllowed && (
-            <div className="w-full justify-center items-center border-t-2 border-gray-200 bg-blue-600 rounded-xl absolute bottom-6 left-0 right-0 mx-6 text-white p-4 text-center shadow-lg hover:bg-blue-700 transition-colors">
-              <Link to="/login" onClick={toggleDrawer}>
-                <span className="uppercase cursor-pointer font-bold text-lg">Login</span>
-              </Link>
-            </div>
+            <Link
+              to="/login"
+              onClick={toggleDrawer}
+              className="mt-8 w-full inline-flex justify-center items-center bg-blue-600 rounded-xl text-white p-4 text-center shadow-lg hover:bg-blue-700 transition-colors"
+            >
+              <span className="uppercase cursor-pointer font-bold text-lg">Login</span>
+            </Link>
           )}
         </div>
       )}

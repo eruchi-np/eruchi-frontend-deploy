@@ -249,23 +249,23 @@ const CreateCampaign = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-5xl mx-auto px-6 py-6">
-          <div className="flex items-center gap-4">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
               onClick={() => navigate('/admin')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
             >
               <ArrowLeft className="h-5 w-5 text-gray-600" />
             </button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Create Campaign</h1>
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Create Campaign</h1>
               <p className="text-sm text-gray-500">Design your sampling campaign and survey</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-28">
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Campaign Info Section */}
           <div className="bg-white rounded-2xl border border-gray-200 overflow-visible">
@@ -722,7 +722,7 @@ const CreateCampaign = () => {
           </div>
 
           {/* Submit Section */}
-          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden sticky bottom-0 shadow-lg">
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden sticky bottom-16 md:bottom-0 shadow-lg">
             <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-emerald-50">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
@@ -737,7 +737,7 @@ const CreateCampaign = () => {
                     </div>
                   )}
                 </div>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                   <button
                     type="button"
                     onClick={() => navigate('/admin')}
@@ -748,7 +748,7 @@ const CreateCampaign = () => {
                   <button
                     type="submit"
                     disabled={loading || !formData.endDate}
-                    className="flex items-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl font-medium hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
+                    className="flex items-center justify-center gap-2 bg-gray-900 text-white px-6 py-3 rounded-xl font-medium hover:bg-gray-800 disabled:bg-gray-400 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
                   >
                     {loading ? (
                       <>

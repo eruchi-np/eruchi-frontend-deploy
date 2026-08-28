@@ -41,7 +41,7 @@ export default function RedeemModal({ tier, onClose, onSuccess }) {
         style={{ fontFamily: "'Inter', sans-serif" }}
       >
         {step !== "success" && (
-          <div className="flex items-center gap-2 px-8 pt-8 pb-0">
+          <div className="flex items-center gap-2 px-5 sm:px-8 pt-8 pb-0">
             {["form", "confirm"].map((s, i) => (
               <React.Fragment key={s}>
                 <div className="flex items-center gap-1.5">
@@ -76,7 +76,7 @@ export default function RedeemModal({ tier, onClose, onSuccess }) {
           </div>
         )}
 
-        <div className="p-8">
+        <div className="p-5 sm:p-8">
           {step === "form" && (
             <>
               <h2 className="text-xl font-bold text-gray-900 mb-1">

@@ -109,13 +109,12 @@ const Signup = () => {
   };
 
   return (
-    <section className="py-20 bg-white text-black">
-      <div className="flex justify-center items-center">
-        <div className="flex w-full rounded-lg lg:w-[600px] mx-5 space-y-12 flex-wrap flex-col">
+    <section className="py-10 sm:py-16 pb-28 bg-white text-black">
+      <div className="flex justify-center items-center px-4">
+        <div className="flex w-full max-w-lg mx-auto space-y-8 sm:space-y-12 flex-col">
           
-          <h1 className="text-[40px] lg:text-4xl font-bold leading-tight">
+          <h1 className="text-3xl sm:text-4xl font-bold leading-tight">
             Glad to have you with us!
-            <br />
           </h1>
 
           <form className="grid grid-cols-1 space-y-7" onSubmit={handleSubmit(onSubmit)}>

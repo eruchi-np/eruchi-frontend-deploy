@@ -37,7 +37,7 @@ import Vouchers from './pages/Vouchers';
 import VoucherDetail from './pages/VoucherDetail';
 import EditProfile from './pages/EditProfile';
 import Terms from './pages/Terms';
-import PrivacyPolicy from './pages/PrivacyPolicy';
+import PrivacyPolicy from './pages/LegalNotice';
 import CompleteAdditionalProfile from './pages/CompleteAdditionalProfile';
 
 // Admin
@@ -49,6 +49,9 @@ import AdminBusinessManagement from './pages/admin/AdminBusinessManagement';
 // Business
 import BusinessScan from './pages/business/BusinessScan';
 import BusinessDashboard from './pages/business/BusinessDashboard';
+import BusinessProfile from './pages/business/BusinessProfile';
+import BusinessVoucherForm from './pages/business/BusinessVoucherForm';
+import MerchantPublicProfile from './pages/MerchantPublicProfile';
 
 // Public / auth pages
 import ResetPassword from './pages/ResetPassword';
@@ -102,6 +105,7 @@ function App() {
         
         <BusinessAccessGuard />
 
+        <div className="min-w-0 max-w-full overflow-x-hidden">
         <Routes>
           <Route element={<PageTransition />}>
             {/* ==================== PUBLIC ROUTES ==================== */}
@@ -152,6 +156,7 @@ function App() {
             />
 
             <Route path="/shop" element={<Shop />} />
+            <Route path="/shop/merchant/:id" element={<MerchantPublicProfile />} />
 
             <Route
               path="/vouchers"
@@ -269,6 +274,35 @@ function App() {
               }
             />
 
+            <Route
+              path="/business/profile"
+              element={
+                <BusinessProtectedRoute>
+                  <BusinessProfile />
+                </BusinessProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/business/vouchers/new"
+              element={
+                <BusinessProtectedRoute>
+                  <BusinessVoucherForm />
+                </BusinessProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/business/vouchers/:id/edit"
+              element={
+                <BusinessProtectedRoute>
+                  <BusinessVoucherForm />
+                </BusinessProtectedRoute>
+              }
+            />
+
+            <Route path="/business/login" element={<Navigate to="/login" replace />} />
+
             {/* 404 */}
             <Route
               path="*"
@@ -291,6 +325,7 @@ function App() {
         </Routes>
 
         <Footer />
+        </div>
         <BottomNavigation />
       </Router>
     </AnimationProvider>

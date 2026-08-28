@@ -125,7 +125,7 @@ const StandaloneSurvey = () => {
 
   return (
     <div className="min-h-screen bg-white pb-24" style={{ fontFamily: "'Inter', sans-serif" }}>
-      <div className="max-w-3xl mx-auto px-4 py-16">
+      <div className="max-w-3xl mx-auto px-4 py-8 sm:py-16">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center text-neutral-500 mb-8 hover:text-neutral-900 transition-colors"
@@ -134,7 +134,7 @@ const StandaloneSurvey = () => {
         </button>
 
         <div className="mb-12">
-          <h1 className="text-[40px] font-light text-neutral-900 mb-4">{survey.title}</h1>
+          <h1 className="text-2xl sm:text-[40px] font-light text-neutral-900 mb-4 break-words">{survey.title}</h1>
           <p className="text-neutral-600 text-lg leading-relaxed">{survey.description}</p>
 
           <div className="flex flex-wrap gap-6 mt-8 text-sm text-neutral-500 border-t border-neutral-100 pt-6">

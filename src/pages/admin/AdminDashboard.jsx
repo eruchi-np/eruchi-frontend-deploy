@@ -189,26 +189,26 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-gray-50">
       {/* Top Header Bar */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <button onClick={() => navigate("/profile")} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+              <button onClick={() => navigate("/profile")} className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0">
                 <ArrowLeft className="h-5 w-5 text-gray-600" />
               </button>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Dashboard</h1>
                 <p className="text-sm text-gray-500">Admin Control Panel</p>
               </div>
             </div>
 
-            <div className="flex items-center flex-wrap gap-3">
-              <button onClick={() => navigate("/admin/create-campaign")} className="flex items-center gap-2 text-white px-5 py-2.5 rounded-xl font-medium transition-all hover:opacity-90" style={{ backgroundColor: NAVY }}>
-                <Plus className="h-4 w-4" /> New Campaign
+            <div className="flex items-center flex-wrap gap-2 sm:gap-3">
+              <button onClick={() => navigate("/admin/create-campaign")} className="flex items-center gap-2 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90" style={{ backgroundColor: NAVY }}>
+                <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New </span>Campaign
               </button>
-              <button onClick={() => navigate("/admin/create-sep-survey")} className="flex items-center gap-2 bg-white border-2 px-5 py-2.5 rounded-xl font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
-                <Plus className="h-4 w-4" /> New Standalone Survey
+              <button onClick={() => navigate("/admin/create-sep-survey")} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
+                <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Standalone </span>Survey
               </button>
-              <button onClick={() => navigate('/admin/businesses')} className="flex items-center gap-2 bg-white border-2 px-5 py-2.5 rounded-xl font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
+              <button onClick={() => navigate('/admin/businesses')} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
                 <Building2 className="h-4 w-4" /> Businesses
               </button>
             </div>
@@ -216,29 +216,29 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-28">
         {/* Analytics Summary */}
         <StatsGrid stats={stats} NAVY={NAVY} />
 
         {/* Dynamic Tab Selector */}
-        <div className="flex gap-2 mb-8">
+        <div className="flex gap-2 mb-8 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
           <button
             onClick={() => setActiveTab("users")}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl font-medium text-sm transition-colors shadow-sm shrink-0"
             style={activeTab === "users" ? { backgroundColor: NAVY, color: "white" } : { backgroundColor: "white", color: "#4b5563", border: "1px solid #e5e7eb" }}
           >
             <Users className="h-4 w-4" /> Users
           </button>
           <button
             onClick={() => setActiveTab("survey_exports")}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl font-medium text-sm transition-colors shadow-sm shrink-0"
             style={activeTab === "survey_exports" ? { backgroundColor: NAVY, color: "white" } : { backgroundColor: "white", color: "#4b5563", border: "1px solid #e5e7eb" }}
           >
             <Clock className="h-4 w-4" /> Survey Timer Export
           </button>
           <button
             onClick={() => setActiveTab("surveys")}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl font-medium text-sm transition-colors shadow-sm shrink-0"
             style={activeTab === "surveys" ? { backgroundColor: NAVY, color: "white" } : { backgroundColor: "white", color: "#4b5563", border: "1px solid #e5e7eb" }}
           >
             <FileText className="h-4 w-4" /> Surveys

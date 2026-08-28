@@ -31,8 +31,8 @@ const WelcomeToERuchi = () => {
     >
       <div className="w-full h-full flex flex-col items-center justify-center">
         <div className="flex flex-col items-center justify-center max-w-lg mx-auto px-4">
-          <h1 className="text-4xl font-bold mb-8 text-white text-center">Welcome to eRuchi!</h1>
-          <div className="text-xl mb-12 space-y-6 text-white text-center">
+          <h1 className="text-3xl sm:text-4xl font-bold mb-8 text-white text-center">Welcome to eRuchi!</h1>
+          <div className="text-base sm:text-xl mb-12 space-y-6 text-white text-center">
             <p>
               Thank you for completing your profile and telling us what's at the <strong>core</strong> of what defines you.
             </p>

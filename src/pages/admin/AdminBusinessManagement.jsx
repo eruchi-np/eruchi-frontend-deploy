@@ -458,23 +458,23 @@ export default function AdminBusinessManagement() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6 pb-28" style={{ fontFamily: "'Inter', sans-serif" }}>
       <div className="max-w-6xl mx-auto">
 
         {/* ── Page header ── */}
-        <div className="flex items-center justify-between gap-4 mb-6">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
               onClick={() => navigate('/admin')}
-              className="p-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition-colors"
+              className="p-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition-colors shrink-0"
             >
               <ArrowLeft className="h-5 w-5 text-gray-600" />
             </button>
-            <h1 className="text-2xl font-bold text-gray-900">Business Management</h1>
+            <h1 className="text-lg sm:text-2xl font-bold text-gray-900 leading-tight">Business Management</h1>
           </div>
           <button
             onClick={openAddBusinessModal}
-            className="flex items-center gap-1.5 px-4 py-2 text-white rounded-xl text-sm font-medium shadow-sm transition-all hover:opacity-90"
+            className="flex items-center justify-center gap-1.5 px-4 py-2 text-white rounded-xl text-sm font-medium shadow-sm transition-all hover:opacity-90 shrink-0"
             style={{ backgroundColor: NAVY }}
           >
             <Building2 className="h-4 w-4" />

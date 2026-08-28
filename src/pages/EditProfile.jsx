@@ -259,7 +259,7 @@ const EditProfile = () => {
       )}
 
       {/* Header */}
-      <div className="bg-white border-b border-[#EDF2F7] py-6 px-6">
+      <div className="bg-white border-b border-[#EDF2F7] py-5 sm:py-6 px-4 sm:px-6">
         <div className="max-w-[860px] mx-auto flex items-center gap-4">
           <button
             onClick={() => navigate("/profile")}
@@ -280,12 +280,12 @@ const EditProfile = () => {
 
       {/* Tabs */}
       <div className="bg-white border-b border-[#EDF2F7]">
-        <div className="max-w-[860px] mx-auto px-6 flex gap-1">
+        <div className="max-w-[860px] mx-auto px-4 sm:px-6 flex gap-1 overflow-x-auto">
           {TABS.map((tab, i) => (
             <button
               key={tab}
               onClick={() => setActiveTab(i)}
-              className={`py-3.5 px-4 text-xs font-semibold tracking-[0.4px] border-b-2 transition-colors ${
+              className={`py-3.5 px-3 sm:px-4 text-xs font-semibold tracking-[0.4px] border-b-2 transition-colors whitespace-nowrap shrink-0 ${
                 activeTab === i
                   ? "border-[#3399FF] text-[#3399FF]"
                   : "border-transparent text-[#6B7A8A] hover:text-[#0F1A14]"

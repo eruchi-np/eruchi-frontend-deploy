@@ -12,16 +12,41 @@
     font-weight: 300;
   }
 
+  html {
+    overflow-x: hidden;
+    max-width: 100%;
+    -webkit-text-size-adjust: 100%;
+  }
+
   body {
     margin: 0;
     padding: 0;
     min-width: 320px;
     min-height: 100vh;
+    max-width: 100%;
+    overflow-x: hidden;
     font-family: "Inter", "Helvetica Neue", Helvetica, system-ui,
       -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   }
 
   #root {
     width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
   }
 }
