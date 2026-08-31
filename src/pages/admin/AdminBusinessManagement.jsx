@@ -4,7 +4,7 @@ import { adminAPI, sepSurveyAPI } from '../../services/api';
 import {
   ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2, Calendar,
   ShieldAlert, Eye, EyeOff, RefreshCw, Building2, KeyRound, Upload,
-  MessageSquarePlus, X,
+  MessageSquarePlus, X, Pencil, Star,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -73,6 +73,7 @@ const EMPTY_BUSINESS_FORM = {
   closingTime: '',
   instagram: '',
   website: '',
+  googleMapsUrl: '',
   isVerified: false,
 };
 
@@ -100,12 +101,15 @@ export default function AdminBusinessManagement() {
   const [surveysLoading, setSurveysLoading]       = useState(false);
   const [surveysLoaded, setSurveysLoaded]         = useState(false);
 
-  // Add-business modal
+  // Add/edit-business modal
   const [showAddBusinessModal, setShowAddBusinessModal] = useState(false);
+  const [editingBusiness, setEditingBusiness]     = useState(null);
   const [businessForm, setBusinessForm]           = useState(EMPTY_BUSINESS_FORM);
   const [businessModalError, setBusinessModalError] = useState('');
   const [businessSubmitLoading, setBusinessSubmitLoading] = useState(false);
   const [showPassword, setShowPassword]           = useState(false);
+  const [posterUploading, setPosterUploading]     = useState(false);
+  const [ratingRefreshing, setRatingRefreshing]   = useState(false);
   const [selectedBusinessForPassword, setSelectedBusinessForPassword] = useState(null);
   const [newPassword, setNewPassword]                                 = useState('');
   const [passwordModalError, setPasswordModalError]                   = useState('');
@@ -343,58 +347,154 @@ export default function AdminBusinessManagement() {
   // ── Add-business actions ───────────────────────────────────────────────────
 
   const openAddBusinessModal = () => {
+    setEditingBusiness(null);
     setBusinessForm(EMPTY_BUSINESS_FORM);
     setBusinessModalError('');
     setShowPassword(false);
     setShowAddBusinessModal(true);
   };
 
-  const handleCreateBusiness = async (e) => {
+  const closeBusinessModal = () => {
+    setShowAddBusinessModal(false);
+    setEditingBusiness(null);
+    setBusinessModalError('');
+  };
+
+  const formFromBusiness = (business) => ({
+    name: business.name || '',
+    brandName: business.brandName || '',
+    email: business.email || '',
+    password: '',
+    phone: business.phone || '',
+    address: business.address || '',
+    category: business.category || '',
+    description: business.description || '',
+    contactName: business.contactPerson?.name || '',
+    contactDesignation: business.contactPerson?.designation || '',
+    contactPhone: business.contactPerson?.phone || '',
+    operatingDays: business.operatingDays || [],
+    openingTime: business.operatingHours?.open || '',
+    closingTime: business.operatingHours?.close || '',
+    instagram: business.instagram || '',
+    website: business.website || '',
+    googleMapsUrl: business.googleMapsUrl || '',
+    isVerified: !!business.isVerified,
+  });
+
+  const openEditBusinessModal = (business) => {
+    setEditingBusiness(business);
+    setBusinessForm(formFromBusiness(business));
+    setBusinessModalError('');
+    setShowPassword(false);
+    setShowAddBusinessModal(true);
+  };
+
+  const mergeBusiness = (updated) => {
+    setBusinesses((prev) => prev.map((b) => (b._id === updated._id ? { ...b, ...updated } : b)));
+    setEditingBusiness((prev) => (prev && prev._id === updated._id ? { ...prev, ...updated } : prev));
+  };
+
+  const profilePayload = () => ({
+    name:         businessForm.name,
+    brandName:    businessForm.brandName,
+    phone:        businessForm.phone,
+    address:      businessForm.address,
+    category:     businessForm.category,
+    description:  businessForm.description,
+    contactPerson: {
+      name:        businessForm.contactName,
+      designation: businessForm.contactDesignation,
+      phone:       businessForm.contactPhone,
+    },
+    operatingDays:  businessForm.operatingDays,
+    operatingHours: {
+      open:  businessForm.openingTime,
+      close: businessForm.closingTime,
+    },
+    instagram:     businessForm.instagram,
+    website:       businessForm.website,
+    googleMapsUrl: businessForm.googleMapsUrl,
+    isVerified:    businessForm.isVerified,
+  });
+
+  const handleSaveBusiness = async (e) => {
     e.preventDefault();
-    if (businessForm.password.length < 8) {
+    if (!editingBusiness && businessForm.password.length < 8) {
       setBusinessModalError('Password must be at least 8 characters.');
       return;
     }
     setBusinessSubmitLoading(true);
     setBusinessModalError('');
     try {
-      const payload = {
-        name:         businessForm.name,
-        brandName:    businessForm.brandName,
-        email:        businessForm.email,
-        password:     businessForm.password,
-        phone:        businessForm.phone,
-        address:      businessForm.address,
-        category:     businessForm.category,
-        description:  businessForm.description,
-        contactPerson: {
-          name:        businessForm.contactName,
-          designation: businessForm.contactDesignation,
-          phone:       businessForm.contactPhone,
-        },
-        operatingDays:  businessForm.operatingDays,
-        operatingHours: {
-          open:  businessForm.openingTime,
-          close: businessForm.closingTime,
-        },
-        instagram:  businessForm.instagram,
-        website:    businessForm.website,
-        isVerified: businessForm.isVerified,
-      };
-      const res = await adminAPI.createBusiness(payload);
-      toast.success('Business created successfully!');
-      const newBusiness = res.data.data;
-      if (newBusiness) {
-        setBusinesses(prev => [newBusiness, ...prev]);
+      if (editingBusiness) {
+        const res = await adminAPI.updateBusiness(editingBusiness._id, profilePayload());
+        toast.success('Business updated');
+        mergeBusiness(res.data.data);
+        closeBusinessModal();
       } else {
-        fetchBusinesses();
+        const payload = {
+          ...profilePayload(),
+          email:    businessForm.email,
+          password: businessForm.password,
+        };
+        const res = await adminAPI.createBusiness(payload);
+        toast.success('Business created successfully!');
+        const newBusiness = res.data.data;
+        if (newBusiness) {
+          setBusinesses((prev) => [newBusiness, ...prev]);
+        } else {
+          fetchBusinesses();
+        }
+        closeBusinessModal();
       }
-      setShowAddBusinessModal(false);
     } catch (err) {
       console.error(err);
-      setBusinessModalError(err.response?.data?.message || 'Failed to create business');
+      setBusinessModalError(
+        err.response?.data?.message || (editingBusiness ? 'Failed to update business' : 'Failed to create business')
+      );
     } finally {
       setBusinessSubmitLoading(false);
+    }
+  };
+
+  const handlePosterUpload = async (file) => {
+    if (!file || !editingBusiness) return;
+    try {
+      setPosterUploading(true);
+      const formData = new FormData();
+      formData.append('poster', file);
+      const res = await adminAPI.uploadBusinessPoster(editingBusiness._id, formData);
+      mergeBusiness(res.data.data);
+      toast.success('Poster added');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to upload poster');
+    } finally {
+      setPosterUploading(false);
+    }
+  };
+
+  const handlePosterDelete = async (index) => {
+    if (!editingBusiness) return;
+    try {
+      const res = await adminAPI.deleteBusinessPoster(editingBusiness._id, index);
+      mergeBusiness(res.data.data);
+      toast.success('Poster removed');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to remove poster');
+    }
+  };
+
+  const handleRefreshRating = async () => {
+    if (!editingBusiness) return;
+    try {
+      setRatingRefreshing(true);
+      const res = await adminAPI.refreshBusinessGoogleRating(editingBusiness._id);
+      mergeBusiness(res.data.data);
+      toast.success('Rating updated');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to refresh rating');
+    } finally {
+      setRatingRefreshing(false);
     }
   };
 
@@ -552,6 +652,13 @@ export default function AdminBusinessManagement() {
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <button
+                        onClick={() => openEditBusinessModal(business)}
+                        className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                        title="Edit details"
+                      >
+                        <Pencil className="h-4 w-4 text-gray-500" />
+                      </button>
+                      <button
                         onClick={() => {
                           setSelectedBusinessForPassword(business);
                           setNewPassword('');
@@ -704,18 +811,22 @@ export default function AdminBusinessManagement() {
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Add New Business</h3>
-                <p className="text-xs text-gray-500 mt-0.5">Create a merchant account on eRuchi</p>
+                <h3 className="text-lg font-bold text-gray-900">
+                  {editingBusiness ? 'Edit Business' : 'Add New Business'}
+                </h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {editingBusiness ? 'Update merchant details, Maps link, and posters' : 'Create a merchant account on eRuchi'}
+                </p>
               </div>
               <button
-                onClick={() => setShowAddBusinessModal(false)}
+                onClick={closeBusinessModal}
                 className="text-gray-400 hover:text-gray-700 font-medium text-lg leading-none"
               >
                 ✕
               </button>
             </div>
 
-            <form onSubmit={handleCreateBusiness} className="flex flex-col gap-6">
+            <form onSubmit={handleSaveBusiness} className="flex flex-col gap-6">
 
               {/* ── Section: Business Details ── */}
               <section>
@@ -752,8 +863,9 @@ export default function AdminBusinessManagement() {
                         type="email"
                         placeholder="merchant@email.com"
                         required
+                        readOnly={!!editingBusiness}
                         {...bField('email')}
-                        className={inputCls}
+                        className={`${inputCls} ${editingBusiness ? 'bg-gray-50 text-gray-500' : ''}`}
                       />
                     </div>
                     <div>
@@ -923,12 +1035,106 @@ export default function AdminBusinessManagement() {
                 </div>
               </section>
 
+              {/* ── Section: Google Maps ── */}
+              <section>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 pb-1 border-b border-gray-100">
+                  Google Maps
+                </p>
+                <div className="flex flex-col gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Maps link</label>
+                    <input
+                      type="text"
+                      placeholder="https://maps.app.goo.gl/…"
+                      {...bField('googleMapsUrl')}
+                      className={inputCls}
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      Paste the Google Maps share URL. Rating is fetched now and refreshed weekly.
+                    </p>
+                  </div>
+                  {editingBusiness && (
+                    <div className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                      <div className="min-w-0">
+                        {editingBusiness.googleRating != null ? (
+                          <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5">
+                            <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                            {Number(editingBusiness.googleRating).toFixed(1)}
+                            <span className="text-gray-500 font-normal">
+                              ({editingBusiness.googleReviewCount ?? 0} reviews)
+                            </span>
+                          </p>
+                        ) : (
+                          <p className="text-sm text-gray-500">No rating cached yet</p>
+                        )}
+                        {editingBusiness.googleRatingUpdatedAt && (
+                          <p className="text-[10px] text-gray-400 mt-0.5">
+                            Updated {new Date(editingBusiness.googleRatingUpdatedAt).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleRefreshRating}
+                        disabled={ratingRefreshing || !businessForm.googleMapsUrl}
+                        className="flex items-center gap-1 px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium text-gray-600 hover:bg-white transition-colors whitespace-nowrap disabled:opacity-50"
+                      >
+                        <RefreshCw className={`h-3 w-3 ${ratingRefreshing ? 'animate-spin' : ''}`} />
+                        Refresh
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </section>
+
+              {/* ── Section: Posters (edit only) ── */}
+              {editingBusiness && (
+                <section>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 pb-1 border-b border-gray-100">
+                    Store posters
+                  </p>
+                  <div className="flex flex-wrap gap-3">
+                    {(editingBusiness.posters || []).map((poster, index) => (
+                      <div key={index} className="relative w-24 h-24 rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                        <img src={poster} alt={`Poster ${index + 1}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => handlePosterDelete(index)}
+                          className="absolute top-1 right-1 p-1 bg-white/90 rounded-full shadow-sm hover:bg-red-50"
+                          title="Remove poster"
+                        >
+                          <Trash2 className="h-3 w-3 text-red-600" />
+                        </button>
+                      </div>
+                    ))}
+                    {(editingBusiness.posters || []).length < 3 && (
+                      <label className="w-24 h-24 rounded-xl border border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 text-gray-400 cursor-pointer hover:border-gray-400 hover:bg-gray-50">
+                        <Upload className="h-4 w-4" />
+                        <span className="text-[10px] font-medium">{posterUploading ? 'Uploading…' : 'Add'}</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          disabled={posterUploading}
+                          onChange={(e) => {
+                            handlePosterUpload(e.target.files?.[0]);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-2">Up to 3 images, 2MB each. Shown on the public store page.</p>
+                </section>
+              )}
+
               {/* ── Section: Account Setup ── */}
               <section>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3 pb-1 border-b border-gray-100">
                   Account Setup
                 </p>
                 <div className="flex flex-col gap-3">
+                  {!editingBusiness && (
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Password *</label>
                     <div className="flex gap-2">
@@ -972,6 +1178,7 @@ export default function AdminBusinessManagement() {
                       </p>
                     )}
                   </div>
+                  )}
 
                   {/* Verified toggle */}
                   <label
@@ -987,8 +1194,12 @@ export default function AdminBusinessManagement() {
                       style={{ accentColor: NAVY }}
                     />
                     <div>
-                      <p className="text-sm font-medium text-gray-700">Mark as verified immediately</p>
-                      <p className="text-[10px] text-gray-400">Business can log in right away if checked</p>
+                      <p className="text-sm font-medium text-gray-700">
+                        {editingBusiness ? 'Verified (can log in)' : 'Mark as verified immediately'}
+                      </p>
+                      <p className="text-[10px] text-gray-400">
+                        {editingBusiness ? 'Uncheck to block merchant login' : 'Business can log in right away if checked'}
+                      </p>
                     </div>
                   </label>
                 </div>
@@ -1009,7 +1220,9 @@ export default function AdminBusinessManagement() {
                 className="w-full py-2.5 rounded-xl text-white text-sm font-medium transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                 style={{ backgroundColor: NAVY }}
               >
-                {businessSubmitLoading ? 'Creating account…' : 'Create Business Account'}
+                {businessSubmitLoading
+                  ? (editingBusiness ? 'Saving…' : 'Creating account…')
+                  : (editingBusiness ? 'Save Changes' : 'Create Business Account')}
               </button>
             </form>
           </div>

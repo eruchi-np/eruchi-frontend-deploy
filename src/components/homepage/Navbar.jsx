@@ -129,6 +129,11 @@ const Navbar = () => {
           <Link to="/for-business">
             <span className="uppercase cursor-pointer font-semibold hover:text-blue-600 transition-colors">Merchant</span>
           </Link>
+          {authUser?.role === 'admin' && (
+            <Link to="/admin">
+              <span className="uppercase cursor-pointer font-semibold hover:text-blue-600 transition-colors">Admin</span>
+            </Link>
+          )}
         </div>
 
         {/* User auth area */}
@@ -206,6 +211,15 @@ const Navbar = () => {
             >
               MERCHANT
             </Link>
+            {authUser?.role === 'admin' && (
+              <Link
+                to="/admin"
+                onClick={toggleDrawer}
+                className="text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors py-2 border-b border-gray-100"
+              >
+                ADMIN
+              </Link>
+            )}
 
             {isAllowed && user ? (
               <Link

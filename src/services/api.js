@@ -75,9 +75,16 @@ export const adminAPI = {
   updateUserStatus: (userId, data) => api.put(`/admin/users/${userId}/status`, data),
   getBusinesses: (params) => api.get('/admin/businesses', { params }),
   createBusiness: (data) => api.post('/admin/businesses', data),
+  updateBusiness: (id, data) => api.put(`/admin/businesses/${id}`, data),
   verifyBusiness: (id, data) => api.put(`/admin/businesses/${id}/verify`, data),
   deleteBusiness: (id) => api.delete(`/admin/businesses/${id}`),
   changeBusinessPassword: (id, data) => api.put(`/admin/businesses/${id}/password`, data),
+  uploadBusinessPoster: (id, formData) =>
+    api.post(`/admin/businesses/${id}/posters`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  deleteBusinessPoster: (id, index) => api.delete(`/admin/businesses/${id}/posters/${index}`),
+  refreshBusinessGoogleRating: (id) => api.post(`/admin/businesses/${id}/google-rating/refresh`),
   getVoucherOffers: (params) => api.get('/admin/voucher-offers', { params }),
   createVoucherOffer: (data) => api.post('/admin/voucher-offers', data),
   updateVoucherOffer: (id, data) => api.put(`/admin/voucher-offers/${id}`, data),

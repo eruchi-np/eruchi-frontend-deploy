@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Clock, Instagram, Globe, MapPin, Phone, Loader2 } from 'lucide-react';
+import { ArrowLeft, Clock, Instagram, Globe, MapPin, Phone, Loader2, Star } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { businessAPI, userAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import VoucherRedeemModal from '../components/widgets/VoucherRedeemModal';
+import { instagramUrl, instagramLabel, websiteUrl } from '../utils/merchantLinks';
 
 const formatHours = (hours) => {
   if (!hours?.open && !hours?.close) return null;
@@ -27,6 +28,7 @@ export default function MerchantPublicProfile() {
   const [offers, setOffers] = useState([]);
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [userCredits, setUserCredits] = useState(0);
+  const [posterIndex, setPosterIndex] = useState(0);
 
   useEffect(() => {
     const load = async () => {
@@ -55,6 +57,16 @@ export default function MerchantPublicProfile() {
     };
     load();
   }, [id]);
+
+  const posters = business?.posters?.filter(Boolean) || [];
+
+  useEffect(() => {
+    if (posters.length < 2) return undefined;
+    const interval = setInterval(() => {
+      setPosterIndex((prev) => (prev + 1) % posters.length);
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [posters.length]);
 
   const handleRedeem = (offer) => {
     if (!user) {
@@ -93,6 +105,21 @@ export default function MerchantPublicProfile() {
 
   const displayName = business.brandName || business.name;
   const hours = formatHours(business.operatingHours);
+  const igHref = instagramUrl(business.instagram);
+  const igLabel = instagramLabel(business.instagram);
+  const webHref = websiteUrl(business.website);
+  const mapsHref = business.googleMapsUrl?.trim() || null;
+  const hasRating = business.googleRating != null;
+
+  const ratingEl = hasRating ? (
+    <span className="inline-flex items-center gap-1 text-sm font-medium text-gray-800">
+      <Star size={14} className="fill-amber-400 text-amber-400" />
+      {Number(business.googleRating).toFixed(1)}
+      {business.googleReviewCount != null && (
+        <span className="text-gray-500 font-normal">({business.googleReviewCount})</span>
+      )}
+    </span>
+  ) : null;
 
   return (
     <div className="min-h-screen bg-white pb-24" style={{ fontFamily: "'Inter', sans-serif" }}>
@@ -100,6 +127,34 @@ export default function MerchantPublicProfile() {
         <button onClick={() => navigate('/shop')} className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 mb-6">
           <ArrowLeft size={16} /> Shop
         </button>
+
+        {posters.length > 0 && (
+          <div className="relative mb-6 overflow-hidden rounded-2xl bg-gray-100 aspect-[16/9]">
+            {posters.map((poster, i) => (
+              <img
+                key={i}
+                src={poster}
+                alt={`${displayName} poster ${i + 1}`}
+                className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
+                  i === posterIndex ? 'opacity-100' : 'opacity-0'
+                }`}
+              />
+            ))}
+            {posters.length > 1 && (
+              <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5">
+                {posters.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    aria-label={`Show poster ${i + 1}`}
+                    onClick={() => setPosterIndex(i)}
+                    className={`w-2 h-2 rounded-full ${i === posterIndex ? 'bg-white' : 'bg-white/50'}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex items-start gap-4 mb-6">
           <div className="w-20 h-20 rounded-2xl bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center shrink-0">
@@ -112,6 +167,15 @@ export default function MerchantPublicProfile() {
           <div className="min-w-0">
             <p className="text-xs uppercase tracking-widest text-gray-400">{business.category || 'Merchant'}</p>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mt-0.5 break-words">{displayName}</h1>
+            {ratingEl && (
+              mapsHref ? (
+                <a href={mapsHref} target="_blank" rel="noreferrer" className="mt-1 inline-flex hover:opacity-80">
+                  {ratingEl}
+                </a>
+              ) : (
+                <div className="mt-1">{ratingEl}</div>
+              )
+            )}
           </div>
         </div>
 
@@ -123,7 +187,13 @@ export default function MerchantPublicProfile() {
 
         <div className="flex flex-col gap-2 text-sm text-gray-600 mb-8">
           {business.address && (
-            <p className="flex items-center gap-2"><MapPin size={16} className="text-gray-400" /> {business.address}</p>
+            mapsHref ? (
+              <a href={mapsHref} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-gray-900 hover:underline">
+                <MapPin size={16} className="text-gray-400 shrink-0" /> {business.address}
+              </a>
+            ) : (
+              <p className="flex items-center gap-2"><MapPin size={16} className="text-gray-400 shrink-0" /> {business.address}</p>
+            )
           )}
           {business.phone && (
             <p className="flex items-center gap-2"><Phone size={16} className="text-gray-400" /> {business.phone}</p>
@@ -134,12 +204,14 @@ export default function MerchantPublicProfile() {
           {business.operatingDays?.length > 0 && (
             <p className="text-xs text-gray-400 pl-6">{business.operatingDays.join(', ')}</p>
           )}
-          {business.instagram && (
-            <p className="flex items-center gap-2"><Instagram size={16} className="text-gray-400" /> {business.instagram}</p>
+          {igHref && (
+            <a href={igHref} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-gray-900 hover:underline break-all">
+              <Instagram size={16} className="text-gray-400 shrink-0" /> {igLabel}
+            </a>
           )}
-          {business.website && (
-            <a href={business.website} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-gray-900 break-all">
-              <Globe size={16} className="text-gray-400" /> {business.website}
+          {webHref && (
+            <a href={webHref} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-gray-900 hover:underline break-all">
+              <Globe size={16} className="text-gray-400 shrink-0" /> {business.website.replace(/^https?:\/\//i, '')}
             </a>
           )}
         </div>
