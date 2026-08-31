@@ -79,26 +79,7 @@ const headingStyle = {
 };
 
 /* --- Survey Card Helpers & Components --- */
-const TICKET_PALETTES = [
-  { bg: '#00704A', accent: '#005C3C' },
-  { bg: '#1E88E5', accent: '#1565C0' },
-  { bg: '#FB8C00', accent: '#EF6C00' },
-  { bg: '#6A1B9A', accent: '#4A148C' },
-  { bg: '#00897B', accent: '#00695C' },
-  { bg: '#3949AB', accent: '#283593' },
-  { bg: '#C62828', accent: '#8E0000' },
-  { bg: '#EC407A', accent: '#D81B60' },
-  { bg: '#212121', accent: '#000000' },
-];
-
-const getPalette = (seed = '') => {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) {
-    hash = (hash << 5) - hash + seed.charCodeAt(i);
-    hash |= 0;
-  }
-  return TICKET_PALETTES[Math.abs(hash) % TICKET_PALETTES.length];
-};
+const SURVEY_CARD_BG = '#3399ff';
 
 const daysRemaining = (endDate) => {
   if (!endDate) return null;
@@ -115,14 +96,8 @@ function MetaPill({ icon: Icon, label }) {
 }
 
 function SurveyCard({ survey, onStart }) {
-  const palette = useMemo(
-    () => getPalette(survey.feedbackBusinessName || survey.title || survey._id),
-    [survey._id, survey.title, survey.feedbackBusinessName],
-  );
-
   const left = daysRemaining(survey.endDate);
   const isExpired = left !== null && left <= 0;
-  const isUrgent = left !== null && left > 0 && left <= 3;
   const Icon = survey.isMerchantFeedback ? MessageSquare : FileText;
 
   return (
@@ -145,11 +120,11 @@ function SurveyCard({ survey, onStart }) {
     >
       {/* ── Colored ticket header ── */}
       <div
-        className="relative flex items-center gap-3 sm:gap-4 px-4 pb-6 pt-5 sm:px-8 sm:pb-8 sm:pt-6 overflow-hidden"
-        style={{ backgroundColor: palette.bg }}
+        className="relative flex items-center gap-4 px-6 pb-8 pt-6 sm:px-8 overflow-hidden"
+        style={{ backgroundColor: SURVEY_CARD_BG }}
       >
         <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white shadow-md transition-transform duration-300 group-hover:scale-105">
-          <Icon className="h-6 w-6" style={{ color: palette.bg }} />
+          <Icon className="h-6 w-6" style={{ color: SURVEY_CARD_BG }} />
         </div>
 
         <div className="relative min-w-0 flex-1">
@@ -164,22 +139,6 @@ function SurveyCard({ survey, onStart }) {
             {survey.title}
           </h2>
         </div>
-
-        {/* credits medallion */}
-        <div className="relative flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-full bg-white shadow-md z-10">
-          <span
-            className="text-lg font-bold leading-none"
-            style={{ color: palette.bg }}
-          >
-            {survey.credits}
-          </span>
-        </div>
-
-        {isUrgent && (
-          <span className="absolute right-4 top-3 rounded-full bg-white px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-red-500 shadow-sm z-10">
-            Ending soon
-          </span>
-        )}
       </div>
 
       {/* ── Perforation ── */}
@@ -228,7 +187,7 @@ function SurveyCard({ survey, onStart }) {
             onStart(survey);
           }}
           className="inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:self-end"
-          style={{ backgroundColor: palette.bg }}
+          style={{ backgroundColor: SURVEY_CARD_BG }}
         >
           {isExpired ? 'Closed' : 'Start survey'}
           {!isExpired && (
@@ -366,7 +325,7 @@ export default function Homepage() {
 
   const handleSurveyClick = () => {
     trackEvent('cta_click', '/');
-    navigate(isLoggedIn ? "/standalone-surveys" : "/login");
+    navigate(isLoggedIn ? "/standalone-surveys" : "/shop");
   };
 
   const requireTerms = () => {
@@ -641,7 +600,7 @@ export default function Homepage() {
           <div className="max-w-[1314px] mx-auto px-4 sm:px-8 lg:px-10">
             <div className="text-center mb-12">
               <h2 className="text-gray-900 mb-3" style={headingStyle}>
-                Latest <span className="text-blue-600">surveys</span> right now
+                Latest <span className="text-[#3399ff]">surveys</span> right now
               </h2>
             </div>
 

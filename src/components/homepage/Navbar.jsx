@@ -84,7 +84,7 @@ const Navbar = () => {
         <div className="flex items-center justify-between mx-3 sm:mx-4 h-[52px] sm:h-[60px]">
           <Link to="/business/dashboard" className="min-w-0">
             <img
-              src="/LogoEarlyAccess.png"
+              src="/logo.png"
               className="h-9 sm:h-[52px] w-auto"
               alt="eRuchi"
             />
@@ -106,7 +106,7 @@ const Navbar = () => {
         {/* Logo */}
         <div className="cursor-pointer min-w-0 shrink">
           <Link to="/">
-            <img src="/LogoEarlyAccess.png" className="h-9 sm:h-[52px] w-auto" alt="eRuchi" />
+            <img src="/logo.png" className="h-9 sm:h-[52px] w-auto" alt="eRuchi" />
           </Link>
         </div>
 
