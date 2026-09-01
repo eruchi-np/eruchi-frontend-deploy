@@ -14,7 +14,7 @@ const Campaigns = () => {
   useEffect(() => {
     const fetchCampaigns = async () => {
       try {
-        const response = await campaignAPI.getCampaigns();
+        const response = await campaignAPI.getCampaigns({ skipErrorToast: true });
         setCampaigns(response.data.data);
       } catch (error) {
         console.error('Error fetching campaigns:', error);
@@ -29,7 +29,7 @@ const Campaigns = () => {
   const handleJoinCampaign = async (campaignId) => {
     setJoining(campaignId);
     try {
-      const response = await campaignAPI.joinCampaign(campaignId);
+      const response = await campaignAPI.joinCampaign(campaignId, { skipErrorToast: true });
       
       // Show success message and redirect to profile instead of survey
       toast.success("Successfully joined campaign! Your sample will be dispatched soon.");

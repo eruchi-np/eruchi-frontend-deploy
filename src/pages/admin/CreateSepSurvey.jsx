@@ -41,7 +41,7 @@ const CreateSepSurvey = () => {
 
     const fetchSurvey = async () => {
       try {
-        const res = await sepSurveyAPI.getById(surveyId);
+        const res = await sepSurveyAPI.getById(surveyId, { skipErrorToast: true });
         const survey = res.data.data;
 
         const minutesSinceCreation = (Date.now() - new Date(survey.createdAt).getTime()) / (1000 * 60);

@@ -4,8 +4,15 @@ export const isAuthenticated = () => {
   return !!localStorage.getItem('access_token');
 };
 
+export const getPostLoginPath = (user) => {
+  if (!user) return '/';
+  if (!user.isRegistrationComplete) return '/complete-basic-info';
+  if (!user.isProfileComplete) return '/complete-profile';
+  return '/';
+};
+
 export const redirectToProfile = (router) => {
-  router.push('/profile');
+  router('/profile');
 };
 
 // Check if user is using cookie-based authentication (Google OAuth)

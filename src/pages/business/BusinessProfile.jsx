@@ -30,7 +30,7 @@ export default function BusinessProfile() {
   useEffect(() => {
     const load = async () => {
       try {
-        const { data } = await businessAPI.getProfile();
+        const { data } = await businessAPI.getProfile({ skipErrorToast: true });
         const biz = data.data;
         setProfile(biz);
         setForm({

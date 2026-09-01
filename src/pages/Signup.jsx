@@ -3,8 +3,9 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Loader2 } from 'lucide-react';
 import axios from 'axios';
-import toast, { Toaster } from 'react-hot-toast';
-import { isAuthenticated, redirectToProfile } from "../utils/auth";
+import toast from 'react-hot-toast';
+import { getPostLoginPath } from "../utils/auth";
+import { useAuth } from "../context/AuthContext";
 import { useNavigate } from 'react-router-dom';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Link } from 'react-router-dom';
@@ -41,13 +42,14 @@ const formSchema = z.object({
 
 const Signup = () => {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
+  const [signupError, setSignupError] = useState('');
   
   useEffect(() => {
-    if (isAuthenticated()) {
-      toast.error("You're already logged in. Back to Profile!");
-      setTimeout(() => redirectToProfile(navigate), 1000);
+    if (!authLoading && user) {
+      navigate(getPostLoginPath(user), { replace: true });
     }
-  }, [navigate]);
+  }, [authLoading, user, navigate]);
 
   const [isLoading, setIsLoading] = useState(false);
   
@@ -64,6 +66,7 @@ const Signup = () => {
 
   const onSubmit = async (data) => {
     setIsLoading(true);
+    setSignupError('');
 
     const emailPrefix = data.email.split('@')[0];
     const safeUsername = emailPrefix
@@ -101,7 +104,7 @@ const Signup = () => {
         errorMessage = errorData.message;
       }
 
-      toast.error(errorMessage);
+      setSignupError(errorMessage);
       console.error('Signup failed:', err, errorData);
     } finally {
       setIsLoading(false);
@@ -329,6 +332,10 @@ const Signup = () => {
               </Link>
             </div>
 
+            {signupError && (
+              <p className="text-sm text-red-500 font-medium">{signupError}</p>
+            )}
+
             {/* Submit button */}
             <button
               type="submit"
@@ -350,7 +357,6 @@ const Signup = () => {
             </button>
           </form>
         </div>
-        <Toaster />
       </div>
     </section>
   );

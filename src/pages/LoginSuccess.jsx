@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import axios from 'axios';
 import Cookies from 'js-cookie';
-import toast from 'react-hot-toast';
+import { getPostLoginPath } from '../utils/auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -15,7 +15,6 @@ const axiosWithCredentials = axios.create({
 
 const LoginSuccess = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -53,15 +52,9 @@ const LoginSuccess = () => {
           // Store a placeholder token that indicates cookie-based auth
           localStorage.setItem('access_token', 'USE_COOKIE_AUTH');
 
-          // Dispatch auth change event
           window.dispatchEvent(new Event('authChange'));
-
-          // Small delay to ensure state updates
           await new Promise(resolve => setTimeout(resolve, 200));
-
-          // Check if profile is complete
-          navigate('/');
-          
+          navigate(getPostLoginPath(userData), { replace: true });
         } else {
           // We have the token from cookie! This is the ideal case
           console.log('Token found in cookie, storing in localStorage');
@@ -85,29 +78,21 @@ const LoginSuccess = () => {
           localStorage.setItem('username', `${userData.firstName} ${userData.lastName}`);
           localStorage.setItem('user_id', userData.id);
 
-          // Dispatch auth change event
           window.dispatchEvent(new Event('authChange'));
-
-          // Small delay to ensure state updates
           await new Promise(resolve => setTimeout(resolve, 200));
-
-          // Check if profile is complete
-          navigate('/');
+          navigate(getPostLoginPath(userData), { replace: true });
         }
 
       } catch (err) {
         console.error('Google login success handler error:', err);
-        console.error('Error details:', err.response?.data);
-        setError(err.message || 'Authentication failed');
-        
-        // Clear any invalid data
+        const message =
+          err.response?.data?.message || err.message || 'Authentication failed. Please try again.';
+        setError(message);
+
         Cookies.remove('token');
         localStorage.removeItem('access_token');
         localStorage.removeItem('auth_method');
-        
-        toast.error('Authentication failed. Please try again.');
-        
-        // Redirect to login after a short delay
+
         setTimeout(() => {
           navigate('/login', { replace: true });
         }, 2000);

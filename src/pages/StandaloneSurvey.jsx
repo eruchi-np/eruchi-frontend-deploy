@@ -8,10 +8,13 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import useSurveyTimer from "../hooks/userSurveyTimer";
+import { useAuth } from "../context/AuthContext";
+import { goToSurveyComplete } from "../utils/surveyComplete";
 
 const StandaloneSurvey = () => {
   const { surveyId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [survey, setSurvey] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -73,24 +76,6 @@ const StandaloneSurvey = () => {
     });
   };
 
-  const redirectAfterSurvey = async () => {
-    try {
-      const res = await sepSurveyAPI.getAll();
-      const allSurveys = res.data?.data || res.data || [];
-      const remainingSurveys = allSurveys.filter(
-        (s) => (s._id || s.id) !== surveyId
-      );
-
-      if (remainingSurveys.length > 0) {
-        navigate("/surveys");
-      } else {
-        navigate("/profile");
-      }
-    } catch (err) {
-      navigate("/profile");
-    }
-  };
-
   const handleSubmit = async () => {
     if (!isComplete()) {
       toast.error("Please answer all questions");
@@ -100,9 +85,13 @@ const StandaloneSurvey = () => {
     setSubmitting(true);
     try {
       const timingData = getTimingData();
+      const previousStreak = user?.streakCount ?? 0;
       await sepSurveyAPI.submit(surveyId, responses, timingData);
-      toast.success(`Completed! +${survey.credits} credits added`);
-      await redirectAfterSurvey();
+      window.dispatchEvent(new Event("authChange"));
+      goToSurveyComplete(navigate, {
+        creditsEarned: survey.credits || 0,
+        previousStreak,
+      });
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to submit");
     } finally {

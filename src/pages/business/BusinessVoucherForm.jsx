@@ -37,7 +37,7 @@ export default function BusinessVoucherForm() {
     if (!isEdit) return;
     const load = async () => {
       try {
-        const { data } = await businessAPI.getVoucherOffers();
+        const { data } = await businessAPI.getVoucherOffers({ skipErrorToast: true });
         const offer = (data.data || []).find((o) => o._id === id);
         if (!offer) {
           toast.error('Voucher not found');

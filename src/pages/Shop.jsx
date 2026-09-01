@@ -1,17 +1,18 @@
-import React, { useState, useMemo, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronDown,
   SearchX,
-  Calendar,
-  Hourglass,
 } from "lucide-react";
 import { userAPI, voucherAPI } from "../services/api";
 import VoucherRedeemModal from "../components/widgets/VoucherRedeemModal";
+import VoucherCard from "../components/shop/VoucherCard";
 import SearchBar from "../components/widgets/SearchBar";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-hot-toast";
 import AnimatedContent from "../components/animations/AnimatedContent";
+import Pagination from "../components/ui/Pagination";
+import { parsePage, writeSearchParams } from "../utils/searchParams";
 
 import vendorPoster1 from "../assets/poster-1.webp";
 import vendorPoster2 from "../assets/poster-2.webp";
@@ -37,278 +38,43 @@ const descriptionStyle = {
   fontWeight: 300,
 };
 
-// Simple Durstenfeld shuffle utility
-const shuffleArray = (array) => {
-  const shuffled = [...array];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-};
-
-// Vibrant ticket palettes — bg, darker accent, and soft ray color
-const TICKET_PALETTES = [
-  { bg: "#00704A", accent: "#005C3C", text: "#FFFFFF" }, // green
-  { bg: "#E50914", accent: "#B8070F", text: "#FFFFFF" }, // red
-  { bg: "#1E88E5", accent: "#1565C0", text: "#FFFFFF" }, // blue
-  { bg: "#FB8C00", accent: "#EF6C00", text: "#FFFFFF" }, // orange
-  { bg: "#212121", accent: "#000000", text: "#FFFFFF" }, // black
-  { bg: "#EC407A", accent: "#D81B60", text: "#FFFFFF" }, // pink
-  { bg: "#6A1B9A", accent: "#4A148C", text: "#FFFFFF" }, // purple
-  { bg: "#00897B", accent: "#00695C", text: "#FFFFFF" }, // teal
-  { bg: "#3949AB", accent: "#283593", text: "#FFFFFF" }, // indigo
-  { bg: "#C62828", accent: "#8E0000", text: "#FFFFFF" }, // maroon
-];
-
-// Deterministic: same brand name → same color, always
-const getBrandPalette = (brandName = "") => {
-  let hash = 0;
-  for (let i = 0; i < brandName.length; i++) {
-    hash = (hash << 5) - hash + brandName.charCodeAt(i);
-    hash |= 0;
-  }
-  return TICKET_PALETTES[Math.abs(hash) % TICKET_PALETTES.length];
-};
-
-function VoucherCard({ offer, onRedeem, onViewStore }) {
-  const discountLabel =
-    offer.discountType === "percentage"
-      ? `${offer.discountValue}%`
-      : offer.discountType === "free_item"
-      ? (offer.discountValue ? `Free ${offer.discountValue}` : "Free")
-      : offer.discountType === "value_combo"
-      ? "Value Combo"
-      : `Rs. ${offer.discountValue}`;
-
-  const showOffSuffix = offer.discountType === "percentage" || offer.discountType === "flat";
-
-  const stockInfo = useMemo(() => {
-    if (offer.totalStock !== null && offer.totalStock !== undefined) {
-      return {
-        remaining: Math.max(0, offer.totalStock - (offer.totalRedeemed || 0)),
-        isMonthly: false,
-      };
-    }
-    if (offer.monthlyStock !== null && offer.monthlyStock !== undefined) {
-      const currentLog =
-        offer.monthlyRedemptionLog && offer.monthlyRedemptionLog.length > 0
-          ? offer.monthlyRedemptionLog[offer.monthlyRedemptionLog.length - 1]
-          : null;
-      return {
-        remaining: Math.max(
-          0,
-          offer.monthlyStock - (currentLog ? currentLog.count : 0)
-        ),
-        isMonthly: true,
-      };
-    }
-    return null;
-  }, [offer]);
-
-  const formattedDeadline = useMemo(() => {
-    if (!offer.validUntil) return null;
-    return new Date(offer.validUntil).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-  }, [offer.validUntil]);
-
-  const isOut = stockInfo !== null && stockInfo.remaining === 0;
-  const isLowStock = stockInfo !== null && !isOut && stockInfo.remaining <= 10;
-  const brandName =
-    offer.business?.brandName || offer.business?.name || "Official Brand";
-  const brandLogo = offer.business?.logo || offer.business?.logoUrl || null;
-  const palette = useMemo(() => getBrandPalette(brandName), [brandName]);
-  const businessId = offer.business?._id;
-  const openStore = (e) => {
-    e.stopPropagation();
-    if (businessId) onViewStore?.(businessId);
-  };
-
-  return (
-    <div
-      onClick={() => !isOut && onRedeem(offer)}
-      role="button"
-      tabIndex={isOut ? -1 : 0}
-      aria-disabled={isOut}
-      onKeyDown={(e) => {
-        if (!isOut && (e.key === "Enter" || e.key === " ")) {
-          e.preventDefault();
-          onRedeem(offer);
-        }
-      }}
-      className={`w-full h-full bg-white flex flex-col group outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 rounded-2xl ${
-        isOut ? "cursor-not-allowed opacity-60" : "cursor-pointer"
-      }`}
-      >
-      {/* ── Ticket-style panel ── */}
-      <div
-        className="relative w-full aspect-square rounded-2xl flex flex-col transition-all duration-300 group-hover:shadow-lg group-hover:-translate-y-1"
-        style={{ backgroundColor: palette.bg }}
-      >
-        {/* Decorative sunburst rays behind the logo */}
-        <div
-          className="absolute top-[8%] left-1/2 -translate-x-1/2 w-3/4 aspect-square rounded-full opacity-20 pointer-events-none"
-          style={{
-            background: `repeating-conic-gradient(${palette.accent} 0deg 12deg, transparent 12deg 24deg)`,
-          }}
-        />
-
-        {/* Top: brand + logo — opens store profile (description, hours, etc.) */}
-        <div className="flex-[13] relative flex flex-col items-center justify-center gap-2 px-4">
-          <button
-            type="button"
-            onClick={openStore}
-            disabled={!businessId}
-            className="text-[8px] xs:text-[10px] sm:text-xs font-semibold tracking-[0.2em] sm:tracking-[0.25em] uppercase line-clamp-1 max-w-full underline-offset-2 hover:underline disabled:no-underline disabled:cursor-default"
-            style={{ color: palette.text, opacity: 0.9 }}
-          >
-            {brandName}
-          </button>
-          <button
-            type="button"
-            onClick={openStore}
-            disabled={!businessId}
-            className="w-[45%] max-w-24 aspect-square rounded-full bg-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105 disabled:cursor-default"
-            aria-label={`View ${brandName} store`}
-          >
-            {brandLogo ? (
-              <img
-                src={brandLogo}
-                alt={`${brandName} logo`}
-                className="max-w-[80%] max-h-[80%] object-contain"
-              />
-            ) : (
-              <span
-                className="font-semibold text-3xl sm:text-4xl tracking-tight select-none"
-                style={{ color: palette.bg }}
-              >
-                {brandName.charAt(0).toUpperCase()}
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* Perforation row */}
-        <div className="relative flex items-center h-0 z-10">
-         <span className="absolute -left-2.5 w-5 h-5 bg-white rounded-full -translate-x-1/2" />
-         <span className="absolute -right-2.5 w-5 h-5 bg-white rounded-full translate-x-1/2" />
-         <div className="w-full mx-3 border-t-2 border-dashed border-white/40" />
-       </div>
-
-        {/* Bottom: discount + redeem pill */}
-        <div className="flex-[9] relative flex flex-col items-center justify-center gap-2 px-4">
-          <div className="flex items-baseline gap-1.5">
-            <span
-              className="font-bold leading-none text-lg xs:text-xl sm:text-3xl"
-              style={{ color: palette.text }}
-            >
-              {discountLabel}
-            </span>
-            {showOffSuffix && (
-              <span
-                className="text-[10px] xs:text-xs sm:text-sm tracking-widest font-medium"
-                style={{ color: palette.text, opacity: 0.8 }}
-              >
-                OFF
-              </span>
-            )}
-          </div>
-          <span
-           className="bg-white text-[10px] xs:text-xs sm:text-sm font-semibold px-3 xs:px-4 sm:px-6 py-1 sm:py-1.5 rounded-full shadow-sm max-w-full transition-transform duration-300 group-hover:scale-105"
-             style={{ color: palette.accent }}
-           >
-            Redeem
-          </span>
-        </div>
-
-        {isOut && (
-          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] flex items-center justify-center rounded-2xl z-20">
-            <span className="text-white text-xs font-semibold tracking-widest uppercase">
-              Sold Out
-            </span>
-          </div>
-        )}
-
-        {!isOut && stockInfo !== null && isLowStock && (
-          <span className="absolute top-2.5 right-2.5 sm:top-3 sm:right-3 bg-white text-red-500 text-[9px] sm:text-[10px] font-semibold px-2 py-1 rounded-full shadow-sm z-10">
-            {stockInfo.remaining} left
-          </span>
-        )}
-      </div>
-
-      {/* ── Info ── */}
-      <div className="pt-3 sm:pt-4 flex flex-col gap-0.5">
-        <button
-          type="button"
-          onClick={openStore}
-          disabled={!businessId}
-          className="text-gray-400 text-[9px] sm:text-[11px] font-medium tracking-wide uppercase line-clamp-1 text-left hover:text-gray-700 disabled:hover:text-gray-400"
-        >
-          {brandName}
-        </button>
-
-        <h2 className="text-gray-900 line-clamp-1 text-sm sm:text-base font-medium leading-snug">
-          {offer.title}
-        </h2>
-
-        <p className="text-gray-500 text-xs sm:text-sm mt-0.5">
-          {offer.creditsRequired} credits{" "}
-          <span className="text-gray-400">· {discountLabel}{showOffSuffix ? " off" : ""}</span>
-        </p>
-        {offer.approxValue != null && (
-          <p className="text-gray-400 text-[10px] sm:text-[11px] mt-0.5">
-            Estimated savings Rs. {offer.approxValue}
-          </p>
-        )}
-
-        <div className="flex items-center gap-1 text-gray-400 text-[10px] sm:text-[11px] mt-1.5">
-          <Hourglass size={10} />
-          <span>Valid {offer.expiryDays} days once claimed</span>
-        </div>
-
-        {formattedDeadline && (
-          <div className="flex items-center gap-1 text-gray-400 text-[10px] sm:text-[11px]">
-            <Calendar size={10} />
-            <span>Ends {formattedDeadline}</span>
-          </div>
-        )}
-
-        {offer.business?._id && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onViewStore?.(offer.business._id);
-            }}
-            className="mt-2 text-[11px] sm:text-xs font-medium text-blue-600 hover:text-blue-800 text-left"
-          >
-            View store
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
+const SHOP_PAGE_SIZE = 12;
 
 export default function Shop() {
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const search = searchParams.get("q") || "";
+  const sortOrder = searchParams.get("sort") || "default";
+  const category = searchParams.get("category") || "all";
+  const catalogPage = parsePage(searchParams.get("page"));
+  const hasClientFilters =
+    Boolean(search) || category !== "all" || sortOrder !== "default";
+
+  const setShopParams = (patch) =>
+    writeSearchParams(setSearchParams, patch, {
+      q: "",
+      sort: "default",
+      category: "all",
+      page: 1,
+    });
+
   const [ready, setReady] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState(null);
-  const [search, setSearch] = useState("");
-  const [sortOrder, setSortOrder] = useState("default");
-  const [category, setCategory] = useState("all");
   const [posterIndex, setPosterIndex] = useState(0);
   const [showIsland, setShowIsland] = useState(false);
 
   const [voucherOffers, setVoucherOffers] = useState([]);
   const [userCredits, setUserCredits] = useState(0);
+  const [loadingOffers, setLoadingOffers] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
+  const [retryTick, setRetryTick] = useState(0);
+  const [apiTotal, setApiTotal] = useState(0);
+  const [apiTotalPages, setApiTotalPages] = useState(1);
+  const skipCatalogScroll = useRef(true);
 
- // Trigger floating island entrance instantly on mount
+  const fetchPage = hasClientFilters ? 1 : catalogPage;
+
   useEffect(() => {
-    // A minimal 20ms delay allows the browser to register the initial hidden state before animating in
     const timer = setTimeout(() => setShowIsland(true), 500);
     return () => clearTimeout(timer);
   }, []);
@@ -328,7 +94,6 @@ export default function Shop() {
     setSelectedOffer(offer);
   };
 
-  // Auto-advance the spotlight deals carousel
   useEffect(() => {
     const interval = setInterval(() => {
       setPosterIndex((prev) => (prev + 1) % VENDOR_POSTERS.length);
@@ -339,30 +104,41 @@ export default function Shop() {
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     setReady(true);
+    let cancelled = false;
 
     const fetchData = async () => {
+      setLoadingOffers(true);
+      setFetchError(null);
       try {
         const [offersResult, profileResult] = await Promise.allSettled([
-          voucherAPI.getOffers(),
+          voucherAPI.getOffers({
+            page: fetchPage,
+            limit: hasClientFilters ? 100 : SHOP_PAGE_SIZE,
+            skipErrorToast: true,
+          }),
           token
-            ? userAPI.getProfile({ skipAuthRedirect: true })
+            ? userAPI.getProfile({ skipAuthRedirect: true, skipErrorToast: true })
             : Promise.resolve(null),
         ]);
+
+        if (cancelled) return;
 
         if (offersResult.status !== "fulfilled") {
           console.error("Fetch Failure:", offersResult.reason);
           setVoucherOffers([]);
+          setFetchError("Could not load rewards. Check your connection and try again.");
           return;
         }
 
         const offersRes = offersResult.value;
         const responseData = offersRes.data?.data || offersRes.data;
         const targetArray = Array.isArray(responseData) ? responseData : [];
+        const pagination = offersRes.data?.pagination;
 
-        // Randomize the voucher collection once when loaded
-        const randomizedArray = shuffleArray(targetArray);
+        setVoucherOffers(targetArray);
+        setApiTotal(pagination?.total ?? targetArray.length);
+        setApiTotalPages(Math.max(1, pagination?.totalPages || 1));
 
-        setVoucherOffers(randomizedArray);
         if (profileResult.status === "fulfilled" && profileResult.value) {
           const profileRes = profileResult.value;
           setUserCredits(
@@ -376,12 +152,19 @@ export default function Shop() {
           console.warn("Profile fetch failed, continuing with context state.");
         }
       } catch (err) {
+        if (cancelled) return;
         console.error("Fetch Failure:", err);
         setVoucherOffers([]);
+        setFetchError("Could not load rewards. Check your connection and try again.");
+      } finally {
+        if (!cancelled) setLoadingOffers(false);
       }
     };
     fetchData();
-  }, [user]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user, fetchPage, hasClientFilters, retryTick]);
 
   const categories = useMemo(() => {
     const found = new Set();
@@ -425,6 +208,27 @@ export default function Shop() {
 
     return vouchers;
   }, [search, sortOrder, category, voucherOffers]);
+
+  const catalogPages = hasClientFilters
+    ? Math.max(1, Math.ceil(filteredCatalog.length / SHOP_PAGE_SIZE))
+    : apiTotalPages;
+  const catalogTotal = hasClientFilters ? filteredCatalog.length : apiTotal;
+  const pagedCatalog = useMemo(() => {
+    if (!hasClientFilters) return filteredCatalog;
+    const start = (catalogPage - 1) * SHOP_PAGE_SIZE;
+    return filteredCatalog.slice(start, start + SHOP_PAGE_SIZE);
+  }, [filteredCatalog, catalogPage, hasClientFilters]);
+
+  useEffect(() => {
+    if (skipCatalogScroll.current) {
+      skipCatalogScroll.current = false;
+      return;
+    }
+    document.getElementById("rewards-catalog")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  }, [catalogPage]);
 
   if (!ready) return null;
 
@@ -507,7 +311,7 @@ export default function Shop() {
           >
             <SearchBar
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => setShopParams({ q: e.target.value, page: 1 })}
               placeholder="Search rewards..."
             />
 
@@ -515,7 +319,7 @@ export default function Shop() {
               <div className="relative">
                 <select
                   value={sortOrder}
-                  onChange={(e) => setSortOrder(e.target.value)}
+                  onChange={(e) => setShopParams({ sort: e.target.value, page: 1 })}
                   className="w-full pl-4 lg:pl-5 pr-10 py-3.5 lg:py-4 border border-gray-200 rounded-full text-sm lg:text-base text-gray-900 outline-none transition-colors focus:border-gray-300 bg-white appearance-none cursor-pointer"
                 >
                   <option value="default">Sort by</option>
@@ -531,7 +335,7 @@ export default function Shop() {
               <div className="relative">
                 <select
                   value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  onChange={(e) => setShopParams({ category: e.target.value, page: 1 })}
                   className="w-full pl-4 lg:pl-5 pr-10 py-3.5 lg:py-4 border border-gray-200 rounded-full text-sm lg:text-base text-gray-900 outline-none transition-colors focus:border-gray-300 bg-white appearance-none cursor-pointer"
                 >
                   <option value="all">All categories</option>
@@ -551,9 +355,33 @@ export default function Shop() {
         </div>
 
         {/* Catalog Layout Core Grid View */}
-        {filteredCatalog.length > 0 ? (
+        {fetchError ? (
+          <AnimatedContent direction="vertical" distance={30} duration={0.6}>
+            <div className="text-center py-20 border-2 border-dashed border-gray-200 rounded-3xl bg-gray-50/50 max-w-2xl mx-auto px-4">
+              <SearchX className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-gray-900 text-xl font-medium mb-2">
+                Couldn’t load rewards
+              </h3>
+              <p className="text-gray-500 text-sm max-w-sm mx-auto mb-6">
+                {fetchError}
+              </p>
+              <button
+                onClick={() => setRetryTick((n) => n + 1)}
+                className="px-6 py-3 text-white rounded-full text-sm font-medium transition-opacity hover:opacity-90"
+                style={{ backgroundColor: "#134074" }}
+              >
+                Retry
+              </button>
+            </div>
+          </AnimatedContent>
+        ) : loadingOffers ? (
+          <div className="flex justify-center py-20">
+            <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-900 rounded-full animate-spin" />
+          </div>
+        ) : filteredCatalog.length > 0 ? (
+          <>
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-8 sm:gap-y-12 items-stretch">
-            {filteredCatalog.map((item) => (
+            {pagedCatalog.map((item) => (
               <div key={item.id} className="w-full">
                 <VoucherCard
                   offer={item.originalData}
@@ -563,6 +391,15 @@ export default function Shop() {
               </div>
             ))}
           </div>
+          <Pagination
+            page={catalogPage}
+            totalPages={catalogPages}
+            total={catalogTotal}
+            pageSize={SHOP_PAGE_SIZE}
+            onChange={(nextPage) => setShopParams({ page: nextPage })}
+            label="rewards"
+          />
+          </>
         ) : (
           <AnimatedContent direction="vertical" distance={30} duration={0.6}>
             <div className="text-center py-20 border-2 border-dashed border-gray-200 rounded-3xl bg-gray-50/50 max-w-2xl mx-auto px-4">
@@ -576,9 +413,7 @@ export default function Shop() {
               </p>
               <button
                 onClick={() => {
-                  setSearch("");
-                  setCategory("all");
-                  setSortOrder("default");
+                  setShopParams({ q: "", category: "all", sort: "default", page: 1 });
                 }}
                 className="px-6 py-3 text-white rounded-full text-sm font-medium transition-opacity hover:opacity-90"
                 style={{ backgroundColor: "#134074" }}
@@ -590,7 +425,7 @@ export default function Shop() {
         )}
 
         {/* More Coming Soon Indicator */}
-        {filteredCatalog.length > 0 && (
+        {!fetchError && !loadingOffers && filteredCatalog.length > 0 && (
           <AnimatedContent
             direction="vertical"
             distance={20}

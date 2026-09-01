@@ -12,6 +12,7 @@ const DemographicsWizard = ({ onComplete }) => {
   const { formData, updateFormData, errors: hookErrors } = useDemographics();
   const [currentStep, setCurrentStep] = useState(1);
   const [localErrors, setLocalErrors] = useState({});
+  const [submitError, setSubmitError] = useState('');
 
   const stepLabels = [
     "Sampler Profile",
@@ -68,6 +69,7 @@ const DemographicsWizard = ({ onComplete }) => {
 
   const handleComplete = async () => {
     if (!checkStepValidation(4)) return;
+    setSubmitError('');
 
     const payload = {
       firstLanguage: (formData.firstLanguage || '').trim(),
@@ -93,7 +95,7 @@ const DemographicsWizard = ({ onComplete }) => {
 
     try {
       console.log('Submitting demographics:', payload);
-      const response = await userAPI.updateDemographics(payload);
+      const response = await userAPI.updateDemographics(payload, { skipErrorToast: true });
 
       if (response.data.success) {
         toast.success("You're in. Your first survey is ready. Takes under 2 minutes.");
@@ -101,10 +103,20 @@ const DemographicsWizard = ({ onComplete }) => {
         // otherwise a stale draft could resurrect old answers on a future visit.
         clearDemographicsDraft();
         onComplete();
+      } else {
+        setSubmitError(response.data.message || "Failed to save profile. Please try again.");
       }
     } catch (error) {
       console.error('Error:', error.response?.data);
-      toast.error(error.response?.data?.message || "Failed to save profile");
+      const data = error.response?.data;
+      setSubmitError(
+        data?.message ||
+        data?.errors?.[0]?.msg ||
+        data?.errors?.[0]?.message ||
+        (!error.response
+          ? "Network error. Check your connection."
+          : "Failed to save profile. Please try again.")
+      );
     }
   };
 
@@ -149,6 +161,9 @@ const DemographicsWizard = ({ onComplete }) => {
 
   return (
     <div className="w-full">
+      {submitError && (
+        <p className="text-sm text-red-600 font-medium text-center mb-4">{submitError}</p>
+      )}
       <Stepper
         initialStep={1}
         onStepChange={(step) => setCurrentStep(step)}

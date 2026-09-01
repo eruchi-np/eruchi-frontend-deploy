@@ -27,6 +27,7 @@ const CompleteBasicInfo = () => {
   const { user, refreshUser, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const {
     register,
@@ -51,7 +52,6 @@ const CompleteBasicInfo = () => {
     if (authLoading) return;
 
     if (!token) {
-      toast.error("Please log in to continue");
       navigate('/login', { replace: true });
       return;
     }
@@ -60,7 +60,7 @@ const CompleteBasicInfo = () => {
       if (user.isProfileComplete) {
         navigate('/', { replace: true });
       } else {
-        navigate('/profile', { replace: true });
+        navigate('/complete-profile', { replace: true });
       }
     }
 
@@ -75,12 +75,13 @@ const CompleteBasicInfo = () => {
 
   const onSubmit = async (data) => {
     setSubmitting(true);
+    setSubmitError('');
 
     const token = localStorage.getItem('access_token');
     const authMethod = localStorage.getItem('auth_method');
 
     if (!token) {
-      toast.error("Authentication required. Redirecting to login...");
+      setSubmitError("Authentication required. Redirecting to login...");
       navigate('/login', { replace: true });
       setSubmitting(false);
       return;
@@ -106,26 +107,21 @@ const CompleteBasicInfo = () => {
       );
 
       toast.success("Basic information saved successfully!");
-
-      // Refresh user data
       await refreshUser();
+      navigate('/complete-profile', { replace: true });
 
     } catch (err) {
       console.error("[ERROR] Failed to update basic profile:", err);
 
       if (err.response?.status === 401) {
-        toast.error("Session expired or invalid authentication. Please log in again.");
+        setSubmitError("Session expired. Please log in again.");
         localStorage.removeItem('access_token');
         localStorage.removeItem('auth_method');
         navigate('/login', { replace: true });
-      } else if (err.response?.status === 400) {
-        const msg = err.response.data.message ||
-                    err.response.data.errors?.[0]?.msg ||
-                    "Invalid information provided.";
-        toast.error(msg);
       } else {
-        toast.error(
+        setSubmitError(
           err.response?.data?.message ||
+          err.response?.data?.errors?.[0]?.msg ||
           "Could not save your information. Please try again."
         );
       }
@@ -214,6 +210,10 @@ const CompleteBasicInfo = () => {
                 )}
               </div>
             </div>
+
+            {submitError && (
+              <p className="text-sm text-red-500 font-medium">{submitError}</p>
+            )}
 
             {/* Submit button */}
             <button

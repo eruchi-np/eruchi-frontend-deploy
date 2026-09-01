@@ -28,7 +28,7 @@ const AdminDashboard = () => {
 
   const fetchSurveys = async () => {
     try {
-      const res = await sepSurveyAPI.getAvailable();
+      const res = await sepSurveyAPI.getAvailable({ skipErrorToast: true });
       setSurveys(res.data.data || []);
     } catch (err) {
       console.error("Failed to fetch surveys", err);
@@ -42,7 +42,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     const checkAdminAccess = async () => {
       try {
-        const userResponse = await userAPI.getProfile();
+        const userResponse = await userAPI.getProfile({ skipErrorToast: true });
         const userData = userResponse.data.data.user;
 
         if (userData.role !== "admin") {
@@ -71,7 +71,10 @@ const AdminDashboard = () => {
         page,
         limit: pageSize,
       };
-      const response = await adminAPI.getUsers(params);
+      const response = await adminAPI.getUsers({
+        ...params,
+        skipErrorToast: true,
+      });
       setUsers(response.data.data);
 
       if (response.data.pagination) {

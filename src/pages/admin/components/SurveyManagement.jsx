@@ -35,7 +35,7 @@ const SurveyManagement = ({ surveys, refetchSurveys, NAVY }) => {
 
     setDeletingId(surveyId);
     try {
-      await sepSurveyAPI.delete(surveyId);
+      await sepSurveyAPI.delete(surveyId, { skipErrorToast: true });
       toast.success("Survey deleted");
       refetchSurveys();
     } catch (err) {
