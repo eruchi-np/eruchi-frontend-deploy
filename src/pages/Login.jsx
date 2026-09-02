@@ -7,7 +7,7 @@ import { getPostLoginPath } from "../utils/auth";
 import { useAuth } from "../context/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
 import Cookies from "js-cookie";
 import { businessAPI } from "../services/api";
 
@@ -62,6 +62,8 @@ const Login = () => {
   const [bizPassword, setBizPassword] = useState('');
   const [bizLoading, setBizLoading] = useState(false);
   const [bizError, setBizError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showBizPassword, setShowBizPassword] = useState(false);
 
   const {
     register,
@@ -242,14 +244,24 @@ const Login = () => {
                     </div>
 
                     <div>
-                      <input
-                        type="password"
-                        placeholder="Password"
-                        {...register("password")}
-                        className={`w-full outline-none text-lg font-medium p-4 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 ${
-                          errors.password ? "border-red-500" : "border-gray-300 focus:border-black"
-                        }`}
-                      />
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Password"
+                          {...register("password")}
+                          className={`w-full outline-none text-lg font-medium p-4 pr-12 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 ${
+                            errors.password ? "border-red-500" : "border-gray-300 focus:border-black"
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-700"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
                       {errors.password && (
                         <p className="text-sm text-red-500 mt-2 font-medium">{errors.password.message}</p>
                       )}
@@ -326,14 +338,24 @@ const Login = () => {
                   </div>
 
                   <div>
-                    <input
-                      type="password"
-                      placeholder="Password"
-                      value={bizPassword}
-                      onChange={(e) => setBizPassword(e.target.value)}
-                      required
-                      className="w-full outline-none text-lg font-medium p-4 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 border-gray-300 focus:border-black"
-                    />
+                    <div className="relative">
+                      <input
+                        type={showBizPassword ? "text" : "password"}
+                        placeholder="Password"
+                        value={bizPassword}
+                        onChange={(e) => setBizPassword(e.target.value)}
+                        required
+                        className="w-full outline-none text-lg font-medium p-4 pr-12 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 border-gray-300 focus:border-black"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowBizPassword((prev) => !prev)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-700"
+                        aria-label={showBizPassword ? "Hide password" : "Show password"}
+                      >
+                        {showBizPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                      </button>
+                    </div>
                   </div>
                 </div>
 
