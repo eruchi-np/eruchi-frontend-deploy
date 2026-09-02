@@ -39,6 +39,37 @@ export function merchantKey(offer) {
   );
 }
 
+export function paginateByMerchant(items, pageSize, getOffer = (item) => item) {
+  const groups = [];
+  const indexByKey = new Map();
+
+  items.forEach((item) => {
+    const key = merchantKey(getOffer(item));
+    if (!indexByKey.has(key)) {
+      indexByKey.set(key, groups.length);
+      groups.push([]);
+    }
+    groups[indexByKey.get(key)].push(item);
+  });
+
+  const pages = [];
+  let current = [];
+  let count = 0;
+
+  groups.forEach((group) => {
+    if (current.length && count + group.length > pageSize) {
+      pages.push(current);
+      current = [];
+      count = 0;
+    }
+    current.push(...group);
+    count += group.length;
+  });
+
+  if (current.length) pages.push(current);
+  return pages.length ? pages : [[]];
+}
+
 function shuffle(list) {
   const items = [...list];
   for (let i = items.length - 1; i > 0; i -= 1) {

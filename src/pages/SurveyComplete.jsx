@@ -49,7 +49,7 @@ export default function SurveyComplete() {
       try {
         const [profileRes, offersRes] = await Promise.all([
           userAPI.getProfile({ skipErrorToast: true }),
-          voucherAPI.getOffers({ limit: 100, skipErrorToast: true }),
+          voucherAPI.getOffers({ all: 1, limit: 100, skipErrorToast: true }),
         ]);
         if (cancelled) return;
 

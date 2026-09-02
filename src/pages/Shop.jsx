@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   ChevronDown,
@@ -13,6 +13,7 @@ import { toast } from "react-hot-toast";
 import AnimatedContent from "../components/animations/AnimatedContent";
 import Pagination from "../components/ui/Pagination";
 import { parsePage, writeSearchParams } from "../utils/searchParams";
+import { paginateByMerchant } from "../utils/pickSurveyOffers";
 
 import vendorPoster1 from "../assets/poster-1.webp";
 import vendorPoster2 from "../assets/poster-2.webp";
@@ -47,16 +48,30 @@ export default function Shop() {
   const sortOrder = searchParams.get("sort") || "default";
   const category = searchParams.get("category") || "all";
   const catalogPage = parsePage(searchParams.get("page"));
-  const hasClientFilters =
-    Boolean(search) || category !== "all" || sortOrder !== "default";
+  const [searchDraft, setSearchDraft] = useState(search);
 
-  const setShopParams = (patch) =>
-    writeSearchParams(setSearchParams, patch, {
-      q: "",
-      sort: "default",
-      category: "all",
-      page: 1,
-    });
+  const setShopParams = useCallback(
+    (patch) =>
+      writeSearchParams(setSearchParams, patch, {
+        q: "",
+        sort: "default",
+        category: "all",
+        page: 1,
+      }),
+    [setSearchParams]
+  );
+
+  useEffect(() => {
+    setSearchDraft(search);
+  }, [search]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchDraft === search) return;
+      setShopParams({ q: searchDraft, page: 1 });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchDraft, search, setShopParams]);
 
   const [ready, setReady] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState(null);
@@ -68,11 +83,7 @@ export default function Shop() {
   const [loadingOffers, setLoadingOffers] = useState(true);
   const [fetchError, setFetchError] = useState(null);
   const [retryTick, setRetryTick] = useState(0);
-  const [apiTotal, setApiTotal] = useState(0);
-  const [apiTotalPages, setApiTotalPages] = useState(1);
   const skipCatalogScroll = useRef(true);
-
-  const fetchPage = hasClientFilters ? 1 : catalogPage;
 
   useEffect(() => {
     const timer = setTimeout(() => setShowIsland(true), 500);
@@ -112,8 +123,8 @@ export default function Shop() {
       try {
         const [offersResult, profileResult] = await Promise.allSettled([
           voucherAPI.getOffers({
-            page: fetchPage,
-            limit: hasClientFilters ? 100 : SHOP_PAGE_SIZE,
+            all: 1,
+            limit: 100,
             skipErrorToast: true,
           }),
           token
@@ -133,11 +144,8 @@ export default function Shop() {
         const offersRes = offersResult.value;
         const responseData = offersRes.data?.data || offersRes.data;
         const targetArray = Array.isArray(responseData) ? responseData : [];
-        const pagination = offersRes.data?.pagination;
 
         setVoucherOffers(targetArray);
-        setApiTotal(pagination?.total ?? targetArray.length);
-        setApiTotalPages(Math.max(1, pagination?.totalPages || 1));
 
         if (profileResult.status === "fulfilled" && profileResult.value) {
           const profileRes = profileResult.value;
@@ -164,7 +172,7 @@ export default function Shop() {
     return () => {
       cancelled = true;
     };
-  }, [user, fetchPage, hasClientFilters, retryTick]);
+  }, [user, retryTick]);
 
   const categories = useMemo(() => {
     const found = new Set();
@@ -175,14 +183,14 @@ export default function Shop() {
   }, [voucherOffers]);
 
   const filteredCatalog = useMemo(() => {
-    const q = search.toLowerCase().replace(/\s/g, "");
+    const q = searchDraft.toLowerCase().replace(/\s/g, "");
 
     let vouchers = voucherOffers.map((offer, idx) => ({
       id: offer._id,
       credits: offer.creditsRequired,
       searchPayload: `${offer.title || ""} ${offer.business?.brandName || ""} ${
-        offer.creditsRequired || ""
-      } ${offer.discountValue || ""}`
+        offer.business?.name || ""
+      } ${offer.creditsRequired || ""} ${offer.discountValue || ""}`
         .toLowerCase()
         .replace(/\s/g, ""),
       originalData: offer,
@@ -204,20 +212,38 @@ export default function Shop() {
     }
 
     if (sortOrder === "asc") vouchers.sort((a, b) => a.credits - b.credits);
-    if (sortOrder === "desc") vouchers.sort((a, b) => b.credits - a.credits);
+    else if (sortOrder === "desc") vouchers.sort((a, b) => b.credits - a.credits);
+    else {
+      vouchers.sort((a, b) => {
+        const merchA = (
+          a.originalData.business?.brandName ||
+          a.originalData.business?.name ||
+          ""
+        ).toLowerCase();
+        const merchB = (
+          b.originalData.business?.brandName ||
+          b.originalData.business?.name ||
+          ""
+        ).toLowerCase();
+        if (merchA !== merchB) return merchA.localeCompare(merchB);
+        return (a.originalData.createdAt || "").localeCompare(
+          b.originalData.createdAt || ""
+        );
+      });
+    }
 
     return vouchers;
-  }, [search, sortOrder, category, voucherOffers]);
+  }, [searchDraft, sortOrder, category, voucherOffers]);
 
-  const catalogPages = hasClientFilters
-    ? Math.max(1, Math.ceil(filteredCatalog.length / SHOP_PAGE_SIZE))
-    : apiTotalPages;
-  const catalogTotal = hasClientFilters ? filteredCatalog.length : apiTotal;
-  const pagedCatalog = useMemo(() => {
-    if (!hasClientFilters) return filteredCatalog;
-    const start = (catalogPage - 1) * SHOP_PAGE_SIZE;
-    return filteredCatalog.slice(start, start + SHOP_PAGE_SIZE);
-  }, [filteredCatalog, catalogPage, hasClientFilters]);
+  const listPage = searchDraft === search ? catalogPage : 1;
+  const catalogPagesList = useMemo(
+    () => paginateByMerchant(filteredCatalog, SHOP_PAGE_SIZE, (item) => item.originalData),
+    [filteredCatalog]
+  );
+  const catalogPages = Math.max(1, catalogPagesList.length);
+  const catalogTotal = filteredCatalog.length;
+  const safePage = Math.min(listPage, catalogPages);
+  const pagedCatalog = catalogPagesList[safePage - 1] || [];
 
   useEffect(() => {
     if (skipCatalogScroll.current) {
@@ -310,8 +336,8 @@ export default function Shop() {
             className="flex flex-col gap-4 w-full"
           >
             <SearchBar
-              value={search}
-              onChange={(e) => setShopParams({ q: e.target.value, page: 1 })}
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
               placeholder="Search rewards..."
             />
 
@@ -392,7 +418,7 @@ export default function Shop() {
             ))}
           </div>
           <Pagination
-            page={catalogPage}
+            page={safePage}
             totalPages={catalogPages}
             total={catalogTotal}
             pageSize={SHOP_PAGE_SIZE}
