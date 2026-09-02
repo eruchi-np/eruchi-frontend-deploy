@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Ticket, ArrowLeft } from "lucide-react";
 import { voucherAPI } from "../services/api";
+import Pagination from "../components/ui/Pagination";
+import { parsePage, writeSearchParams } from "../utils/searchParams";
 
 const TABS = ["active", "used", "expired"];
 
@@ -89,6 +91,8 @@ function VoucherTicketCard({ voucher, onClick }) {
               <img
                 src={brandLogo}
                 alt={`${brandName} logo`}
+                loading="lazy"
+                decoding="async"
                 className="max-w-[80%] max-h-[80%] object-contain"
               />
             ) : (
@@ -176,26 +180,48 @@ function VoucherTicketCard({ voucher, onClick }) {
   );
 }
 
+const VOUCHER_PAGE_SIZE = 12;
+
 export default function Vouchers() {
-  const [activeTab, setActiveTab] = useState("active");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabFromUrl = searchParams.get("tab");
+  const activeTab = TABS.includes(tabFromUrl) ? tabFromUrl : "active";
+  const page = parsePage(searchParams.get("page"));
+  const setListParams = (patch) =>
+    writeSearchParams(setSearchParams, patch, { tab: "active", page: 1 });
+
   const [vouchers, setVouchers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [retryTick, setRetryTick] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetch = async () => {
       setLoading(true);
+      setError(null);
       try {
-        const res = await voucherAPI.getMyVouchers({ status: activeTab });
+        const res = await voucherAPI.getMyVouchers({
+          status: activeTab,
+          page,
+          limit: VOUCHER_PAGE_SIZE,
+          skipErrorToast: true,
+        });
         setVouchers(res.data.data || []);
+        setTotalPages(res.data.pagination?.totalPages || 1);
+        setTotal(res.data.pagination?.total || res.data.data?.length || 0);
       } catch (err) {
         console.error("Failed to fetch vouchers", err);
+        setVouchers([]);
+        setError("Could not load your vouchers. Check your connection and try again.");
       } finally {
         setLoading(false);
       }
     };
     fetch();
-  }, [activeTab]);
+  }, [activeTab, page, retryTick]);
 
   return (
     <div
@@ -222,7 +248,7 @@ export default function Vouchers() {
           {TABS.map((tab) => (
             <button
               key={tab}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => setListParams({ tab, page: 1 })}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                 activeTab === tab
                   ? "bg-gray-900 text-white"
@@ -237,6 +263,17 @@ export default function Vouchers() {
         {loading ? (
           <div className="flex justify-center py-16">
             <div className="w-8 h-8 border-2 border-gray-200 border-t-gray-900 rounded-full animate-spin" />
+          </div>
+        ) : error ? (
+          <div className="text-center py-16">
+            <Ticket size={40} className="text-gray-200 mx-auto mb-3" />
+            <p className="text-gray-500 text-sm mb-6">{error}</p>
+            <button
+              onClick={() => setRetryTick((n) => n + 1)}
+              className="px-6 py-2.5 rounded-full bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors"
+            >
+              Retry
+            </button>
           </div>
         ) : vouchers.length === 0 ? (
           <div className="text-center py-16">
@@ -254,6 +291,7 @@ export default function Vouchers() {
             )}
           </div>
         ) : (
+          <>
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 sm:gap-x-8 gap-y-8 sm:gap-y-12 items-stretch">
             {vouchers.map((v) => (
               <div key={v._id} className="w-full">
@@ -264,6 +302,15 @@ export default function Vouchers() {
               </div>
             ))}
           </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={VOUCHER_PAGE_SIZE}
+            onChange={(nextPage) => setListParams({ page: nextPage })}
+            label="vouchers"
+          />
+          </>
         )}
       </div>
     </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { sepSurveyAPI } from '../services/api';
 import {
   Loader2,
@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import AnimatedContent from '../components/animations/AnimatedContent';
+import Pagination from '../components/ui/Pagination';
+import { parsePage, writeSearchParams } from '../utils/searchParams';
 
 const headingStyle = {
   fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
@@ -149,18 +151,36 @@ function SurveyCard({ survey, onStart }) {
   );
 }
 
+const SURVEY_PAGE_SIZE = 12;
+
 const StandaloneSurveys = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const page = parsePage(searchParams.get('page'));
+  const sortOrder = searchParams.get('sort') || 'default';
+  const setListParams = (patch) =>
+    writeSearchParams(setSearchParams, patch, { page: 1, sort: 'default' });
+
   const [surveys, setSurveys] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [sortOrder, setSortOrder] = useState('default');
+  const [retryTick, setRetryTick] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalSurveys, setTotalSurveys] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchSurveys = async () => {
       try {
-        const res = await sepSurveyAPI.getAvailable({ limit: 20 });
+        setLoading(true);
+        setError(null);
+        const res = await sepSurveyAPI.getAvailable({
+          page,
+          limit: SURVEY_PAGE_SIZE,
+          skipErrorToast: true,
+        });
         setSurveys(res.data.data || []);
+        setTotalPages(res.data.pagination?.totalPages || 1);
+        setTotalSurveys(res.data.pagination?.totalSurveys || res.data.data?.length || 0);
       } catch (err) {
         console.error('Failed to load standalone surveys:', err);
         setError('Could not load available surveys. Please try again later.');
@@ -171,7 +191,7 @@ const StandaloneSurveys = () => {
     };
 
     fetchSurveys();
-  }, []);
+  }, [page, retryTick]);
 
   const sortedSurveys = useMemo(() => {
     const now = new Date();
@@ -234,7 +254,7 @@ const StandaloneSurveys = () => {
             {error}
           </p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={() => setRetryTick((n) => n + 1)}
             className="mx-auto w-full max-w-xs rounded-full px-6 py-4 font-medium text-white transition-transform hover:scale-[1.02]"
             style={{ backgroundColor: '#134074' }}
           >
@@ -278,7 +298,7 @@ const StandaloneSurveys = () => {
               <div className="relative">
                 <select
                   value={sortOrder}
-                  onChange={(e) => setSortOrder(e.target.value)}
+                  onChange={(e) => setListParams({ sort: e.target.value, page: 1 })}
                   className="w-full cursor-pointer appearance-none rounded-full border border-gray-200 bg-white py-3.5 pl-4 pr-10 text-sm text-gray-900 outline-none transition-colors focus:border-gray-300 lg:py-4 lg:pl-5 lg:text-base"
                 >
                   <option value="default">Default ordering</option>
@@ -319,6 +339,7 @@ const StandaloneSurveys = () => {
             </div>
           </AnimatedContent>
         ) : (
+          <>
           <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2">
             {sortedSurveys.map((survey, index) => (
               <AnimatedContent
@@ -336,6 +357,15 @@ const StandaloneSurveys = () => {
               </AnimatedContent>
             ))}
           </div>
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={totalSurveys}
+            pageSize={SURVEY_PAGE_SIZE}
+            onChange={(nextPage) => setListParams({ page: nextPage })}
+            label="surveys"
+          />
+          </>
         )}
 
         {sortedSurveys.length > 0 && (

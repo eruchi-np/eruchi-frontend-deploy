@@ -18,10 +18,10 @@ const SurveyHistory = () => {
   useEffect(() => {
     const fetchHistory = async () => {
       try {
-        const campRes = await surveyAPI.getSurveyHistory();
+        const campRes = await surveyAPI.getSurveyHistory({ skipErrorToast: true });
         setCampaignResponses(campRes.data.data || []);
 
-        const standRes = await sepSurveyAPI.getHistory({ limit: 20 });
+        const standRes = await sepSurveyAPI.getHistory({ limit: 20, skipErrorToast: true });
         setStandaloneResponses(standRes.data.data || []);
       } catch (err) {
         console.error('Failed to load survey history:', err);

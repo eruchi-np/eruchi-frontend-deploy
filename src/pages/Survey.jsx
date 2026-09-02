@@ -2,7 +2,8 @@ import React,  { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { surveyAPI, userAPI } from '../services/api';
 import { ArrowLeft, Star, Loader2, Package, Clock, Type, FileText, CheckSquare, Sliders } from 'lucide-react';
-import toast from 'react-hot-toast'; // ← ONLY THIS LINE ADDED
+import toast from 'react-hot-toast';
+import { goToSurveyComplete } from '../utils/surveyComplete';
 
 const Survey = () => {
   const { campaignId } = useParams();
@@ -158,9 +159,11 @@ const Survey = () => {
     setSubmitting(true);
     
     try {
+      const previousStreak = user?.streakCount ?? 0;
+      const creditsEarned = survey.creditsToAward || 100;
       await surveyAPI.submitSurvey({ responses });
-      toast.success('Survey submitted successfully!');
-      navigate('/profile');
+      window.dispatchEvent(new Event('authChange'));
+      goToSurveyComplete(navigate, { creditsEarned, previousStreak });
     } catch (error) {
       console.error('Error submitting survey:', error);
       const errorMessage = error.response?.data?.message || 'Failed to submit survey';

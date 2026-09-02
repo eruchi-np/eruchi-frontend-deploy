@@ -7,6 +7,7 @@ import {
   MessageSquarePlus, X, Pencil, Star,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import Pagination from '../../components/ui/Pagination';
 
 const NAVY = "#1B2A4A";
 
@@ -85,6 +86,10 @@ export default function AdminBusinessManagement() {
   // Business list
   const [businesses, setBusinesses]               = useState([]);
   const [loading, setLoading]                     = useState(true);
+  const [currentPage, setCurrentPage]             = useState(1);
+  const [totalPages, setTotalPages]               = useState(1);
+  const [totalBusinesses, setTotalBusinesses]     = useState(0);
+  const BUSINESS_PAGE_SIZE = 20;
   const [expandedBusinesses, setExpandedBusinesses] = useState({});
   const [businessOffers, setBusinessOffers]       = useState({});
   const [offersLoading, setOffersLoading]         = useState({});
@@ -118,7 +123,7 @@ export default function AdminBusinessManagement() {
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
-  useEffect(() => { fetchBusinesses(); }, []);
+  useEffect(() => { fetchBusinesses(currentPage); }, [currentPage]);
 
   const addPublicSurveyRow = () => {
     setVoucherForm((prev) => ({
@@ -146,11 +151,14 @@ export default function AdminBusinessManagement() {
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
-  const fetchBusinesses = async () => {
+  const fetchBusinesses = async (page = currentPage) => {
     try {
       setLoading(true);
-      const res = await adminAPI.getBusinesses();
+      const res = await adminAPI.getBusinesses({ page, limit: BUSINESS_PAGE_SIZE, skipErrorToast: true });
       setBusinesses(res.data.data || []);
+      setCurrentPage(res.data.pagination?.currentPage || page);
+      setTotalPages(res.data.pagination?.totalPages || 1);
+      setTotalBusinesses(res.data.pagination?.total || 0);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load businesses');
@@ -162,7 +170,7 @@ export default function AdminBusinessManagement() {
   const fetchOffers = async (businessId) => {
     try {
       setOffersLoading(prev => ({ ...prev, [businessId]: true }));
-      const res = await adminAPI.getVoucherOffers({ businessId });
+      const res = await adminAPI.getVoucherOffers({ businessId, skipErrorToast: true });
       setBusinessOffers(prev => ({ ...prev, [businessId]: res.data.data || [] }));
     } catch (err) {
       console.error(err);
@@ -183,7 +191,7 @@ export default function AdminBusinessManagement() {
   const fetchAvailableSurveys = async () => {
     try {
       setSurveysLoading(true);
-      const res = await sepSurveyAPI.getAvailable({ limit: 100 });
+      const res = await sepSurveyAPI.getAvailable({ limit: 100, skipErrorToast: true });
       setAvailableSurveys(res.data.data || []);
       setSurveysLoaded(true);
     } catch (err) {
@@ -604,7 +612,7 @@ export default function AdminBusinessManagement() {
                       <div className="relative shrink-0">
                         <div className="w-14 h-14 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center">
                           {business.logo ? (
-                            <img src={business.logo} alt={`${business.name} logo`} className="w-full h-full object-contain" />
+                            <img src={business.logo} alt={`${business.name} logo`} loading="lazy" decoding="async" className="w-full h-full object-contain" />
                           ) : (
                             <Building2 className="h-5 w-5 text-gray-300" />
                           )}
@@ -799,6 +807,14 @@ export default function AdminBusinessManagement() {
             })}
           </div>
         )}
+        <Pagination
+          page={currentPage}
+          totalPages={totalPages}
+          total={totalBusinesses}
+          pageSize={BUSINESS_PAGE_SIZE}
+          onChange={setCurrentPage}
+          label="businesses"
+        />
       </div>
 
       {/* ════════════════════════════════════════════════════════════════════

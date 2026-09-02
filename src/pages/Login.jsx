@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import toast from 'react-hot-toast';
-import { isAuthenticated, redirectToProfile } from "../utils/auth";
+import { getPostLoginPath } from "../utils/auth";
+import { useAuth } from "../context/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import { Loader2 } from 'lucide-react';
@@ -25,27 +26,37 @@ const loginSchema = z.object({
 
 const Login = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('user');
+  const [loginError, setLoginError] = useState('');
 
   useEffect(() => {
-    // Already logged in as a business — send straight to dashboard
+    const oauthError = searchParams.get('error');
+    if (oauthError) {
+      setLoginError(
+        oauthError === 'google_auth_failed'
+          ? 'Google sign-in failed. Please try again.'
+          : 'Sign-in failed. Please try again.'
+      );
+    }
+  }, [searchParams]);
+
+  useEffect(() => {
     if (localStorage.getItem('is_business') === 'true') {
       navigate('/business/dashboard', { replace: true });
       return;
     }
-    // Already logged in as a regular user
-    if (isAuthenticated()) {
-      toast.error("You're already logged in!");
-      setTimeout(() => {
-        redirectToProfile(navigate);
-      }, 1000);
+    if (!authLoading && user) {
+      navigate(getPostLoginPath(user), { replace: true });
     }
-  }, [navigate]);
+  }, [navigate, user, authLoading]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [needsVerification, setNeedsVerification] = useState(false);
   const [attemptedEmail, setAttemptedEmail] = useState('');
   const [isResending, setIsResending] = useState(false);
+  const [resendError, setResendError] = useState('');
 
   const [bizEmail, setBizEmail] = useState('');
   const [bizPassword, setBizPassword] = useState('');
@@ -63,6 +74,7 @@ const Login = () => {
   const onSubmit = async (data) => {
     setIsLoading(true);
     setNeedsVerification(false);
+    setLoginError('');
     setAttemptedEmail(data.username);
 
     try {
@@ -94,7 +106,7 @@ const Login = () => {
 
       window.dispatchEvent(new Event('authChange'));
       toast.success("Login successful!");
-      navigate('/');
+      navigate(getPostLoginPath(userData), { replace: true });
 
     } catch (error) {
       const errorMessage = error.response?.data?.message ||
@@ -104,7 +116,7 @@ const Login = () => {
       if (errorMessage.includes('verify your email')) {
         setNeedsVerification(true);
       } else {
-        toast.error(errorMessage);
+        setLoginError(errorMessage);
       }
     } finally {
       setIsLoading(false);
@@ -113,11 +125,14 @@ const Login = () => {
 
   const handleResend = async () => {
     setIsResending(true);
+    setResendError('');
     try {
       await axios.post(`${API_BASE_URL}/auth/resend-verification`, { email: attemptedEmail });
       toast.success('Verification email resent!');
-    } catch {
-      toast.error('Failed to resend verification email.');
+    } catch (error) {
+      setResendError(
+        error.response?.data?.message || 'Failed to resend verification email.'
+      );
     } finally {
       setIsResending(false);
     }
@@ -132,7 +147,10 @@ const Login = () => {
     setBizError('');
     setBizLoading(true);
     try {
-      const response = await businessAPI.login({ email: bizEmail, password: bizPassword });
+      const response = await businessAPI.login(
+        { email: bizEmail, password: bizPassword },
+        { skipErrorToast: true, skipAuthRedirect: true }
+      );
 
       // Store business session flags so the navbar and guard can detect the session
       localStorage.setItem('is_business', 'true');
@@ -238,6 +256,10 @@ const Login = () => {
                     </div>
                   </div>
 
+                  {loginError && (
+                    <p className="text-sm text-red-500 font-medium">{loginError}</p>
+                  )}
+
                   {needsVerification && (
                     <div className="bg-yellow-50 p-4 rounded-lg">
                       <p className="text-yellow-700 mb-2">Please verify your email to login.</p>
@@ -256,6 +278,9 @@ const Login = () => {
                           </div>
                         ) : 'Resend Verification Email'}
                       </button>
+                      {resendError && (
+                        <p className="text-sm text-red-500 font-medium mt-2">{resendError}</p>
+                      )}
                     </div>
                   )}
 

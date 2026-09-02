@@ -6,6 +6,7 @@ import { businessAPI, userAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import VoucherRedeemModal from '../components/widgets/VoucherRedeemModal';
 import { instagramUrl, instagramLabel, websiteUrl } from '../utils/merchantLinks';
+import usePageMeta from '../hooks/usePageMeta';
 
 const formatHours = (hours) => {
   if (!hours?.open && !hours?.close) return null;
@@ -29,17 +30,19 @@ export default function MerchantPublicProfile() {
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [userCredits, setUserCredits] = useState(0);
   const [posterIndex, setPosterIndex] = useState(0);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     const load = async () => {
+      setLoading(true);
       try {
-        const { data } = await businessAPI.getPublicProfile(id);
+        const { data } = await businessAPI.getPublicProfile(id, { skipErrorToast: true });
         setBusiness(data.data.business);
         setOffers(data.data.offers || []);
         const token = localStorage.getItem('access_token');
         if (token) {
           try {
-            const profileRes = await userAPI.getProfile({ skipAuthRedirect: true });
+            const profileRes = await userAPI.getProfile({ skipAuthRedirect: true, skipErrorToast: true });
             setUserCredits(
               profileRes.data?.data?.user?.credits ??
                 profileRes.data?.user?.credits ??
@@ -50,13 +53,24 @@ export default function MerchantPublicProfile() {
           }
         }
       } catch (err) {
+        setBusiness(null);
         toast.error(err.response?.data?.message || 'Store not found');
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [id]);
+  }, [id, retryTick]);
+
+  const displayName = business?.brandName || business?.name;
+  usePageMeta({
+    title: displayName || 'Partner store',
+    description: business?.description
+      ? String(business.description).slice(0, 160)
+      : 'View this eRuchi partner store and redeem credit rewards.',
+    index: Boolean(business),
+    canonicalPath: `/shop/merchant/${id}`,
+  });
 
   const posters = business?.posters?.filter(Boolean) || [];
 
@@ -98,12 +112,19 @@ export default function MerchantPublicProfile() {
         <button onClick={() => navigate('/shop')} className="flex items-center gap-1 text-sm text-gray-500 mb-6">
           <ArrowLeft size={16} /> Back to shop
         </button>
-        <p className="text-gray-600">This store is not available.</p>
+        <p className="text-gray-600 mb-6">This store is not available.</p>
+        <button
+          type="button"
+          onClick={() => setRetryTick((n) => n + 1)}
+          className="rounded-full px-6 py-2.5 text-sm font-medium text-white"
+          style={{ backgroundColor: '#134074' }}
+        >
+          Retry
+        </button>
       </div>
     );
   }
 
-  const displayName = business.brandName || business.name;
   const hours = formatHours(business.operatingHours);
   const igHref = instagramUrl(business.instagram);
   const igLabel = instagramLabel(business.instagram);
@@ -135,6 +156,8 @@ export default function MerchantPublicProfile() {
                 key={i}
                 src={poster}
                 alt={`${displayName} poster ${i + 1}`}
+                loading={i === 0 ? 'eager' : 'lazy'}
+                decoding="async"
                 className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${
                   i === posterIndex ? 'opacity-100' : 'opacity-0'
                 }`}
@@ -159,9 +182,9 @@ export default function MerchantPublicProfile() {
         <div className="flex items-start gap-4 mb-6">
           <div className="w-20 h-20 rounded-2xl bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center shrink-0">
             {business.logo ? (
-              <img src={business.logo} alt={displayName} className="w-full h-full object-contain" />
+              <img src={business.logo} alt={displayName} loading="lazy" decoding="async" className="w-full h-full object-contain" />
             ) : (
-              <span className="text-3xl font-semibold text-gray-400">{displayName.charAt(0)}</span>
+              <span className="text-3xl font-semibold text-gray-400">{(displayName || 'S').charAt(0)}</span>
             )}
           </div>
           <div className="min-w-0">

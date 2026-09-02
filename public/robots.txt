@@ -1,0 +1,29 @@
+User-agent: *
+Allow: /
+Allow: /shop
+Allow: /shop/merchant/
+Allow: /for-business
+Allow: /faqs
+Allow: /terms
+Allow: /privacy-policy
+
+Disallow: /login
+Disallow: /signup
+Disallow: /reset-password
+Disallow: /profile
+Disallow: /edit-profile
+Disallow: /complete-basic-info
+Disallow: /complete-profile
+Disallow: /additional-profile
+Disallow: /email-verification
+Disallow: /vouchers
+Disallow: /campaigns
+Disallow: /campaign-history
+Disallow: /survey
+Disallow: /standalone-surveys
+Disallow: /standalone-survey
+Disallow: /survey-history
+Disallow: /admin
+Disallow: /business
+
+Sitemap: https://eruchi.com.np/sitemap.xml

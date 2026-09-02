@@ -39,12 +39,12 @@ import vendorPoster3 from "../assets/poster-3.webp";
 const HERO_BG = heroBg;
 
 const PARTNER_LOGOS = [
-  { name: "Ascend Climbing Gym", logo: ujamaa },
-  { name: "Himalayan Java", logo: himalayanHoney },
-  { name: "Wound & Catheter Care", logo: ascend },
-  { name: "Chronic-Condition Monitoring", logo: grannyDelicacies },
-  { name: "Chronic-Condition Monitoring", logo: dalucha },
-  { name: "Chronic-Condition Monitoring", logo: mamba },
+  { name: "Ujamaa Coffee & Bakery", logo: ujamaa },
+  { name: "Himalayan Honey", logo: himalayanHoney },
+  { name: "Ascend Climbing Gym", logo: ascend },
+  { name: "Granny's Delicacies", logo: grannyDelicacies },
+  { name: "dalucha cafe", logo: dalucha },
+  { name: "Mamba Sports Center", logo: mamba },
 ];
 
 const VENDOR_POSTERS = [
@@ -299,7 +299,7 @@ export default function Homepage() {
 
     (async () => {
       try {
-        const res = await userAPI.getProfile();
+        const res = await userAPI.getProfile({ skipErrorToast: true });
         const userData = res?.data?.data?.user;
         if (userData) {
           setCredits(userData.credits ?? 0);
@@ -313,7 +313,7 @@ export default function Homepage() {
     (async () => {
       setSurveysLoading(true);
       try {
-        const res = await sepSurveyAPI.getAvailable({ limit: 4 });
+        const res = await sepSurveyAPI.getAvailable({ limit: 4, skipErrorToast: true });
         setSurveys(res.data.data || []);
       } catch (err) {
         console.error('Failed to load standalone surveys:', err);
@@ -586,6 +586,8 @@ export default function Homepage() {
                   key={i}
                   src={partner.logo}
                   alt={partner.name}
+                  loading="lazy"
+                  decoding="async"
                   className="h-6 sm:h-10 w-auto object-contain min-w-0 grayscale-0 opacity-100 sm:grayscale sm:opacity-60 sm:hover:grayscale-0 sm:hover:opacity-100 transition-all duration-300"
                 />
               ))}

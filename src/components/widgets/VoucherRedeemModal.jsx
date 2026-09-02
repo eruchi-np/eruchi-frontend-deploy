@@ -31,7 +31,7 @@ const getBrandPalette = (brandName = "") => {
   return TICKET_PALETTES[Math.abs(hash) % TICKET_PALETTES.length];
 };
 
-export default function VoucherRedeemModal({ offer, userCredits, onClose, onSuccess }) {
+export default function VoucherRedeemModal({ offer, userCredits, onClose, onSuccess, onRedeemed }) {
   const [step, setStep] = useState("confirm");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -54,6 +54,7 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
       const res = await voucherAPI.redeem(offer._id);
       setVoucher(res.data.voucher);
       setStep("success");
+      onRedeemed?.(res.data.voucher);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to redeem voucher");
     } finally {

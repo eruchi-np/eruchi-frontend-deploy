@@ -10,7 +10,7 @@ const VoucherManagement = ({ vouchers, voucherLoading, voucherStatusFilter, hand
 
   const handleOpenQR = async (voucherId, title) => {
     try {
-      const res = await adminAPI.getVoucherWithToken(voucherId);
+      const res = await adminAPI.getVoucherWithToken(voucherId, { skipErrorToast: true });
       const v = res.data.data;
       const qrValue = JSON.stringify({ v: v._id, t: v.redemptionToken });
       setQrModal({ qrValue, voucherId, title });

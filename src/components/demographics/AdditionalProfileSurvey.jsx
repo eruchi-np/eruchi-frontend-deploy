@@ -92,18 +92,27 @@ const OptionPill = ({ label, selected, onClick, multi }) => (
 const AdditionalProfileSurvey = ({ onComplete }) => {
   const { formData, updateField, toggleArrayField } = useAdditionalProfile();
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    setSubmitError('');
     try {
-      const response = await userAPI.updateAdditionalProfile(formData);
+      const response = await userAPI.updateAdditionalProfile(formData, { skipErrorToast: true });
       if (response.data.success) {
         toast.success('Thanks! Your answers have been saved.');
         onComplete?.();
+      } else {
+        setSubmitError(response.data.message || 'Failed to save your answers');
       }
     } catch (error) {
       console.error('Error:', error.response?.data);
-      toast.error(error.response?.data?.message || 'Failed to save your answers');
+      const data = error.response?.data;
+      setSubmitError(
+        data?.message ||
+        data?.errors?.[0]?.msg ||
+        'Failed to save your answers'
+      );
     } finally {
       setSubmitting(false);
     }
@@ -148,6 +157,10 @@ const AdditionalProfileSurvey = ({ onComplete }) => {
           </div>
         ))}
       </div>
+
+      {submitError && (
+        <p className="text-sm text-red-600 font-medium mt-6">{submitError}</p>
+      )}
 
       <div className="mt-10 pt-6 border-t border-gray-200 flex items-center justify-between">
         <button

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, lazy, Suspense } from 'react';
 import { createPortal } from 'react-dom';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import toast, { Toaster } from "react-hot-toast";
@@ -13,49 +13,48 @@ import ProfileCompletionGuard from './components/layout/ProfileCompletionGuard';
 import BusinessProtectedRoute from './pages/business/BusinessProtectedRoutes';
 import ScrollToTop from './components/layout/ScrollToTop';
 import BusinessAccessGuard from './components/layout/BusinessAccessGuard';
+import RouteFallback from './components/ui/RouteFallback';
+import { RouteErrorBoundary } from './components/layout/ErrorBoundary';
+import usePageMeta from './hooks/usePageMeta';
+import { getRouteMeta } from './utils/routeMeta';
 
-// Pages
-import Homepage from './pages/Homepage';
-import ForBusiness from './pages/ForBusiness.jsx';
-import FAQs from './pages/FAQs.jsx';
-import Signup from './pages/Signup';
-import Login from './pages/Login';
-import LoginSuccess from './pages/LoginSuccess';
-import Profile from './pages/Profile';
-import Campaigns from './pages/Campaigns';
-import Survey from './pages/Survey';
-import CampaignHistory from './pages/CampaignHistory';
-import CompleteProfile from './pages/CompleteProfile';
-import CompleteBasicInfo from './pages/CompleteBasicInfo';
-import EmailVerificationPending from './pages/EmailVerificationPending';
-import VerifyEmail from './pages/VerifyEmail';
-import StandaloneSurvey from './pages/StandaloneSurvey.jsx';
-import StandaloneSurveys from './pages/StandaloneSurveys.jsx';
-import SurveyHistory from './pages/SurveyHistory.jsx';
-import Shop from './pages/Shop.jsx';
-import Vouchers from './pages/Vouchers';
-import VoucherDetail from './pages/VoucherDetail';
-import EditProfile from './pages/EditProfile';
-import Terms from './pages/Terms';
-import PrivacyPolicy from './pages/LegalNotice';
-import CompleteAdditionalProfile from './pages/CompleteAdditionalProfile';
-
-// Admin
-import AdminDashboard from './pages/admin/AdminDashboard';
-import CreateCampaign from './pages/admin/CreateCampaign';
-import CreateSepSurvey from './pages/admin/CreateSepSurvey.jsx';
-import AdminBusinessManagement from './pages/admin/AdminBusinessManagement';
-
-// Business
-import BusinessScan from './pages/business/BusinessScan';
-import BusinessDashboard from './pages/business/BusinessDashboard';
-import BusinessProfile from './pages/business/BusinessProfile';
-import BusinessVoucherForm from './pages/business/BusinessVoucherForm';
-import MerchantPublicProfile from './pages/MerchantPublicProfile';
-
-// Public / auth pages
-import ResetPassword from './pages/ResetPassword';
-import ResetPasswordToken from './pages/ResetPasswordToken';
+const Homepage = lazy(() => import('./pages/Homepage'));
+const ForBusiness = lazy(() => import('./pages/ForBusiness.jsx'));
+const FAQs = lazy(() => import('./pages/FAQs.jsx'));
+const Signup = lazy(() => import('./pages/Signup'));
+const Login = lazy(() => import('./pages/Login'));
+const LoginSuccess = lazy(() => import('./pages/LoginSuccess'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Campaigns = lazy(() => import('./pages/Campaigns'));
+const Survey = lazy(() => import('./pages/Survey'));
+const CampaignHistory = lazy(() => import('./pages/CampaignHistory'));
+const CompleteProfile = lazy(() => import('./pages/CompleteProfile'));
+const CompleteBasicInfo = lazy(() => import('./pages/CompleteBasicInfo'));
+const EmailVerificationPending = lazy(() => import('./pages/EmailVerificationPending'));
+const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
+const StandaloneSurvey = lazy(() => import('./pages/StandaloneSurvey.jsx'));
+const StandaloneSurveys = lazy(() => import('./pages/StandaloneSurveys.jsx'));
+const SurveyComplete = lazy(() => import('./pages/SurveyComplete.jsx'));
+const SurveyHistory = lazy(() => import('./pages/SurveyHistory.jsx'));
+const Shop = lazy(() => import('./pages/Shop.jsx'));
+const Vouchers = lazy(() => import('./pages/Vouchers'));
+const VoucherDetail = lazy(() => import('./pages/VoucherDetail'));
+const EditProfile = lazy(() => import('./pages/EditProfile'));
+const Terms = lazy(() => import('./pages/Terms'));
+const PrivacyPolicy = lazy(() => import('./pages/LegalNotice'));
+const CompleteAdditionalProfile = lazy(() => import('./pages/CompleteAdditionalProfile'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const CreateCampaign = lazy(() => import('./pages/admin/CreateCampaign'));
+const CreateSepSurvey = lazy(() => import('./pages/admin/CreateSepSurvey.jsx'));
+const AdminBusinessManagement = lazy(() => import('./pages/admin/AdminBusinessManagement'));
+const BusinessScan = lazy(() => import('./pages/business/BusinessScan'));
+const BusinessDashboard = lazy(() => import('./pages/business/BusinessDashboard'));
+const BusinessProfile = lazy(() => import('./pages/business/BusinessProfile'));
+const BusinessVoucherForm = lazy(() => import('./pages/business/BusinessVoucherForm'));
+const MerchantPublicProfile = lazy(() => import('./pages/MerchantPublicProfile'));
+const ResetPassword = lazy(() => import('./pages/ResetPassword'));
+const ResetPasswordToken = lazy(() => import('./pages/ResetPasswordToken'));
+const NotFound = lazy(() => import('./pages/NotFound'));
 
 import { AnimationProvider } from './components/animations/AnimationContext';
 import PageTransition from './components/animations/PageTransition';
@@ -63,6 +62,11 @@ import PageTransition from './components/animations/PageTransition';
 function RouteChangeHandler() {
   const location = useLocation();
   const isFirstLoad = useRef(true);
+  const isMerchantPage = location.pathname.startsWith('/shop/merchant/');
+  usePageMeta({
+    ...getRouteMeta(location.pathname, location.search),
+    skip: isMerchantPage,
+  });
 
   useEffect(() => {
     toast.dismiss();
@@ -106,6 +110,8 @@ function App() {
         <BusinessAccessGuard />
 
         <div className="min-w-0 max-w-full overflow-x-hidden">
+        <RouteErrorBoundary>
+        <Suspense fallback={<RouteFallback />}>
         <Routes>
           <Route element={<PageTransition />}>
             {/* ==================== PUBLIC ROUTES ==================== */}
@@ -222,6 +228,15 @@ function App() {
             />
 
             <Route
+              path="/survey-complete"
+              element={
+                <ProtectedRoute requireProfileComplete={true}>
+                  <SurveyComplete />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
               path="/survey-history"
               element={
                 <ProtectedRoute requireProfileComplete={true}>
@@ -303,15 +318,7 @@ function App() {
 
             <Route path="/business/login" element={<Navigate to="/login" replace />} />
 
-            {/* 404 */}
-            <Route
-              path="*"
-              element={
-                <div className="text-center py-20 text-2xl">
-                  404 - Page Not Found
-                </div>
-              }
-            />
+            <Route path="*" element={<NotFound />} />
           </Route>
           
           <Route
@@ -323,6 +330,8 @@ function App() {
             }
           />
         </Routes>
+        </Suspense>
+        </RouteErrorBoundary>
 
         <Footer />
         </div>
