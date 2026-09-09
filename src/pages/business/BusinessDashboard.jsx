@@ -2,6 +2,17 @@ import React, { useEffect, useState } from "react";
 import { businessAPI } from "../../services/api";
 import { useNavigate } from "react-router-dom";
 import { ScanLine, Upload, Plus, Pencil, Store } from "lucide-react";
+import { discountLabel, formatRs } from "../../utils/billMath";
+
+const scanOffer = (scan) =>
+  scan.offer ||
+  scan.voucherOffer ||
+  scan.offerSnapshot ||
+  scan.snapshot || {
+    discountType: scan.discountType,
+    discountValue: scan.discountValue,
+    title: scan.title || scan.offerTitle,
+  };
 
 export default function BusinessDashboard() {
   const [loading, setLoading] = useState(true);
@@ -193,13 +204,23 @@ export default function BusinessDashboard() {
                 <div className="p-4 text-gray-500">No scan activity yet.</div>
               ) : (
                 <div>
-                  {stats.recentScans.map((scan, index) => (
+                  {stats.recentScans.map((scan, index) => {
+                    const amountText =
+                      scan.billAmountAfterDiscount != null && scan.billAmountAfterDiscount !== ""
+                        ? formatRs(scan.billAmountAfterDiscount)
+                        : "";
+                    const label = discountLabel(scanOffer(scan));
+                    const headline = amountText
+                      ? (label ? `${amountText} · ${label}` : amountText)
+                      : scan.outcome || "Unknown";
+
+                    return (
                     <div
                       key={index}
                       className="p-4 border-b last:border-b-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
                     >
                       <div>
-                        <p className="font-medium">{scan.outcome || "Unknown"}</p>
+                        <p className="font-medium">{headline}</p>
                         <p className="text-sm text-gray-500">
                           {scan.attemptedAt
                             ? new Date(scan.attemptedAt).toLocaleString()
@@ -216,7 +237,8 @@ export default function BusinessDashboard() {
                         {scan.outcome}
                       </span>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </>
