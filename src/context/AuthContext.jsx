@@ -50,7 +50,7 @@ export const AuthProvider = ({ children }) => {
       if (err.response?.status === 401) {
         localStorage.removeItem('access_token');
         localStorage.removeItem('email');
-        localStorage.setItem('username');
+        localStorage.removeItem('username');
         localStorage.removeItem('user_id');
         localStorage.removeItem('auth_method');
         setUser(null);

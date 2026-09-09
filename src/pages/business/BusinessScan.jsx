@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, XCircle, ScanLine, LayoutDashboard } from "lucide-react";
 import { businessAPI } from "../../services/api";
+import { applyVoucherDiscount, parseBillAmount } from "../../utils/billMath";
 
 const RESULT_IDLE = null;
 
@@ -13,14 +14,22 @@ export default function BusinessScan() {
   const [scanError, setScanError] = useState(null);
   const [mode, setMode] = useState("qr"); // "qr" | "code"
   const [codeInput, setCodeInput] = useState("");
+  const [billAmount, setBillAmount] = useState("");
+  const [billError, setBillError] = useState(null);
   const scannerRef = useRef(null);
   const html5QrcodeRef = useRef(null);
 
-  const processResult = async (voucherId, redemptionToken) => {
+  const parsedBill = parseBillAmount(billAmount);
+  const billPreview =
+    result?.type === "pending" && parsedBill != null
+      ? applyVoucherDiscount(parsedBill, result.data?.discountType, result.data?.discountValue)
+      : null;
+
+  const processResult = async (voucherId, redemptionToken, amount) => {
     setLoading(true);
     setResult(null);
     try {
-      const res = await businessAPI.scan({ voucherId, redemptionToken });
+      const res = await businessAPI.scan({ voucherId, redemptionToken, billAmount: amount });
       setResult({ type: "success", data: res.data });
     } catch (err) {
       const status = err.response?.status;
@@ -42,6 +51,8 @@ export default function BusinessScan() {
   const previewVoucher = async (voucherId, redemptionToken) => {
     setLoading(true);
     setResult(null);
+    setBillAmount("");
+    setBillError(null);
     try {
       const res = await businessAPI.previewScan(voucherId, redemptionToken);
       setResult({ type: "pending", voucherId, redemptionToken, data: res.data.data });
@@ -64,7 +75,12 @@ export default function BusinessScan() {
 
   const handleApprove = async () => {
     if (!result || result.type !== "pending") return;
-    await processResult(result.voucherId, result.redemptionToken);
+    const amount = parseBillAmount(billAmount);
+    if (amount == null) {
+      setBillError("Enter a valid total bill amount");
+      return;
+    }
+    await processResult(result.voucherId, result.redemptionToken, amount);
   };
 
   const startScanner = async () => {
@@ -117,6 +133,8 @@ export default function BusinessScan() {
   const handleReset = () => {
     setResult(RESULT_IDLE);
     setCodeInput("");
+    setBillAmount("");
+    setBillError(null);
   };
 
   const handleCodeSubmit = async (e) => {
@@ -126,6 +144,8 @@ export default function BusinessScan() {
 
     setLoading(true);
     setResult(null);
+    setBillAmount("");
+    setBillError(null);
     try {
       const res = await businessAPI.previewScanByCode(trimmed);
       setResult({
@@ -209,10 +229,39 @@ export default function BusinessScan() {
                 {result.data.description && (
                   <p className="text-sm text-gray-500 mt-2">{result.data.description}</p>
                 )}
+                <div className="mt-4 text-left">
+                  <label htmlFor="total-bill-amount" className="block text-sm font-medium text-gray-700 mb-1">
+                    Total bill amount
+                  </label>
+                  <input
+                    id="total-bill-amount"
+                    type="text"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder="Rs (before discount)"
+                    value={billAmount}
+                    onChange={(e) => {
+                      setBillAmount(e.target.value);
+                      setBillError(null);
+                    }}
+                    className="w-full text-center text-lg font-medium border border-gray-200 rounded-xl py-3 bg-white focus:outline-none focus:border-gray-400"
+                  />
+                  {billError && (
+                    <p className="text-xs text-red-500 mt-1">{billError}</p>
+                  )}
+                  {!billError && billAmount.trim() && parsedBill == null && (
+                    <p className="text-xs text-red-500 mt-1">Enter a valid amount (digits, optional 2 decimals)</p>
+                  )}
+                  {billPreview && (
+                    <p className="text-sm text-gray-600 mt-2">
+                      Discount Rs. {billPreview.discount.toFixed(2)} · Collect Rs. {billPreview.payable.toFixed(2)}
+                    </p>
+                  )}
+                </div>
                 <div className="flex gap-3 mt-4 justify-center">
                   <button
                     onClick={handleApprove}
-                    disabled={loading}
+                    disabled={loading || parsedBill == null}
                     className="px-6 py-2.5 rounded-full bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
                   >
                     {loading ? "Processing..." : "Approve"}

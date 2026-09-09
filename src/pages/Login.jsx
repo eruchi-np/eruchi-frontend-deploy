@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import toast from 'react-hot-toast';
-import { getPostLoginPath } from "../utils/auth";
+import { getPostLoginPath, persistAuthSession } from "../utils/auth";
 import { useAuth } from "../context/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
@@ -91,20 +91,17 @@ const Login = () => {
       if (!userData) throw new Error('Invalid login response');
 
       if (token) {
-        localStorage.setItem('access_token', token);
+        persistAuthSession(token, userData);
         Cookies.set("access_token", token, {
           expires: 1,
           secure: import.meta.env.PROD,
           sameSite: "Strict",
         });
       } else {
+        persistAuthSession(null, userData);
         localStorage.setItem('access_token', 'USE_COOKIE_AUTH');
         localStorage.setItem('auth_method', 'cookie');
       }
-
-      localStorage.setItem('email', userData.email);
-      localStorage.setItem('username', `${userData.firstName} ${userData.lastName}`);
-      localStorage.setItem('user_id', userData.id);
 
       window.dispatchEvent(new Event('authChange'));
       toast.success("Login successful!");

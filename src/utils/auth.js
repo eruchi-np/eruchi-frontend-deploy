@@ -15,6 +15,22 @@ export const redirectToProfile = (router) => {
   router('/profile');
 };
 
+/**
+ * Persist a user session. A real JWT is stored as access_token.
+ * Never sets USE_COOKIE_AUTH when a token is present (that would skip Bearer headers).
+ */
+export const persistAuthSession = (token, user) => {
+  if (token && token !== 'USE_COOKIE_AUTH') {
+    localStorage.setItem('access_token', token);
+    localStorage.setItem('auth_method', 'token');
+  }
+  if (user) {
+    localStorage.setItem('email', user.email || '');
+    localStorage.setItem('username', `${user.firstName || ''} ${user.lastName || ''}`.trim());
+    if (user.id != null) localStorage.setItem('user_id', user.id);
+  }
+};
+
 // Check if user is using cookie-based authentication (Google OAuth)
 export const isCookieAuth = () => {
   const authMethod = localStorage.getItem('auth_method');
