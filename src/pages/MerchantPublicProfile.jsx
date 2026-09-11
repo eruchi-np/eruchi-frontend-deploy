@@ -39,18 +39,15 @@ export default function MerchantPublicProfile() {
         const { data } = await businessAPI.getPublicProfile(id, { skipErrorToast: true });
         setBusiness(data.data.business);
         setOffers(data.data.offers || []);
-        const token = localStorage.getItem('access_token');
-        if (token) {
-          try {
-            const profileRes = await userAPI.getProfile({ skipAuthRedirect: true, skipErrorToast: true });
-            setUserCredits(
-              profileRes.data?.data?.user?.credits ??
-                profileRes.data?.user?.credits ??
-                0
-            );
-          } catch {
-            setUserCredits(user?.credits || 0);
-          }
+        try {
+          const profileRes = await userAPI.getProfile({ skipAuthRedirect: true, skipErrorToast: true });
+          setUserCredits(
+            profileRes.data?.data?.user?.credits ??
+              profileRes.data?.user?.credits ??
+              0
+          );
+        } catch {
+          setUserCredits(user?.credits || 0);
         }
       } catch (err) {
         setBusiness(null);

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { attachCsrf } from '../utils/csrf';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -8,16 +9,9 @@ const api = axios.create({
   withCredentials: true,
 });
 
-// Add token to requests
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
-  const authMethod = localStorage.getItem('auth_method');
-  
-  if (token && authMethod !== 'cookie' && token !== 'USE_COOKIE_AUTH') {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+attachCsrf(api);
+
+api.interceptors.request.use((config) => config);
 
 api.interceptors.response.use(
   (response) => response,
@@ -30,7 +24,7 @@ api.interceptors.response.use(
       if (isBusinessRequest) {
         localStorage.removeItem('is_business');
         localStorage.removeItem('business_name');
-        window.location.href = '/business/login';
+        window.location.href = '/login';
       } else {
         localStorage.removeItem('access_token');
         localStorage.removeItem('email');
@@ -113,6 +107,15 @@ export const adminAPI = {
     headers: { 'Content-Type': 'multipart/form-data' },
     ...config,
   }),
+  getFaqs: (options = {}) => getRequest('/admin/faqs', options),
+  createFaq: (data, config = {}) => api.post('/admin/faqs', data, config),
+  updateFaq: (id, data, config = {}) => api.put(`/admin/faqs/${id}`, data, config),
+  deleteFaq: (id, config = {}) => api.delete(`/admin/faqs/${id}`, config),
+  reorderFaq: (id, direction, config = {}) => api.put(`/admin/faqs/${id}/reorder`, { direction }, config),
+};
+
+export const faqAPI = {
+  getAll: (config = {}) => api.get('/faqs', config),
 };
 
 export const sepSurveyAPI = {

@@ -11,8 +11,10 @@ import { authAPI } from '../services/api';
 const resetPasswordSchema = z.object({
   password: z
     .string()
-    .min(6, 'Password must be at least 6 characters long')
-    .max(50, 'Password must be less than 50 characters'),
+    .min(8, 'Password must be at least 8 characters long')
+    .max(128, 'Password must be less than 128 characters')
+    .regex(/[A-Za-z]/, 'Password must include a letter')
+    .regex(/\d/, 'Password must include a number'),
   confirmPassword: z.string().min(1, 'Please confirm your password'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",

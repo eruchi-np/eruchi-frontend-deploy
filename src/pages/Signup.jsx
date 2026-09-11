@@ -16,7 +16,11 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const formSchema = z.object({
   firstName: z.string().min(2, "First Name must be at least 2 characters").max(50),
   lastName: z.string().min(2, "Last Name must be at least 2 characters").max(50),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+  password: z
+    .string()
+    .min(8, "Password must be at least 8 characters")
+    .regex(/[A-Za-z]/, "Password must include a letter")
+    .regex(/\d/, "Password must include a number"),
   confirmPassword: z.string().min(1, "Confirm Password is required"),
   phone: z.string().regex(/^\+?\d{9,15}$/, "Phone Number must be valid (9–15 digits, optional +)"),
   email: z.string().email("Invalid email address"),

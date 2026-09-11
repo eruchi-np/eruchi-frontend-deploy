@@ -1,7 +1,6 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
-import Cookies from 'js-cookie';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -13,49 +12,38 @@ export const useAuth = () => {
   return context;
 };
 
+const SESSION_HINT = 'USE_COOKIE_AUTH';
+
+const clearSessionHint = () => {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('email');
+  localStorage.removeItem('username');
+  localStorage.removeItem('user_id');
+  localStorage.removeItem('auth_method');
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const refreshUser = async () => {
-    const token = localStorage.getItem('access_token');
-    const authMethod = localStorage.getItem('auth_method');
-    
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
-
     try {
-      let res;
-      const config = { withCredentials: true };
-
-      if (authMethod === 'cookie' || token === 'USE_COOKIE_AUTH') {
-        res = await axios.get(`${API_BASE_URL}/users/me`, config);
-      } else {
-        config.headers = { Authorization: `Bearer ${token}` };
-        res = await axios.get(`${API_BASE_URL}/users/me`, config);
-      }
-      
+      const res = await axios.get(`${API_BASE_URL}/users/me`, { withCredentials: true });
       const userData = res.data.data.user;
       setUser(userData);
-      // Sync localStorage for legacy components
+      localStorage.setItem('access_token', SESSION_HINT);
+      localStorage.setItem('auth_method', 'cookie');
       localStorage.setItem('username', `${userData.firstName} ${userData.lastName}`);
       localStorage.setItem('email', userData.email);
       localStorage.setItem('user_id', userData.id);
     } catch (err) {
       console.error('Failed to fetch user:', err);
-      
+
       if (err.response?.status === 401) {
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('email');
-        localStorage.removeItem('username');
-        localStorage.removeItem('user_id');
-        localStorage.removeItem('auth_method');
+        clearSessionHint();
         setUser(null);
       }
-      
+
       if (err.response?.status === 429) {
         console.warn('Rate limited on user fetch - retrying later');
       }
@@ -64,11 +52,10 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // On mount + events
   useEffect(() => {
     refreshUser();
 
-    const interval = setInterval(refreshUser, 3 * 60 * 1000); // Refresh every 3 minutes
+    const interval = setInterval(refreshUser, 3 * 60 * 1000);
 
     const handleStorage = () => refreshUser();
     window.addEventListener('storage', handleStorage);
@@ -83,13 +70,15 @@ export const AuthProvider = ({ children }) => {
     };
   }, []);
 
-  const logout = () => {
-    localStorage.clear();
-    // Clear cookies
-    Cookies.remove('token');
-    Cookies.remove('access_token');
-    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-    document.cookie = 'access_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+  const logout = async () => {
+    try {
+      await axios.post(`${API_BASE_URL}/auth/logout`, {}, { withCredentials: true });
+    } catch {
+      // still clear locally
+    }
+    clearSessionHint();
+    localStorage.removeItem('is_business');
+    localStorage.removeItem('business_name');
     setUser(null);
     window.dispatchEvent(new Event('authChange'));
   };

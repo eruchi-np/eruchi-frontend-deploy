@@ -47,11 +47,9 @@ const CompleteBasicInfo = () => {
 
   // Redirect if already complete or no auth
   useEffect(() => {
-    const token = localStorage.getItem('access_token');
-
     if (authLoading) return;
 
-    if (!token) {
+    if (!user) {
       navigate('/login', { replace: true });
       return;
     }
@@ -77,10 +75,7 @@ const CompleteBasicInfo = () => {
     setSubmitting(true);
     setSubmitError('');
 
-    const token = localStorage.getItem('access_token');
-    const authMethod = localStorage.getItem('auth_method');
-
-    if (!token) {
+    if (!user) {
       setSubmitError("Authentication required. Redirecting to login...");
       navigate('/login', { replace: true });
       setSubmitting(false);
@@ -91,10 +86,6 @@ const CompleteBasicInfo = () => {
       const config = {
         withCredentials: true,
       };
-
-      if (token && token !== 'USE_COOKIE_AUTH' && authMethod !== 'cookie') {
-        config.headers = { Authorization: `Bearer ${token}` };
-      }
 
       await axios.put(
         `${API_BASE_URL}/users/me/basic-profile`,
