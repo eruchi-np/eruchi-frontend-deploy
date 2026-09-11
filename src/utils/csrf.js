@@ -16,6 +16,7 @@ export const ensureCsrfToken = async () => {
         csrfToken = res.data?.csrfToken || '';
         return csrfToken;
       })
+      .catch(() => '')
       .finally(() => {
         inflight = null;
       });
