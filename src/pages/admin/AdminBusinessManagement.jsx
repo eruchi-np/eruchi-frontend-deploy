@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import Pagination from '../../components/ui/Pagination';
 
 const NAVY = "#1B2A4A";
+const MAX_POSTERS = 5;
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -191,7 +192,7 @@ export default function AdminBusinessManagement() {
   const fetchAvailableSurveys = async () => {
     try {
       setSurveysLoading(true);
-      const res = await sepSurveyAPI.getAvailable({ limit: 100, skipErrorToast: true });
+      const res = await sepSurveyAPI.getAvailable({ limit: 100, manage: 1, skipErrorToast: true });
       setAvailableSurveys(res.data.data || []);
       setSurveysLoaded(true);
     } catch (err) {
@@ -1066,7 +1067,7 @@ export default function AdminBusinessManagement() {
                       className={inputCls}
                     />
                     <p className="text-[10px] text-gray-400 mt-1">
-                      Paste the Google Maps share URL. Rating is fetched now and refreshed weekly.
+                      Paste the Google Maps share URL (merchants can also add this on their profile). Rating is fetched when the link changes and refreshed weekly. Only admin can refresh on demand.
                     </p>
                   </div>
                   {editingBusiness && (
@@ -1123,7 +1124,7 @@ export default function AdminBusinessManagement() {
                         </button>
                       </div>
                     ))}
-                    {(editingBusiness.posters || []).length < 3 && (
+                    {(editingBusiness.posters || []).length < MAX_POSTERS && (
                       <label className="w-24 h-24 rounded-xl border border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 text-gray-400 cursor-pointer hover:border-gray-400 hover:bg-gray-50">
                         <Upload className="h-4 w-4" />
                         <span className="text-[10px] font-medium">{posterUploading ? 'Uploading…' : 'Add'}</span>
@@ -1140,7 +1141,7 @@ export default function AdminBusinessManagement() {
                       </label>
                     )}
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-2">Up to 3 images, 2MB each. Shown on the public store page.</p>
+                  <p className="text-[10px] text-gray-400 mt-2">Up to {MAX_POSTERS} images, 2MB each. Videos are not allowed. Shown on the public store page.</p>
                 </section>
               )}
 

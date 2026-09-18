@@ -4,11 +4,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import toast, { Toaster } from "react-hot-toast";
 
 // Layout & Components
-import Navbar from './components/homepage/Navbar';
-import ProfileCompletionBar from './components/layout/ProfileCompletionBar';
+import HomeNav from './components/homepage/HomeNav';
 import BottomNavigation from './components/layout/BottomNavigation';
 import Footer from './components/layout/Footer';
 import ProtectedRoute from './components/layout/ProtectedRoute';
+import AdminRoute from './components/layout/AdminRoute';
 import ProfileCompletionGuard from './components/layout/ProfileCompletionGuard';
 import BusinessProtectedRoute from './pages/business/BusinessProtectedRoutes';
 import ScrollToTop from './components/layout/ScrollToTop';
@@ -47,6 +47,7 @@ const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const CreateCampaign = lazy(() => import('./pages/admin/CreateCampaign'));
 const CreateSepSurvey = lazy(() => import('./pages/admin/CreateSepSurvey.jsx'));
 const AdminBusinessManagement = lazy(() => import('./pages/admin/AdminBusinessManagement'));
+const AdminFaqManagement = lazy(() => import('./pages/admin/AdminFaqManagement.jsx'));
 const BusinessScan = lazy(() => import('./pages/business/BusinessScan'));
 const BusinessDashboard = lazy(() => import('./pages/business/BusinessDashboard'));
 const BusinessProfile = lazy(() => import('./pages/business/BusinessProfile'));
@@ -58,6 +59,35 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 
 import { AnimationProvider } from './components/animations/AnimationContext';
 import PageTransition from './components/animations/PageTransition';
+
+function AppChrome({ children }) {
+  const { pathname } = useLocation();
+  const isHome = pathname === '/';
+  const isProfile = pathname === '/profile';
+  const isShop = pathname === '/shop';
+  const isSurveys = pathname === '/standalone-surveys';
+  const isBusiness = pathname.startsWith('/business');
+  const isOnboarding =
+    pathname === '/complete-basic-info' ||
+    pathname === '/complete-profile' ||
+    pathname === '/additional-profile' ||
+    pathname === '/login' ||
+    pathname === '/signup' ||
+    pathname === '/email-verification';
+  const overlayNav = isHome || isProfile || isShop || isSurveys || isOnboarding;
+  const navVariant = overlayNav ? 'overlay' : 'page';
+
+  return (
+    <>
+      {!isBusiness && <HomeNav variant={navVariant} />}
+      <BusinessAccessGuard />
+      <div className={`min-w-0 max-w-full ${overlayNav ? "overflow-x-clip" : "overflow-x-hidden"}`}>
+        {children}
+        {!isHome && !isProfile && !isShop && !isSurveys && !isBusiness && !isOnboarding && <Footer />}
+      </div>
+    </>
+  );
+}
 
 function RouteChangeHandler() {
   const location = useLocation();
@@ -98,18 +128,15 @@ function App() {
       document.body
     )}
     <AnimationProvider>
-      <Router>
+      <Router
+        future={{
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <RouteChangeHandler />
         <ScrollToTop />
-
-        <div className="sticky top-0 z-50">
-          <Navbar />
-          <ProfileCompletionBar />
-        </div>
-        
-        <BusinessAccessGuard />
-
-        <div className="min-w-0 max-w-full overflow-x-hidden">
+        <AppChrome>
         <RouteErrorBoundary>
         <Suspense fallback={<RouteFallback />}>
         <Routes>
@@ -125,7 +152,14 @@ function App() {
            <Route path="/faqs" element={<FAQs />} />
            <Route path="/email-verification" element={<EmailVerificationPending />} />
             <Route path="/verify-email/:token" element={<VerifyEmail />} />
-            <Route path="/edit-profile" element={<EditProfile />} />
+            <Route
+              path="/edit-profile"
+              element={
+                <ProtectedRoute>
+                  <EditProfile />
+                </ProtectedRoute>
+              }
+            />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
@@ -246,28 +280,65 @@ function App() {
             />
 
             {/* ==================== ADMIN ROUTES ==================== */}
-            <Route path="/admin" element={<AdminDashboard />} />
-            <Route path="/admin/create-campaign" element={<CreateCampaign />} />
-
             <Route
-              path="/admin/create-sep-survey"
+              path="/admin"
               element={
-                <ProtectedRoute>
-                  <CreateSepSurvey />
-                </ProtectedRoute>
+                <AdminRoute>
+                  <AdminDashboard />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/create-campaign"
+              element={
+                <AdminRoute>
+                  <CreateCampaign />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/edit-campaign/:campaignId"
+              element={
+                <AdminRoute>
+                  <CreateCampaign />
+                </AdminRoute>
               }
             />
 
             <Route
-             path="/admin/edit-sep-survey/:id"
-             element={
-               <ProtectedRoute>
-                 <CreateSepSurvey />
-               </ProtectedRoute>
-             }
-           />
+              path="/admin/create-sep-survey"
+              element={
+                <AdminRoute>
+                  <CreateSepSurvey />
+                </AdminRoute>
+              }
+            />
 
-            <Route path="/admin/businesses" element={<AdminBusinessManagement />} />
+            <Route
+              path="/admin/edit-sep-survey/:surveyId"
+              element={
+                <AdminRoute>
+                  <CreateSepSurvey />
+                </AdminRoute>
+              }
+            />
+
+            <Route
+              path="/admin/businesses"
+              element={
+                <AdminRoute>
+                  <AdminBusinessManagement />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/faqs"
+              element={
+                <AdminRoute>
+                  <AdminFaqManagement />
+                </AdminRoute>
+              }
+            />
 
             {/* ==================== BUSINESS ROUTES ==================== */}
 
@@ -333,8 +404,7 @@ function App() {
         </Suspense>
         </RouteErrorBoundary>
 
-        <Footer />
-        </div>
+        </AppChrome>
         <BottomNavigation />
       </Router>
     </AnimationProvider>

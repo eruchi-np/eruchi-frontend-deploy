@@ -1,95 +1,154 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { userAPI, adminAPI, sepSurveyAPI } from "../../services/api";
-import { Users, Package, Plus, ArrowLeft, Award, Clock, X, Building2, FileText } from "lucide-react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { adminAPI, sepSurveyAPI } from "../../services/api";
+import {
+  Users, Package, Plus, ArrowLeft, Award, Clock, X, Building2, FileText,
+  HelpCircle, CalendarDays, Ticket, ScanLine,
+} from "lucide-react";
 import toast from "react-hot-toast";
 
 import StatsGrid from "./components/StatsGrid.jsx";
 import SurveyExports from "./components/SurveyExports.jsx";
 import UserManagement from "./components/UserManagement.jsx";
+import UserDetailDrawer from "./components/UserDetailDrawer.jsx";
 import SurveyManagement from "./components/SurveyManagement.jsx";
+import SurveyCalendar from "./components/SurveyCalendar.jsx";
+import VoucherManagement from "./components/VoucherManagement.jsx";
+import ScanLogView from "./components/ScanLogView.jsx";
 
 const NAVY = "#1B2A4A";
+const TABS = [
+  { id: "users", label: "Users", icon: Users },
+  { id: "surveys", label: "Surveys", icon: FileText },
+  { id: "calendar", label: "Calendar", icon: CalendarDays },
+  { id: "vouchers", label: "Vouchers", icon: Ticket },
+  { id: "scans", label: "Scan log", icon: ScanLine },
+  { id: "survey_exports", label: "Timer export", icon: Clock },
+];
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "users";
+  const setActiveTab = (tab) => setSearchParams({ tab });
 
-  // Root States
-  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [users, setUsers] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
-  const [avgCredits, setAvgCredits] = useState(0);
+  const [dashboardStats, setDashboardStats] = useState(null);
   const [surveys, setSurveys] = useState([]);
-  const [activeTab, setActiveTab] = useState("users");
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [userQuery, setUserQuery] = useState({ status: "", q: "" });
   const pageSize = 50;
+
+  const [vouchers, setVouchers] = useState([]);
+  const [voucherLoading, setVoucherLoading] = useState(false);
+  const [voucherStatusFilter, setVoucherStatusFilter] = useState("active");
+  const [voucherPagination, setVoucherPagination] = useState(null);
+
+  const [scanLogs, setScanLogs] = useState([]);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanOutcome, setScanOutcome] = useState("");
+  const [scanPagination, setScanPagination] = useState(null);
+
+  const fetchStats = async () => {
+    try {
+      const res = await adminAPI.getStats({ skipErrorToast: true });
+      setDashboardStats(res.data.data);
+    } catch (err) {
+      console.error("Failed to fetch admin stats", err);
+    }
+  };
 
   const fetchSurveys = async () => {
     try {
-      const res = await sepSurveyAPI.getAvailable({ skipErrorToast: true });
+      const res = await sepSurveyAPI.getAvailable({ limit: 500, skipErrorToast: true });
       setSurveys(res.data.data || []);
     } catch (err) {
       console.error("Failed to fetch surveys", err);
     }
   };
 
-  useEffect(() => {
-    fetchSurveys();
-  }, []);
-
-  useEffect(() => {
-    const checkAdminAccess = async () => {
-      try {
-        const userResponse = await userAPI.getProfile({ skipErrorToast: true });
-        const userData = userResponse.data.data.user;
-
-        if (userData.role !== "admin") {
-          navigate("/profile");
-          return;
-        }
-        await fetchUsers("", 1);
-      } catch (error) {
-        console.error("Error checking admin access:", error);
-        if (error.response?.status === 401 || error.response?.status === 403) {
-          navigate("/profile");
-        } else {
-          setError("Failed to load admin dashboard");
-        }
-      } finally {
-        setLoading(false);
-      }
-    };
-    checkAdminAccess();
-  }, [navigate]);
-
-  const fetchUsers = async (status = "", page = 1) => {
+  const fetchUsers = useCallback(async (status = "", page = 1, q = "") => {
     try {
-      const params = {
+      setCurrentPage(page);
+      setUserQuery({ status, q });
+      const response = await adminAPI.getUsers({
         ...(status && { status }),
+        ...(q.trim() && { q: q.trim() }),
         page,
         limit: pageSize,
-      };
-      const response = await adminAPI.getUsers({
-        ...params,
         skipErrorToast: true,
       });
       setUsers(response.data.data);
-
       if (response.data.pagination) {
         setTotalPages(response.data.pagination.totalPages);
         setTotalUsers(response.data.pagination.totalUsers);
-        setAvgCredits(response.data.pagination.avgCredits ?? 0);
       } else {
         setTotalUsers(response.data.data.length);
         setTotalPages(1);
       }
-    } catch (error) {
-      console.error("Error fetching users:", error);
+    } catch (err) {
+      console.error("Error fetching users:", err);
       setError("Failed to load users data");
     }
+  }, []);
+
+  const fetchVouchers = async (status = voucherStatusFilter, page = 1) => {
+    setVoucherLoading(true);
+    try {
+      const res = await adminAPI.getVouchers({ status, page, limit: 20, skipErrorToast: true });
+      setVouchers(res.data.data || []);
+      setVoucherPagination(res.data.pagination || null);
+    } catch (err) {
+      toast.error("Failed to load vouchers");
+    } finally {
+      setVoucherLoading(false);
+    }
   };
+
+  const fetchScans = async (outcome = scanOutcome, page = 1) => {
+    setScanLoading(true);
+    try {
+      const res = await adminAPI.getScanLog({
+        ...(outcome && { outcome }),
+        page,
+        limit: 50,
+        skipErrorToast: true,
+      });
+      setScanLogs(res.data.data || []);
+      setScanPagination(res.data.pagination || null);
+    } catch (err) {
+      toast.error("Failed to load scan log");
+    } finally {
+      setScanLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const boot = async () => {
+      try {
+        await Promise.all([fetchUsers("", 1), fetchSurveys(), fetchStats()]);
+      } catch (err) {
+        setError("Failed to load admin dashboard");
+      } finally {
+        setLoading(false);
+      }
+    };
+    boot();
+  }, [fetchUsers]);
+
+  useEffect(() => {
+    if (activeTab === "campaigns") {
+      setActiveTab("users");
+      return;
+    }
+    if (activeTab === "vouchers") fetchVouchers(voucherStatusFilter, 1);
+    if (activeTab === "scans") fetchScans(scanOutcome, 1);
+  }, [activeTab]);
 
   const handleExportTimings = async (surveyId, title) => {
     try {
@@ -104,7 +163,6 @@ const AdminDashboard = () => {
       window.URL.revokeObjectURL(url);
       toast.success("CSV downloaded");
     } catch (err) {
-      console.error(err);
       toast.error(
         err.response?.status === 404
           ? "No timing data found for this survey"
@@ -117,9 +175,8 @@ const AdminDashboard = () => {
     try {
       await adminAPI.updateUserStatus(userId, { status: newStatus });
       toast.success(`User status updated to ${newStatus}`);
-      fetchUsers("", currentPage);
+      fetchUsers(userQuery.status, currentPage, userQuery.q);
     } catch (error) {
-      console.error("Error updating user status:", error);
       toast.error(error.response?.data?.message || "Failed to update user status");
     }
   };
@@ -127,21 +184,16 @@ const AdminDashboard = () => {
   const handleBulkUpdateStatus = async (userIds, newStatus) => {
     const loadingToast = toast.loading(`Updating ${userIds.length} user(s)...`);
     try {
-      const updatePromises = userIds.map((userId) =>
-        adminAPI.updateUserStatus(userId, { status: newStatus })
-      );
-      await Promise.all(updatePromises);
+      await Promise.all(userIds.map((userId) => adminAPI.updateUserStatus(userId, { status: newStatus })));
       toast.success(`Successfully updated ${userIds.length} user(s) to ${newStatus}`, { id: loadingToast });
-      fetchUsers("", currentPage);
+      fetchUsers(userQuery.status, currentPage, userQuery.q);
     } catch (error) {
-      console.error("Error in bulk update:", error);
       toast.error("Some updates failed. Please try again.", { id: loadingToast });
     }
   };
 
-  const handlePageChange = (newPage) => {
-    setCurrentPage(newPage);
-    fetchUsers("", newPage);
+  const handlePageChange = (newPage, status = userQuery.status, q = userQuery.q) => {
+    fetchUsers(status, newPage, q);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -155,9 +207,12 @@ const AdminDashboard = () => {
   };
 
   const stats = [
-    { label: "Total Users", value: totalUsers, icon: Users },
-    { label: "Active Campaigns", value: users.filter((u) => u.activeCampaign?.status).length, icon: Package },
-    { label: "Avg. Credits", value: avgCredits, icon: Award },
+    { label: "Total Users", value: dashboardStats?.totalUsers ?? totalUsers, icon: Users },
+    { label: "In a campaign", value: dashboardStats?.usersInCampaign ?? 0, icon: Package },
+    { label: "Live surveys", value: dashboardStats?.liveSurveys ?? 0, icon: FileText, to: "/admin?tab=surveys" },
+    { label: "Avg. Credits", value: dashboardStats?.avgCredits ?? 0, icon: Award },
+    { label: "Pending businesses", value: dashboardStats?.pendingBusinesses ?? 0, icon: Building2, to: "/admin/businesses" },
+    { label: "Redeemed (7d)", value: dashboardStats?.vouchersRedeemedWeek ?? 0, icon: Ticket, to: "/admin?tab=vouchers" },
   ];
 
   if (loading) {
@@ -190,8 +245,7 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Header Bar */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+      <div className="bg-white/80 backdrop-blur-md border-b border-transparent">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-3 sm:gap-4 min-w-0">
@@ -205,14 +259,14 @@ const AdminDashboard = () => {
             </div>
 
             <div className="flex items-center flex-wrap gap-2 sm:gap-3">
-              <button onClick={() => navigate("/admin/create-campaign")} className="flex items-center gap-2 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90" style={{ backgroundColor: NAVY }}>
-                <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New </span>Campaign
-              </button>
-              <button onClick={() => navigate("/admin/create-sep-survey")} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
+              <button onClick={() => navigate("/admin/create-sep-survey")} className="flex items-center gap-2 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90" style={{ backgroundColor: NAVY }}>
                 <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Standalone </span>Survey
               </button>
-              <button onClick={() => navigate('/admin/businesses')} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
+              <button onClick={() => navigate("/admin/businesses")} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
                 <Building2 className="h-4 w-4" /> Businesses
+              </button>
+              <button onClick={() => navigate("/admin/faqs")} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
+                <HelpCircle className="h-4 w-4" /> FAQs
               </button>
             </div>
           </div>
@@ -220,36 +274,23 @@ const AdminDashboard = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-28">
-        {/* Analytics Summary */}
         <StatsGrid stats={stats} NAVY={NAVY} />
 
-        {/* Dynamic Tab Selector */}
         <div className="flex gap-2 mb-8 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
-          <button
-            onClick={() => setActiveTab("users")}
-            className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl font-medium text-sm transition-colors shadow-sm shrink-0"
-            style={activeTab === "users" ? { backgroundColor: NAVY, color: "white" } : { backgroundColor: "white", color: "#4b5563", border: "1px solid #e5e7eb" }}
-          >
-            <Users className="h-4 w-4" /> Users
-          </button>
-          <button
-            onClick={() => setActiveTab("survey_exports")}
-            className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl font-medium text-sm transition-colors shadow-sm shrink-0"
-            style={activeTab === "survey_exports" ? { backgroundColor: NAVY, color: "white" } : { backgroundColor: "white", color: "#4b5563", border: "1px solid #e5e7eb" }}
-          >
-            <Clock className="h-4 w-4" /> Survey Timer Export
-          </button>
-          <button
-            onClick={() => setActiveTab("surveys")}
-            className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl font-medium text-sm transition-colors shadow-sm shrink-0"
-            style={activeTab === "surveys" ? { backgroundColor: NAVY, color: "white" } : { backgroundColor: "white", color: "#4b5563", border: "1px solid #e5e7eb" }}
-          >
-            <FileText className="h-4 w-4" /> Surveys
-          </button>
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className="flex items-center gap-2 px-4 sm:px-5 py-2.5 rounded-xl font-medium text-sm transition-colors shadow-sm shrink-0"
+              style={activeTab === tab.id ? { backgroundColor: NAVY, color: "white" } : { backgroundColor: "white", color: "#4b5563", border: "1px solid #e5e7eb" }}
+            >
+              <tab.icon className="h-4 w-4" /> {tab.label}
+            </button>
+          ))}
         </div>
 
-        {/* View Switch Rendering */}
-        {activeTab === "users" ? (
+        {activeTab === "users" && (
           <UserManagement
             users={users}
             fetchUsers={fetchUsers}
@@ -262,13 +303,59 @@ const AdminDashboard = () => {
             handleBulkUpdateStatus={handleBulkUpdateStatus}
             getStatusColor={getStatusColor}
             NAVY={NAVY}
+            onSelectUser={setSelectedUserId}
           />
-        ) : activeTab === "survey_exports" ? (
-          <SurveyExports surveys={surveys} handleExportTimings={handleExportTimings} />
-        ) : (
+        )}
+        {activeTab === "surveys" && (
           <SurveyManagement surveys={surveys} refetchSurveys={fetchSurveys} NAVY={NAVY} />
         )}
+        {activeTab === "calendar" && (
+          <SurveyCalendar surveys={surveys} refetchSurveys={fetchSurveys} NAVY={NAVY} />
+        )}
+        {activeTab === "vouchers" && (
+          <VoucherManagement
+            vouchers={vouchers}
+            voucherLoading={voucherLoading}
+            voucherStatusFilter={voucherStatusFilter}
+            handleVoucherStatusFilter={(status) => {
+              setVoucherStatusFilter(status);
+              fetchVouchers(status, 1);
+            }}
+            pagination={voucherPagination}
+            onPageChange={(page) => fetchVouchers(voucherStatusFilter, page)}
+            NAVY={NAVY}
+          />
+        )}
+        {activeTab === "scans" && (
+          <ScanLogView
+            logs={scanLogs}
+            loading={scanLoading}
+            outcomeFilter={scanOutcome}
+            onOutcomeFilter={(outcome) => {
+              setScanOutcome(outcome);
+              fetchScans(outcome, 1);
+            }}
+            pagination={scanPagination}
+            onPageChange={(page) => fetchScans(scanOutcome, page)}
+            NAVY={NAVY}
+          />
+        )}
+        {activeTab === "survey_exports" && (
+          <SurveyExports surveys={surveys} handleExportTimings={handleExportTimings} />
+        )}
       </div>
+
+      {selectedUserId && (
+        <UserDetailDrawer
+          userId={selectedUserId}
+          onClose={() => setSelectedUserId(null)}
+          NAVY={NAVY}
+          onCreditsChanged={() => {
+            fetchUsers(userQuery.status, currentPage, userQuery.q);
+            fetchStats();
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -1,6 +1,7 @@
 // src/components/layout/Footer.jsx
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { SUPPORT_EMAIL } from '../../utils/siteConfig';
 
 const Footer = () => {
   const year = new Date().getFullYear();
@@ -19,10 +20,10 @@ const Footer = () => {
               Earn rewards by sharing your opinions.
             </p>
             <a
-              href="mailto:support@eruchi.com.np"
+              href={`mailto:${SUPPORT_EMAIL}`}
               className="inline-block mt-2 text-[11px] text-gray-500 hover:text-[#3399FF] transition-colors"
             >
-              support@eruchi.com.np
+              {SUPPORT_EMAIL}
             </a>
           </div>
 
@@ -85,10 +86,10 @@ const Footer = () => {
                 Earn rewards by sharing your opinions. Nepal's trusted survey platform.
               </p>
               <a
-                href="mailto:support@eruchi.com.np"
+                href={`mailto:${SUPPORT_EMAIL}`}
                 className="inline-block mt-3 text-[11px] text-gray-500 hover:text-[#3399FF] transition-colors"
               >
-                support@eruchi.com.np
+                {SUPPORT_EMAIL}
               </a>
             </div>
 

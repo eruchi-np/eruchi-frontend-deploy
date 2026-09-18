@@ -12,35 +12,39 @@ function SolidFlame({ className, style }) {
 }
 
 export default function StreakCelebration({ from = 0, to = 0 }) {
-  const target = Math.max(Number(to) || 0, Number(from) || 0);
-  const start = Number(from) || 0;
+  const start = Math.max(0, Number(from) || 0);
+  const target = Math.max(0, Number(to) || 0);
   const increased = target > start;
   const [display, setDisplay] = useState(increased ? start : target);
-  const [popping, setPopping] = useState(false);
+  const [phase, setPhase] = useState(increased ? "idle" : "settled");
 
   useEffect(() => {
     if (!increased) {
       setDisplay(target);
+      setPhase("settled");
       return undefined;
     }
 
+    setDisplay(start);
+    setPhase("idle");
     let frame;
     const startTimer = setTimeout(() => {
+      setPhase("ticking");
       const startedAt = performance.now();
-      const duration = 900;
+      const duration = Math.min(1400, 550 + Math.abs(target - start) * 380);
       const tick = (now) => {
         const progress = Math.min(1, (now - startedAt) / duration);
         const eased = 1 - (1 - progress) ** 3;
-        const next = Math.round(start + (target - start) * eased);
-        setDisplay(next);
+        const next = start + (target - start) * eased;
+        setDisplay(progress >= 1 ? target : Math.floor(next));
         if (progress < 1) {
           frame = requestAnimationFrame(tick);
         } else {
-          setPopping(true);
+          setPhase("popped");
         }
       };
       frame = requestAnimationFrame(tick);
-    }, 350);
+    }, 700);
 
     return () => {
       clearTimeout(startTimer);
@@ -50,25 +54,48 @@ export default function StreakCelebration({ from = 0, to = 0 }) {
 
   const active = display > 0;
   const days = Array.from({ length: 7 }, (_, i) => i < Math.min(display, 7));
+  const popping = phase === "popped";
+  const animating = increased && phase !== "settled";
 
   return (
     <div className="flex flex-col items-center">
       <div
-        className={`inline-flex items-center gap-3 rounded-full border border-orange-200 bg-orange-50/80 pl-4 pr-5 py-3 shadow-sm transition-transform duration-300 ${
-          popping ? "scale-105" : "scale-100"
+        className={`relative inline-flex items-center gap-3 rounded-full border pl-4 pr-5 py-3 shadow-sm ${
+          animating
+            ? "border-orange-300 bg-orange-50"
+            : "border-orange-200 bg-orange-50/80"
         }`}
+        style={{
+          animation: popping ? "streak-pop 520ms ease-out" : undefined,
+          boxShadow: popping
+            ? "0 10px 28px rgba(249, 115, 22, 0.28)"
+            : undefined,
+        }}
         aria-label={`${display} day streak`}
       >
-        <SolidFlame
-          className={`transition-transform duration-500 ${
-            popping || increased ? "text-orange-500 scale-110" : active ? "text-orange-500" : "text-gray-300"
-          }`}
-          style={{ width: 28, height: 28 }}
-        />
-        <span className="flex items-baseline gap-1.5">
+        {popping && (
           <span
-            className="text-[28px] font-bold leading-none tabular-nums transition-all"
-            style={{ color: active ? "#134074" : "#9CA3AF" }}
+            className="absolute -top-3 right-6 rounded-full bg-orange-500 px-2 py-0.5 text-[11px] font-bold text-white shadow-sm"
+            style={{ animation: "streak-plus 1100ms ease-out forwards" }}
+          >
+            +{target - start}
+          </span>
+        )}
+        <SolidFlame
+          className={
+            active || animating ? "text-orange-500" : "text-gray-300"
+          }
+          style={{
+            width: 28,
+            height: 28,
+            animation: animating ? "flame-burst 700ms ease-in-out" : undefined,
+            transformOrigin: "bottom center",
+          }}
+        />
+        <span className="flex items-baseline gap-1.5 min-w-[4.5rem]">
+          <span
+            className="text-[28px] font-bold leading-none tabular-nums"
+            style={{ color: active || animating ? "#134074" : "#9CA3AF" }}
           >
             {display}
           </span>

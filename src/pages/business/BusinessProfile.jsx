@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Loader2, Upload } from 'lucide-react';
+import { ArrowLeft, ExternalLink, Loader2, Star, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { businessAPI } from '../../services/api';
 import { BUSINESS_CATEGORIES, DAYS_OF_WEEK, inputCls } from './businessFormConstants';
@@ -14,6 +14,7 @@ const emptyForm = {
   description: '',
   instagram: '',
   website: '',
+  googleMapsUrl: '',
   operatingDays: [],
   openingTime: '',
   closingTime: '',
@@ -42,6 +43,7 @@ export default function BusinessProfile() {
           description: biz.description || '',
           instagram: biz.instagram || '',
           website: biz.website || '',
+          googleMapsUrl: biz.googleMapsUrl || '',
           operatingDays: biz.operatingDays || [],
           openingTime: biz.operatingHours?.open || '',
           closingTime: biz.operatingHours?.close || '',
@@ -95,6 +97,7 @@ export default function BusinessProfile() {
         description: form.description,
         instagram: form.instagram,
         website: form.website,
+        googleMapsUrl: form.googleMapsUrl,
         operatingDays: form.operatingDays,
         operatingHours: { open: form.openingTime, close: form.closingTime },
       });
@@ -251,6 +254,29 @@ export default function BusinessProfile() {
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Website</label>
             <input value={form.website} onChange={setField('website')} placeholder="https://" className={inputCls} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Google Maps link</label>
+            <input
+              value={form.googleMapsUrl}
+              onChange={setField('googleMapsUrl')}
+              placeholder="https://maps.app.goo.gl/…"
+              className={inputCls}
+            />
+            <p className="text-[10px] text-gray-400 mt-1">
+              Paste your Google Maps share URL. The rating is fetched when you save a new link. Only admin can refresh it later.
+            </p>
+            {profile?.googleRating != null ? (
+              <p className="text-sm font-medium text-gray-800 flex items-center gap-1.5 mt-2">
+                <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                {Number(profile.googleRating).toFixed(1)}
+                <span className="text-gray-500 font-normal">
+                  ({profile.googleReviewCount ?? 0} reviews)
+                </span>
+              </p>
+            ) : form.googleMapsUrl.trim() ? (
+              <p className="text-xs text-gray-500 mt-2">No rating cached yet. Save the profile to fetch it.</p>
+            ) : null}
           </div>
 
           <button

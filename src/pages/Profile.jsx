@@ -1,54 +1,227 @@
-import React, { useState, useEffect } from "react";
-import { AlertCircle, Loader2, ShieldCheck, LogOut, Trash2 } from "lucide-react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
-import { userAPI } from "../services/api";
+import { AlertCircle, Check, Loader2, Shield, ShieldCheck } from "lucide-react";
+import { sepSurveyAPI, surveyAPI, userAPI, voucherAPI } from "../services/api";
 import { clearAuth } from "../utils/auth";
-import CreditsCard from "../components/profile/CreditsCard";
-import VouchersCard from "../components/profile/VouchersCard";
-import SurveyHistoryCard from "../components/profile/SurveyHistoryCard";
+import { getNextStreakBonus } from "../utils/streakBonus";
+import { useAuth } from "../context/AuthContext";
+import HomeFooter from "../components/homepage/HomeFooter";
+import StreakGuardModal from "../components/profile/StreakGuardModal";
+import { initProfileCinema } from "../components/profile/profileCinema";
+import CreditRewardBadge from "../components/onboarding/CreditRewardBadge";
+import {
+  PROFILE_COMPLETION_1_CREDITS,
+  PROFILE_COMPLETION_2_CREDITS,
+  PROFILE_COMPLETION_2_QUESTION_COUNT,
+} from "../utils/onboardingCredits";
 import DemographicsWizard from "../components/demographics/DemographicsWizard";
 import AdditionalProfileSurvey from "../components/demographics/AdditionalProfileSurvey";
-import { useAuth } from "../context/AuthContext";
-import AnimatedContent from "../components/animations/AnimatedContent";
+import sectionIcon from "../assets/home/features/opinions.png";
+import skyBg from "../assets/home/sky.jpg";
+import "../components/homepage/homepage.css";
+import "../components/profile/profile.css";
+import "../components/onboarding/onboarding.css";
 
-import heroBg from "../assets/eruchi-home-bg.webp";
+const WEEK_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
+const VOUCHER_COLORS = ["#16365c", "#e91e63", "#f5a623", "#16365c"];
 
-// Shared type scale — matches Homepage.jsx / Shop.jsx
-const headingStyle = {
-  fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-  fontSize: "clamp(28px, 8vw, 58px)",
-  fontWeight: 500,
-  lineHeight: 1.15,
-};
+function nepalParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Kathmandu",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+  }).formatToParts(date);
+  const get = (type) => parts.find((part) => part.type === type)?.value;
+  const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
+  const year = Number(get("year"));
+  const month = Number(get("month"));
+  const day = Number(get("day"));
+  return {
+    year,
+    month,
+    day,
+    weekday: weekday < 0 ? 0 : weekday,
+    key: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+  };
+}
 
-const descriptionStyle = {
-  fontSize: "clamp(15px, 1.5vw, 20px)",
-  fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-  fontWeight: 300,
-};
+function shiftCivilDate(parts, delta) {
+  const shifted = new Date(Date.UTC(parts.year, parts.month - 1, parts.day + delta));
+  const year = shifted.getUTCFullYear();
+  const month = shifted.getUTCMonth() + 1;
+  const day = shifted.getUTCDate();
+  return {
+    year,
+    month,
+    day,
+    weekday: (((parts.weekday + delta) % 7) + 7) % 7,
+    key: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+  };
+}
 
-const Profile = () => {
+function nepalWeekDays(now = new Date()) {
+  const today = nepalParts(now);
+  const sunday = shiftCivilDate(today, -today.weekday);
+  return Array.from({ length: 7 }, (_, i) => shiftCivilDate(sunday, i));
+}
+
+function creditGoal(credits) {
+  const caps = [50, 100, 200, 300, 400, 500, 750, 1000, 1500, 2000, 5000];
+  return caps.find((cap) => credits <= cap) || credits;
+}
+
+function mapSurvey(entry, type) {
+  if (type === "campaign") {
+    return {
+      id: entry._id,
+      title: entry.campaign?.title || "Campaign Survey",
+      description: entry.campaign?.description || "Campaign survey you completed.",
+      minutes: entry.survey?.estimatedMinutes || null,
+      credits: entry.survey?.creditsToAward || 100,
+      createdAt: entry.createdAt,
+    };
+  }
+  return {
+    id: entry._id,
+    title: entry.survey?.title || "Survey",
+    description: entry.survey?.description || "Standalone survey you completed.",
+    minutes: entry.survey?.estimatedMinutes || null,
+    credits: entry.survey?.credits || 50,
+    createdAt: entry.createdAt,
+  };
+}
+
+function easeOutCubic(t) {
+  return 1 - (1 - t) ** 3;
+}
+
+function useCountUp(target, { duration = 2600, delay = 420 } = {}) {
+  const end = Math.max(0, Number(target) || 0);
+  const [amount, setAmount] = useState(0);
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setAmount(end);
+      return undefined;
+    }
+
+    setAmount(0);
+    let raf = 0;
+    let start = null;
+    const timeout = window.setTimeout(() => {
+      const tick = (now) => {
+        if (start == null) start = now;
+        const t = Math.min(1, (now - start) / duration);
+        setAmount(end * easeOutCubic(t));
+        if (t < 1) raf = window.requestAnimationFrame(tick);
+      };
+      raf = window.requestAnimationFrame(tick);
+    }, delay);
+
+    return () => {
+      window.clearTimeout(timeout);
+      window.cancelAnimationFrame(raf);
+    };
+  }, [end, duration, delay]);
+
+  return amount;
+}
+
+function StatRing({ value, max, color, label, unit, children, delay = 420 }) {
+  const r = 62;
+  const c = 2 * Math.PI * r;
+  const end = Math.max(0, Number(value) || 0);
+  const amount = useCountUp(end, { delay });
+  const pct = Math.min(1, amount / Math.max(max, 1));
+  return (
+    <div className="profile-ring">
+      <svg viewBox="0 0 160 160" fill="none">
+        <circle cx="80" cy="80" r={r} stroke="#eef1f4" strokeWidth="10" />
+        <circle
+          className="profile-ring-arc"
+          cx="80"
+          cy="80"
+          r={r}
+          stroke={color}
+          strokeWidth="10"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={c * (1 - pct)}
+          transform="rotate(-90 80 80)"
+        />
+      </svg>
+      <div className="profile-ring-inner">
+        <p className="profile-ring-label">{label}</p>
+        <p className="profile-ring-value">{Math.round(amount).toLocaleString()}</p>
+        {unit ? <p className="profile-ring-unit">{unit}</p> : children}
+      </div>
+    </div>
+  );
+}
+
+function ProfileShell({ children, footer, shellRef }) {
+  return (
+    <div className="home-page profile-page" ref={shellRef}>
+      <div className="profile-sky" style={{ "--sky": `url(${skyBg})` }}>
+        <div className="home-hero-sky" aria-hidden="true" />
+      </div>
+      <div className="home-sheet profile-sheet">{children}</div>
+      {footer}
+    </div>
+  );
+}
+
+export default function Profile() {
+  const navigate = useNavigate();
+  const { refreshUser } = useAuth();
+  const scrollerRef = useRef(null);
+  const pageRef = useRef(null);
   const [user, setUser] = useState(null);
+  const [vouchers, setVouchers] = useState([]);
+  const [surveys, setSurveys] = useState([]);
+  const [weekDone, setWeekDone] = useState(() => WEEK_LABELS.map(() => false));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [localCredits, setLocalCredits] = useState(null);
-  const navigate = useNavigate();
-
-  const { refreshUser } = useAuth();
+  const [scrollPct, setScrollPct] = useState(0);
+  const [thumbW, setThumbW] = useState(32);
   const [showWizard, setShowWizard] = useState(false);
   const [showAdditionalSurvey, setShowAdditionalSurvey] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [showStreakGuard, setShowStreakGuard] = useState(false);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await userAPI.getProfile();
-        const userData = res?.data?.data?.user;
+        const [profileRes, voucherRes, campRes, standRes] = await Promise.all([
+          userAPI.getProfile(),
+          voucherAPI.getMyVouchers({ status: "active", skipErrorToast: true }),
+          surveyAPI.getSurveyHistory({ skipErrorToast: true }),
+          sepSurveyAPI.getHistory({ limit: 100, skipErrorToast: true }),
+        ]);
+
+        const userData = profileRes?.data?.data?.user;
         if (!userData) throw new Error("Invalid user data");
         setUser(userData);
-        setLocalCredits(userData.credits ?? 0);
+
+        const nextVouchers = voucherRes?.data?.data || [];
+        setVouchers(nextVouchers);
+
+        const nextSurveys = [
+          ...(campRes?.data?.data || []).map((row) => mapSurvey(row, "campaign")),
+          ...(standRes?.data?.data || []).map((row) => mapSurvey(row, "standalone")),
+        ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        setSurveys(nextSurveys);
+
+        const done = new Set(nextSurveys.map((row) => nepalParts(new Date(row.createdAt)).key));
+        const streak = Number(userData.streakCount) || 0;
+        if (userData.lastStreakDate && streak > 0) {
+          const last = nepalParts(new Date(userData.lastStreakDate));
+          for (let i = 0; i < Math.min(streak, 7); i += 1) {
+            done.add(shiftCivilDate(last, -i).key);
+          }
+        }
+        setWeekDone(nepalWeekDays().map((day) => done.has(day.key)));
       } catch (err) {
         if (err.response?.status === 401) {
           navigate("/login");
@@ -61,37 +234,46 @@ const Profile = () => {
     })();
   }, [navigate]);
 
+  const syncCarousel = () => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const max = el.scrollWidth - el.clientWidth;
+    setScrollPct(max > 0 ? el.scrollLeft / max : 0);
+    setThumbW(Math.max(22, (el.clientWidth / Math.max(el.scrollWidth, 1)) * 100));
+  };
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return undefined;
+    syncCarousel();
+    el.addEventListener("scroll", syncCarousel, { passive: true });
+    window.addEventListener("resize", syncCarousel);
+    return () => {
+      el.removeEventListener("scroll", syncCarousel);
+      window.removeEventListener("resize", syncCarousel);
+    };
+  }, [vouchers.length, loading]);
+
+  useEffect(() => {
+    if (loading || !user) return undefined;
+    let revert = () => {};
+    let inner = 0;
+    const outer = window.requestAnimationFrame(() => {
+      inner = window.requestAnimationFrame(() => {
+        revert = initProfileCinema(pageRef.current);
+      });
+    });
+    return () => {
+      window.cancelAnimationFrame(outer);
+      window.cancelAnimationFrame(inner);
+      revert();
+    };
+  }, [loading, user?.id]);
+
   const handleLogout = async () => {
     await clearAuth();
     window.dispatchEvent(new Event("authChange"));
     navigate("/login");
-  };
-
-  const handleDeleteAccount = async () => {
-    setDeleting(true);
-    try {
-      await userAPI.deleteAccount();
-      await clearAuth();
-      window.dispatchEvent(new Event("authChange"));
-      navigate("/");
-      toast.success(
-        () => (
-          <div>
-            <p className="font-medium">We're sad to see you go. Your account has been successfully deleted.</p>
-            <p className="text-xs text-gray-500 mt-1">
-              Your data and information will be carefully removed from eRuchi as per our{" "}
-              <a href="/terms" className="underline">Terms of Use</a> and{" "}
-              <a href="/privacy-policy" className="underline">Privacy Policy</a>.
-            </p>
-          </div>
-        ),
-        { duration: 6000 }
-      );
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to delete account.");
-      setDeleting(false);
-      setShowDeleteConfirm(false);
-    }
   };
 
   const handleProfileComplete = async () => {
@@ -106,411 +288,312 @@ const Profile = () => {
     setShowAdditionalSurvey(false);
   };
 
-  if (loading)
+  if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="w-8 h-8 mx-auto mb-4 text-blue-600 animate-spin" />
-          <p
-            className="text-gray-400 text-sm font-light"
-            style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-          >
-            Loading your account...
-          </p>
+      <ProfileShell shellRef={pageRef}>
+        <div className="min-h-[50vh] flex items-center justify-center">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 mx-auto mb-4 text-blue-600 animate-spin" />
+            <p className="text-gray-400 text-sm">Loading your account...</p>
+          </div>
         </div>
-      </div>
+      </ProfileShell>
     );
+  }
 
-  if (error)
+  if (error) {
     return (
-      <div
-        className="min-h-screen bg-white flex items-center justify-center p-4"
-        style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-      >
-        <div className="text-center py-20 border-2 border-dashed border-gray-200 rounded-3xl bg-gray-50/50 max-w-2xl w-full px-6">
-          <AlertCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-gray-900 text-xl font-medium mb-2">
-            Failed to load your profile
-          </h3>
-          <p className="text-gray-500 text-sm max-w-sm mx-auto mb-6">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-3 text-white rounded-full text-sm font-medium transition-opacity hover:opacity-90"
-            style={{ backgroundColor: "#134074" }}
-          >
-            Retry
-          </button>
+      <ProfileShell>
+        <div className="min-h-[50vh] flex items-center justify-center p-4">
+          <div className="text-center py-20 max-w-xl">
+            <AlertCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+            <h3 className="text-xl font-medium mb-2">Failed to load your profile</h3>
+            <p className="text-gray-500 text-sm mb-6">{error}</p>
+            <button type="button" className="home-pill home-pill-sm home-pill-navy" onClick={() => window.location.reload()}>
+              Retry
+            </button>
+          </div>
         </div>
-      </div>
+      </ProfileShell>
     );
+  }
 
   if (!user) return null;
 
-  const firstName = user.firstName;
+  const firstName = user.firstName || user.username || "there";
+  const streak = Number(user.streakCount) || 0;
+  const credits = Number(user.credits) || 0;
+  const nextBonus = getNextStreakBonus(streak);
+  const streakGoal = nextBonus.rewardCounter + nextBonus.remaining;
   const needsOnboarding = !user.isProfileComplete || !user.isAdditionalProfileComplete;
+  const previewSurveys = surveys.slice(0, 4);
+
+  const handleGuardPurchased = (data) => {
+    setUser((prev) => ({
+      ...prev,
+      credits: data.credits ?? prev.credits,
+      streakCount: data.streakCount ?? prev.streakCount,
+      lastStreakDate: data.lastStreakDate ?? prev.lastStreakDate,
+      streakGuardDays: data.streakGuardDays ?? prev.streakGuardDays,
+      canPurchaseStreakGuard: data.canPurchaseStreakGuard,
+      streakGuardCooldownDays: data.streakGuardCooldownDays ?? 0,
+    }));
+    refreshUser();
+  };
 
   return (
-    <div
-      className="min-h-screen bg-white overflow-x-hidden"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-    >
-      {/* ── Hero — mirrors Homepage.jsx hero treatment ── */}
-      <div
-        className="bg-cover bg-center flex flex-col justify-between pt-8 sm:pt-10 lg:pt-16 pb-0 min-h-[420px] sm:min-h-[560px]"
-        style={{ backgroundImage: `url(${heroBg})` }}
-      >
-        <div className="max-w-[1150px] mx-auto px-4 sm:px-8 lg:px-10 w-full flex-1 flex flex-col">
-          <div className="grid lg:grid-cols-[1fr_440px] gap-10 lg:gap-12 flex-1 items-end">
-            {/* Left — identity */}
-            <AnimatedContent
-              direction="vertical"
-              distance={40}
-              duration={0.8}
-              className="my-auto py-8 flex flex-col justify-center"
-            >
-              <div className="order-last lg:order-first flex flex-wrap items-center gap-3 mb-6 lg:mb-6 mt-6 lg:mt-0">
-                {user.role === "admin" && (
-                  <button
-                    onClick={() => navigate("/admin")}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium border border-white/30 bg-white/10 text-white backdrop-blur-sm transition-colors hover:bg-white/20"
-                  >
-                    <ShieldCheck size={15} />
-                    Admin
-                  </button>
-                )}
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-2 px-6 py-3 rounded-full text-sm font-semibold bg-white text-gray-900 shadow-lg transition-all hover:bg-red-50 hover:text-red-600 active:scale-[0.98]"
-                >
-                  <LogOut size={16} />
-                  Sign out
-                </button>
-              </div>
-
-              <h1 className="text-white mb-6" style={headingStyle}>
-                Hey, <span className="text-white">{firstName}</span>.
-              </h1>
-
-              <p
-                className="text-white/80 leading-snug max-w-[480px] mb-6"
-                style={descriptionStyle}
+    <ProfileShell footer={<HomeFooter />} shellRef={pageRef}>
+      <main className="profile-main">
+        <section className="profile-hero">
+          <div>
+            <div className="profile-hero-name">
+              <h1>Hi, {firstName}.</h1>
+              <button
+                type="button"
+                className="profile-guard-btn"
+                onClick={() => setShowStreakGuard(true)}
               >
-                Manage your credits, vouchers, and survey activity — all in
-                one place.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:text-sm text-white/50 font-light">
-                <span className="text-white/80 font-normal">{user.email}</span>
-                {user.phone && (
-                  <>
-                    <span>·</span>
-                    <span>{user.phone}</span>
-                  </>
-                )}
-                <span>·</span>
-                <span>
-                  Member since{" "}
-                  {new Date(user.createdAt).toLocaleDateString("en-US", {
-                    month: "long",
-                    year: "numeric",
-                  })}
-                </span>
-              </div>
-            </AnimatedContent>
-
-            {/* Right — credit balance card, styled like Homepage's logged-in card */}
-            <AnimatedContent
-              direction="vertical"
-              distance={40}
-              duration={0.8}
-              delay={0.15}
-              className="w-full flex flex-col self-stretch"
-            >
-              <div className="bg-white p-8 lg:p-10 w-full flex-1 rounded-t-3xl rounded-b-none flex flex-col justify-center">
-                <div className="flex flex-col justify-between h-full py-2">
-                  <div className="text-center">
-                    <h2 className="text-2xl font-bold text-gray-900">
-                      Your balance
-                    </h2>
-                    <p
-                      className="text-gray-400 mt-1"
-                      style={{ fontSize: "14px", fontWeight: 400 }}
-                    >
-                      {new Date().toLocaleDateString("en-US", {
-                        weekday: "long",
-                        month: "long",
-                        day: "numeric",
-                      })}
-                    </p>
-                  </div>
-
-                  <div className="my-8 flex flex-col items-center text-center py-6">
-                    <p
-                      style={{
-                        fontSize: "80px",
-                        fontWeight: 700,
-                        lineHeight: 1,
-                        color: "#134074",
-                      }}
-                    >
-                      {localCredits ?? 0}
-                    </p>
-                    <p
-                      className="text-gray-400 mt-2"
-                      style={{ fontSize: "14px", fontWeight: 400, letterSpacing: "0.1em" }}
-                    >
-                      CREDITS
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => navigate("/standalone-surveys")}
-                      className="w-full text-white hover:opacity-90 transition-all flex items-center justify-center rounded-full"
-                      style={{
-                        height: "58px",
-                        fontSize: "18px",
-                        fontWeight: 400,
-                        fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-                        backgroundColor: "#134074",
-                        lineHeight: 1,
-                      }}
-                    >
-                      Take Today's Survey
-                    </button>
-                    <button
-                      onClick={() => navigate("/shop")}
-                      className="w-full text-black border border-gray-300 hover:border-gray-400 hover:bg-gray-50 transition-all flex items-center justify-center rounded-full"
-                      style={{
-                        height: "58px",
-                        fontSize: "18px",
-                        fontWeight: 400,
-                        fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-                        lineHeight: 1,
-                      }}
-                    >
-                      Browse Rewards
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </AnimatedContent>
+                <Shield size={15} />
+                Streak Guard
+                {Number(user.streakGuardDays) > 0 ? (
+                  <span>{user.streakGuardDays}d</span>
+                ) : null}
+              </button>
+            </div>
+            <p className="profile-hero-copy">
+              A few credits at a time, it adds up. Here&apos;s everything you&apos;ve earned and claimed so far.
+            </p>
+            <div className="profile-hero-actions">
+              <button type="button" className="profile-btn profile-btn-outline" onClick={() => navigate("/edit-profile")}>
+                Edit Profile
+              </button>
+              <button type="button" className="profile-btn profile-btn-logout" onClick={handleLogout}>
+                Logout
+              </button>
+              {user.role === "admin" && (
+                <button type="button" className="profile-btn profile-btn-outline" onClick={() => navigate("/admin")}>
+                  <ShieldCheck size={14} className="mr-2" />
+                  Admin
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      </div>
 
-      <div className="max-w-[1314px] mx-auto px-4 sm:px-8 lg:px-10 pt-14 pb-28 lg:pt-20 lg:pb-16">
-        {/* ── Profile completion banners ── */}
+          <div className="profile-stats">
+            <div className="profile-stat">
+              <StatRing
+                value={streak}
+                max={streakGoal}
+                color="#7bd13a"
+                label="Day Streak"
+                unit={streak === 1 ? "Day in a row" : "Days in a row"}
+                delay={480}
+              />
+              <div className="profile-week" aria-label="Surveys completed this week">
+                {WEEK_LABELS.map((label, i) => (
+                  <div className="profile-week-day" key={`${label}-${i}`}>
+                    <span>{label}</span>
+                    <div className={`profile-week-dot ${weekDone[i] ? "is-on" : ""}`}>
+                      {weekDone[i] && <Check size={11} strokeWidth={3} />}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="profile-stat">
+              <StatRing
+                value={credits}
+                max={creditGoal(credits)}
+                color="#5ba8e8"
+                label="Total Credits"
+                unit="Credits"
+                delay={640}
+              />
+              <p className="profile-stat-note">
+                You&apos;ve earned {credits} total credits from all your activities.
+              </p>
+            </div>
+          </div>
+        </section>
+
         {needsOnboarding && (
-          <div className="flex flex-col gap-4 mb-14 lg:mb-16">
+          <div className="flex flex-col gap-4 mb-10">
             {!user.isProfileComplete && (
-              <AnimatedContent direction="vertical" distance={30} duration={0.6}>
-                <div className="rounded-3xl border-2 border-dashed border-gray-200 bg-gray-50/50 p-6 sm:p-8">
-                  {!showWizard ? (
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
-                      <div>
-                        <h2 className="text-gray-900 text-lg sm:text-xl font-medium mb-1">
-                          Complete your{" "}
-                          <span className="text-blue-600">profile</span>.
-                        </h2>
-                        <p className="text-gray-500 text-sm font-light max-w-md">
-                          Tell us more about you! We'll use this to send you
-                          surveys that are relevant to you.
-                        </p>
+              <div className="profile-onboard rounded-[28px] p-6 sm:p-8">
+                {!showWizard ? (
+                  <div className="profile-onboard-head">
+                    <div>
+                      <div className="onboard-kicker">
+                        <CreditRewardBadge amount={PROFILE_COMPLETION_1_CREDITS} />
                       </div>
-                      <button
-                        onClick={() => setShowWizard(true)}
-                        className="shrink-0 px-6 py-3 text-white rounded-full text-sm font-medium transition-opacity hover:opacity-90"
-                        style={{ backgroundColor: "#134074" }}
-                      >
-                        Complete profile
-                      </button>
+                      <h2>Complete your profile.</h2>
+                      <p>
+                        Tell us more about you — earn {PROFILE_COMPLETION_1_CREDITS} Ruchi Credits,
+                        and we&apos;ll match you to more relevant surveys.
+                      </p>
                     </div>
-                  ) : (
-                    <div className="w-full bg-white p-3 rounded-2xl border border-gray-100">
-                      <DemographicsWizard onComplete={handleProfileComplete} />
-                    </div>
-                  )}
-                </div>
-              </AnimatedContent>
+                    <button type="button" className="home-pill home-pill-sm home-pill-navy shrink-0" onClick={() => setShowWizard(true)}>
+                      Complete profile
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-full bg-white p-3 rounded-2xl border border-gray-100">
+                    <DemographicsWizard onComplete={handleProfileComplete} />
+                  </div>
+                )}
+              </div>
             )}
-
             {!user.isAdditionalProfileComplete && (
-              <AnimatedContent direction="vertical" distance={30} duration={0.6} delay={0.1}>
-                <div className="rounded-3xl border-2 border-dashed border-gray-200 bg-gray-50/50 p-6 sm:p-8">
-                  {!showAdditionalSurvey ? (
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
-                      <div>
-                        <h2 className="text-gray-900 text-lg sm:text-xl font-medium mb-1">
-                          A few more{" "}
-                          <span className="text-blue-600">questions</span>.
-                        </h2>
-                        <p className="text-gray-500 text-sm font-light max-w-md">
-                          Optional, but it helps us tailor surveys to you even
-                          better.
-                        </p>
+              <div className="profile-onboard rounded-[28px] p-6 sm:p-8">
+                {!showAdditionalSurvey ? (
+                  <div className="profile-onboard-head">
+                    <div>
+                      <div className="onboard-kicker">
+                        <CreditRewardBadge amount={PROFILE_COMPLETION_2_CREDITS} />
                       </div>
-                      <button
-                        onClick={() => setShowAdditionalSurvey(true)}
-                        className="shrink-0 px-6 py-3 rounded-full text-sm font-medium border border-gray-200 bg-white text-gray-700 transition-colors hover:border-gray-400"
-                      >
-                        Answer questions
-                      </button>
+                      <h2>A few more questions.</h2>
+                      <p>
+                        Earn {PROFILE_COMPLETION_2_CREDITS} Ruchi Credits —{" "}
+                        {PROFILE_COMPLETION_2_QUESTION_COUNT} quick questions about your daily life.
+                        Takes about 2 minutes.
+                      </p>
                     </div>
-                  ) : (
-                    <div className="w-full bg-white p-3 rounded-2xl border border-gray-100">
-                      <AdditionalProfileSurvey onComplete={handleAdditionalProfileComplete} />
-                    </div>
-                  )}
-                </div>
-              </AnimatedContent>
+                    <button
+                      type="button"
+                      className="home-pill home-pill-sm home-pill-lime shrink-0"
+                      onClick={() => setShowAdditionalSurvey(true)}
+                    >
+                      Claim your credits
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-full bg-white p-3 rounded-2xl border border-gray-100">
+                    <AdditionalProfileSurvey onComplete={handleAdditionalProfileComplete} />
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
 
-        {/* ── Vouchers + Survey history, side by side ── */}
-        {/* ── Stats strip (reference: "Your Overall Progress") ── */}
-        <AnimatedContent direction="vertical" distance={30} duration={0.6}>
-          <section className="mb-8 lg:mb-10">
-            <h2 className="text-gray-900 text-xl sm:text-2xl font-medium mb-5">
-              Your <span className="text-blue-600">progress</span>
-            </h2>
+        <section className="profile-section">
+          <div className="profile-section-head">
+            <div className="profile-section-title">
+              <img src={sectionIcon} alt="" />
+              <div>
+                <h2>Your Vouchers</h2>
+                <p>Every reward you&apos;ve picked up, all in one place.</p>
+              </div>
+            </div>
+            <button type="button" className="home-pill home-pill-lime profile-view-all" onClick={() => navigate("/vouchers")}>
+              View All
+            </button>
+          </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              {[
-                { label: "Surveys Completed", value: user.totalSurveys ?? 0 },
-                { label: "Credits Balance", value: localCredits ?? 0 },
-                { label: "Active Vouchers", value: user.activeVouchers ?? 0 },
-                {
-                  label: "Member Since",
-                  value: new Date(user.createdAt).toLocaleDateString("en-US", {
-                    month: "short",
-                    year: "numeric",
-                  }),
-                },
-              ].map((s) => (
-                <div
-                  key={s.label}
-                  className="rounded-2xl border border-gray-100 bg-gray-50/60 px-5 py-5 flex flex-col justify-between min-h-[104px]"
-                >
-                  <p className="text-2xl sm:text-[28px] font-semibold leading-none text-gray-900">
-                    {s.value}
-                  </p>
-                  <p className="text-xs text-gray-400 mt-3 leading-tight">
-                    {s.label}
-                  </p>
+          {vouchers.length === 0 ? (
+            <div className="profile-empty">No vouchers yet. Redeem credits in Rewards to see them here.</div>
+          ) : (
+            <>
+              <div className="profile-voucher-row" ref={scrollerRef}>
+                {vouchers.map((voucher, i) => {
+                  const snap = voucher.offerSnapshot || {};
+                  const logo = snap.imageUrl || snap.brandLogo;
+                  const brand = snap.brandName || snap.businessName || "Reward";
+                  return (
+                    <button
+                      key={voucher._id}
+                      type="button"
+                      className="profile-voucher"
+                      style={{ background: VOUCHER_COLORS[i % VOUCHER_COLORS.length] }}
+                      onClick={() => navigate(`/vouchers/${voucher._id}`)}
+                    >
+                      <div className="profile-voucher-cap">
+                        {logo ? (
+                          <img src={logo} alt={brand} />
+                        ) : (
+                          <span className="profile-voucher-initial">{brand.charAt(0).toUpperCase()}</span>
+                        )}
+                      </div>
+                      <p className="profile-voucher-credits">{voucher.creditsSpent ?? 0} CREDITS</p>
+                      <p className="profile-voucher-title">{snap.title || brand}</p>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="profile-voucher-scroll" aria-hidden="true">
+                <div className="home-scroll-track">
+                  <span
+                    className="home-scroll-thumb"
+                    style={{
+                      width: `${thumbW}%`,
+                      left: `${scrollPct * (100 - thumbW)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+
+          <div className="profile-section-cta">
+            <button type="button" className="home-pill home-pill-lg home-pill-navy" onClick={() => navigate("/shop")}>
+              Redeem Vouchers
+            </button>
+          </div>
+        </section>
+
+        <section className="profile-section">
+          <div className="profile-section-head">
+            <div className="profile-section-title">
+              <img src={sectionIcon} alt="" />
+              <div>
+                <h2>Survey History</h2>
+                <p>Every survey you have been a part of, all in one place.</p>
+              </div>
+            </div>
+            <button type="button" className="home-pill home-pill-lime profile-view-all" onClick={() => navigate("/survey-history")}>
+              View All
+            </button>
+          </div>
+
+          {previewSurveys.length === 0 ? (
+            <div className="profile-empty">No surveys completed yet. Take a survey to see it here.</div>
+          ) : (
+            <div className="profile-surveys">
+              {previewSurveys.map((survey) => (
+                <div className="profile-survey" key={survey.id}>
+                  <div className="profile-survey-icon" aria-hidden="true" />
+                  <div className="profile-survey-copy">
+                    <h3>{survey.title}</h3>
+                    <p>{survey.description}</p>
+                  </div>
+                  <div className="profile-survey-meta">
+                    <span>{survey.minutes ? `${survey.minutes} Min` : "—"}</span>
+                    <span>{survey.credits} credits</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="profile-btn profile-btn-outline profile-survey-view"
+                    onClick={() => navigate("/survey-history")}
+                  >
+                    View
+                  </button>
                 </div>
               ))}
             </div>
-          </section>
-        </AnimatedContent>
-
-        {/* ── Vouchers + Activity: equal-height cards, headers inside ── */}
-        <div className="grid lg:grid-cols-2 gap-6 lg:gap-8 items-stretch">
-          <AnimatedContent
-            direction="vertical"
-            distance={30}
-            duration={0.6}
-            delay={0.1}
-            className="h-full"
-          >
-            <section className="h-full rounded-3xl border border-gray-100 bg-white overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between px-6 sm:px-7 pt-6 pb-4 border-b border-gray-100">
-                <div>
-                  <h2 className="text-gray-900 text-lg font-medium">
-                    Your <span className="text-blue-600">vouchers</span>
-                  </h2>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Redeemed rewards
-                  </p>
-                </div>
-                <button
-                  onClick={() => navigate("/vouchers")}
-                  className="text-sm text-blue-600 font-medium hover:opacity-70 transition-opacity shrink-0"
-                >
-                  View all
-                </button>
-              </div>
-              <div className="flex-1 px-2 sm:px-3 py-2">
-                <VouchersCard embedded />
-              </div>
-            </section>
-          </AnimatedContent>
-
-          <AnimatedContent
-            direction="vertical"
-            distance={30}
-            duration={0.6}
-            delay={0.2}
-            className="h-full"
-          >
-            <section className="h-full rounded-3xl border border-gray-100 bg-white overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between px-6 sm:px-7 pt-6 pb-4 border-b border-gray-100">
-                <div>
-                  <h2 className="text-gray-900 text-lg font-medium">
-                    Survey <span className="text-blue-600">activity</span>
-                  </h2>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Recent completions
-                  </p>
-                </div>
-                <button
-                  onClick={() => navigate("/survey-history")}
-                  className="text-sm text-blue-600 font-medium hover:opacity-70 transition-opacity shrink-0"
-                >
-                  View all
-                </button>
-              </div>
-              <div className="flex-1 px-2 sm:px-3 py-2">
-                <SurveyHistoryCard
-                  completedCount={user.totalSurveys ?? 0}
-                  embedded
-                />
-              </div>
-            </section>
-          </AnimatedContent>
-        </div>
-        <div className="mt-16 text-center">
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            Delete account
-          </button>
-        </div>
-      </div>
-
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl p-6 sm:p-8 max-w-sm w-full">
-            <div className="flex items-center gap-2 mb-3 text-red-600">
-              <Trash2 size={18} />
-              <h3 className="font-medium text-gray-900">Delete your account?</h3>
-            </div>
-            <p className="text-sm text-gray-500 mb-6">
-              This action cannot be undone. Your account and associated data will be permanently removed.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={deleting}
-                className="flex-1 px-4 py-2.5 rounded-full text-sm font-medium border border-gray-200 text-gray-700 hover:border-gray-400 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteAccount}
-                disabled={deleting}
-                className="flex-1 px-4 py-2.5 rounded-full text-sm font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-60"
-              >
-                {deleting ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
+          )}
+        </section>
+      </main>
+      {showStreakGuard && (
+        <StreakGuardModal
+          credits={credits}
+          streakGuardDays={Number(user.streakGuardDays) || 0}
+          canPurchase={user.canPurchaseStreakGuard !== false}
+          cooldownDays={Number(user.streakGuardCooldownDays) || 0}
+          onClose={() => setShowStreakGuard(false)}
+          onPurchased={handleGuardPurchased}
+        />
       )}
-    </div>
+    </ProfileShell>
   );
-};
-
-export default Profile;
+}

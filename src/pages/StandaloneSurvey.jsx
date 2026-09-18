@@ -9,7 +9,8 @@ import {
 import toast from "react-hot-toast";
 import useSurveyTimer from "../hooks/userSurveyTimer";
 import { useAuth } from "../context/AuthContext";
-import { goToSurveyComplete } from "../utils/surveyComplete";
+import { completionFromSubmitResponse, goToSurveyComplete } from "../utils/surveyComplete";
+import SurveySubmitConfirm from "../components/survey/SurveySubmitConfirm";
 
 const StandaloneSurvey = () => {
   const { surveyId } = useParams();
@@ -18,6 +19,7 @@ const StandaloneSurvey = () => {
   const [survey, setSurvey] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [responses, setResponses] = useState({});
   const [error, setError] = useState(null);
   const { startQuestion, getTimingData } = useSurveyTimer();
@@ -76,22 +78,29 @@ const StandaloneSurvey = () => {
     });
   };
 
-  const handleSubmit = async () => {
+  const requestSubmit = () => {
     if (!isComplete()) {
       toast.error("Please answer all questions");
       return;
     }
+    setConfirmOpen(true);
+  };
 
+  const handleSubmit = async () => {
     setSubmitting(true);
     try {
       const timingData = getTimingData();
       const previousStreak = user?.streakCount ?? 0;
-      await sepSurveyAPI.submit(surveyId, responses, timingData);
+      const res = await sepSurveyAPI.submit(surveyId, responses, timingData);
+      setConfirmOpen(false);
       window.dispatchEvent(new Event("authChange"));
-      goToSurveyComplete(navigate, {
-        creditsEarned: survey.credits || 0,
-        previousStreak,
-      });
+      goToSurveyComplete(
+        navigate,
+        completionFromSubmitResponse(res, {
+          creditsEarned: survey.credits || 0,
+          previousStreak,
+        })
+      );
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to submit");
     } finally {
@@ -223,7 +232,7 @@ const StandaloneSurvey = () => {
 
         <div className="mt-16 pt-8 border-t border-neutral-100">
           <button
-            onClick={handleSubmit}
+            onClick={requestSubmit}
             disabled={submitting}
             className="w-full text-white py-4 px-8 rounded-md font-medium hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
             style={{ backgroundColor: "#134074" }}
@@ -236,6 +245,13 @@ const StandaloneSurvey = () => {
           </button>
         </div>
       </div>
+
+      <SurveySubmitConfirm
+        open={confirmOpen}
+        submitting={submitting}
+        onCancel={() => !submitting && setConfirmOpen(false)}
+        onConfirm={handleSubmit}
+      />
     </div>
   );
 };

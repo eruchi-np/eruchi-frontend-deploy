@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCircle2, XCircle, ScanLine, LayoutDashboard } from "lucide-react";
 import { businessAPI } from "../../services/api";
-import { discountLabel, formatRs, parseBillAmount } from "../../utils/billMath";
+import { discountLabel, formatRs } from "../../utils/billMath";
 
 const RESULT_IDLE = null;
 
@@ -14,14 +14,20 @@ export default function BusinessScan() {
   const [scanError, setScanError] = useState(null);
   const [mode, setMode] = useState("qr"); // "qr" | "code"
   const [codeInput, setCodeInput] = useState("");
-  const [amountInput, setAmountInput] = useState("");
-  const [amountError, setAmountError] = useState(null);
-  const [amountTouched, setAmountTouched] = useState(false);
+  const [billAmount, setBillAmount] = useState("");
+  const [billAmountError, setBillAmountError] = useState("");
   const scannerRef = useRef(null);
   const html5QrcodeRef = useRef(null);
+  const billInputRef = useRef(null);
 
-  const parsedAmount = parseBillAmount(amountInput);
-  const showAmountError = amountTouched && parsedAmount == null;
+  const parsedBillAmount = (() => {
+    const raw = billAmount.trim().replace(/,/g, "");
+    if (!raw) return null;
+    if (!/^\d+(\.\d{1,2})?$/.test(raw)) return null;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n < 0) return null;
+    return n;
+  })();
 
   const processResult = async (voucherId, redemptionToken, amount) => {
     setLoading(true);
@@ -32,12 +38,14 @@ export default function BusinessScan() {
         redemptionToken,
         billAmountAfterDiscount: amount,
       });
-      setResult({ type: "success", data: res.data, amount });
+      setResult({ type: "success", data: res.data });
     } catch (err) {
       const status = err.response?.status;
       const msg = err.response?.data?.message || "An error occurred";
       if (status === 403) {
         setResult({ type: "wrong_business", message: msg });
+      } else if (/bill amount/i.test(msg)) {
+        setResult({ type: "invalid", message: msg });
       } else if (msg.startsWith("Voucher already used")) {
         setResult({ type: "already_used", message: msg });
       } else if (msg.startsWith("Voucher expired")) {
@@ -53,12 +61,11 @@ export default function BusinessScan() {
   const previewVoucher = async (voucherId, redemptionToken) => {
     setLoading(true);
     setResult(null);
-    setAmountInput("");
-    setAmountError(null);
-    setAmountTouched(false);
     try {
       const res = await businessAPI.previewScan(voucherId, redemptionToken);
       setResult({ type: "pending", voucherId, redemptionToken, data: res.data.data });
+      setBillAmount("");
+      setBillAmountError("");
     } catch (err) {
       const status = err.response?.status;
       const msg = err.response?.data?.message || "An error occurred";
@@ -78,13 +85,12 @@ export default function BusinessScan() {
 
   const handleApprove = async () => {
     if (!result || result.type !== "pending") return;
-    setAmountTouched(true);
-    const amount = parseBillAmount(amountInput);
-    if (amount == null) {
-      setAmountError("Enter an amount.");
+    if (parsedBillAmount === null) {
+      setBillAmountError("Enter an amount");
       return;
     }
-    await processResult(result.voucherId, result.redemptionToken, amount);
+    setBillAmountError("");
+    await processResult(result.voucherId, result.redemptionToken, parsedBillAmount);
   };
 
   const startScanner = async () => {
@@ -129,6 +135,12 @@ export default function BusinessScan() {
   };
 
   useEffect(() => {
+    if (result?.type === "pending") {
+      billInputRef.current?.focus();
+    }
+  }, [result?.type]);
+
+  useEffect(() => {
     return () => {
       stopScanner();
     };
@@ -137,9 +149,8 @@ export default function BusinessScan() {
   const handleReset = () => {
     setResult(RESULT_IDLE);
     setCodeInput("");
-    setAmountInput("");
-    setAmountError(null);
-    setAmountTouched(false);
+    setBillAmount("");
+    setBillAmountError("");
   };
 
   const handleCodeSubmit = async (e) => {
@@ -149,9 +160,6 @@ export default function BusinessScan() {
 
     setLoading(true);
     setResult(null);
-    setAmountInput("");
-    setAmountError(null);
-    setAmountTouched(false);
     try {
       const res = await businessAPI.previewScanByCode(trimmed);
       setResult({
@@ -160,6 +168,8 @@ export default function BusinessScan() {
         redemptionToken: res.data.data.redemptionToken,
         data: res.data.data,
       });
+      setBillAmount("");
+      setBillAmountError("");
     } catch (err) {
       const status = err.response?.status;
       const msg = err.response?.data?.message || "An error occurred";
@@ -213,15 +223,16 @@ export default function BusinessScan() {
               <>
                 <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-3" />
                 <p className="text-xl font-bold text-green-700 mb-1">Voucher Valid</p>
-                {result.data.discount?.title && (
-                  <p className="text-sm font-semibold text-gray-700">
-                    {result.data.discount.title}
-                  </p>
-                )}
-                <p className="text-sm text-gray-500 mt-2">Amount</p>
-                <p className="text-lg font-bold text-green-600">
-                  {formatRs(result.amount ?? result.data?.billAmountAfterDiscount)}
+                <p className="text-sm font-semibold text-gray-700">
+                  {result.data.discount?.title}
                 </p>
+                <p className="text-lg font-bold text-green-600 mt-1">
+                  {result.data.discount?.label
+                    || (result.data.discount?.type === "percentage"
+                      ? `${result.data.discount.value}% off`
+                      : `Rs. ${result.data.discount?.value} off`)}
+                </p>
+                <BillMathBlock math={result.data.math} />
               </>
             )}
             {result.type === "pending" && (
@@ -234,32 +245,35 @@ export default function BusinessScan() {
                 {result.data.description && (
                   <p className="text-sm text-gray-500 mt-2">{result.data.description}</p>
                 )}
-                <div className="mt-4 text-left">
-                  <label htmlFor="collected-amount" className="block text-sm font-medium text-gray-700 mb-1">
-                    Amount
-                  </label>
-                  <input
-                    id="collected-amount"
-                    type="text"
-                    inputMode="decimal"
-                    autoComplete="off"
-                    placeholder="Rs"
-                    value={amountInput}
-                    onChange={(e) => {
-                      setAmountInput(e.target.value);
-                      setAmountError(null);
-                      setAmountTouched(true);
-                    }}
-                    className="w-full text-center text-lg font-medium border border-gray-200 rounded-xl py-3 bg-white focus:outline-none focus:border-gray-400"
-                  />
-                  {(showAmountError || amountError) && (
-                    <p className="text-xs text-red-500 mt-1">Enter an amount.</p>
+                <label className="block text-left mt-5 bg-white rounded-xl border border-blue-200 px-4 py-3">
+                  <span className="block text-sm font-semibold text-gray-800 mb-1">
+                    Amount <span className="text-red-500">*</span>
+                  </span>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                      Rs.
+                    </span>
+                    <input
+                      ref={billInputRef}
+                      type="text"
+                      inputMode="decimal"
+                      value={billAmount}
+                      onChange={(e) => {
+                        setBillAmount(e.target.value.replace(/[^\d.,]/g, ""));
+                        setBillAmountError("");
+                      }}
+                      placeholder="0.00"
+                      className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 text-sm font-medium text-left focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  {billAmountError && (
+                    <p className="mt-1.5 text-xs text-red-500">{billAmountError}</p>
                   )}
-                </div>
+                </label>
                 <div className="flex gap-3 mt-4 justify-center">
                   <button
                     onClick={handleApprove}
-                    disabled={loading || parsedAmount == null}
+                    disabled={loading}
                     className="px-6 py-2.5 rounded-full bg-green-600 text-white text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
                   >
                     {loading ? "Processing..." : "Approve"}
@@ -291,6 +305,8 @@ export default function BusinessScan() {
                     ? "Expired"
                     : result.type === "wrong_business"
                     ? "Not for your business"
+                    : /bill amount/i.test(result.message || "")
+                    ? "Bill amount required"
                     : "Invalid QR Code"}
                 </p>
                 <p className="text-sm text-red-500">{result.message}</p>
@@ -396,6 +412,18 @@ export default function BusinessScan() {
             )}
           </>
         )}
+      </div>
+    </div>
+  );
+}
+
+function BillMathBlock({ math }) {
+  if (!math || math.afterDiscount == null) return null;
+  return (
+    <div className="mt-4 text-left bg-white/80 border border-gray-100 rounded-xl px-4 py-3">
+      <div className="flex justify-between text-sm">
+        <span className="font-semibold text-gray-800">Amount</span>
+        <span className="font-bold text-green-700">{formatRs(math.afterDiscount)}</span>
       </div>
     </div>
   );

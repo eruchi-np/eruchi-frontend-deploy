@@ -65,7 +65,14 @@ const BottomNavigation = () => {
     <nav className="fixed block md:hidden bottom-0 z-50 left-0 right-0 bg-white border-t border-gray-400 px-1 sm:px-3 pt-1.5 pb-[max(0.4rem,env(safe-area-inset-bottom))]">
       <ul className="flex justify-between items-center gap-0.5">
         {navItems.filter(item => !item.requiresProfile || user?.isProfileComplete).map((item) => (
-          <Link key={item.path} to={item.path} className="min-w-0 flex-1">
+          <Link
+            key={item.path}
+            to={item.path}
+            className="min-w-0 flex-1"
+            onClick={() => {
+              if (item.path === "/shop") window.scrollTo(0, 0);
+            }}
+          >
             <NavItem
               icon={item.icon}
               label={item.label}

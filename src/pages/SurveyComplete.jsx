@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { Loader2, SearchX } from "lucide-react";
 import { userAPI, voucherAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
@@ -22,16 +22,19 @@ const headingStyle = {
   lineHeight: 1.15,
 };
 
-const SEARCH_LIMIT = 4;
+const SEARCH_LIMIT = 8;
 
 export default function SurveyComplete() {
   const location = useLocation();
-  const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
   const completion = readSurveyCompleteState(location.state);
 
-  const [credits, setCredits] = useState(user?.credits || 0);
-  const [streak, setStreak] = useState(user?.streakCount || 0);
+  const [credits, setCredits] = useState(
+    completion?.credits ?? user?.credits ?? 0
+  );
+  const [streak, setStreak] = useState(
+    completion?.streakCount ?? user?.streakCount ?? 0
+  );
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
@@ -49,13 +52,20 @@ export default function SurveyComplete() {
       try {
         const [profileRes, offersRes] = await Promise.all([
           userAPI.getProfile({ skipErrorToast: true }),
-          voucherAPI.getOffers({ all: 1, limit: 100, skipErrorToast: true }),
+          voucherAPI.getOffers({ all: 1, skipErrorToast: true }),
         ]);
         if (cancelled) return;
 
         const nextUser = profileRes.data?.data?.user;
-        setCredits(nextUser?.credits ?? user?.credits ?? 0);
-        setStreak(nextUser?.streakCount ?? user?.streakCount ?? 0);
+        setCredits(
+          nextUser?.credits ?? completion?.credits ?? user?.credits ?? 0
+        );
+        setStreak(
+          nextUser?.streakCount ??
+            completion?.streakCount ??
+            user?.streakCount ??
+            0
+        );
         refreshUser();
 
         const responseData = offersRes.data?.data || offersRes.data;
@@ -123,14 +133,25 @@ export default function SurveyComplete() {
             <span className="font-semibold text-gray-900">
               {completion.creditsEarned} Ruchi Credits
             </span>
-            . Your balance is now {credits.toLocaleString()} credits.
+            {completion.streakBonus > 0 ? (
+              <>
+                , including a{" "}
+                <span className="font-semibold text-gray-900">
+                  {completion.streakBonus} credit streak bonus
+                </span>
+              </>
+            ) : null}
+            .
+          </p>
+          <p className="mt-2 text-sm sm:text-base text-gray-500 font-light">
+            Your balance is now {credits.toLocaleString()} credits.
           </p>
         </AnimatedContent>
 
         <div className="mt-10 flex justify-center sm:justify-start">
           <StreakCelebration
             from={completion.previousStreak ?? 0}
-            to={streak}
+            to={completion.streakCount ?? streak}
           />
         </div>
 
@@ -138,14 +159,18 @@ export default function SurveyComplete() {
           <div className="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-10 mb-8">
             <div className="flex-1">
               <h2 className="text-2xl sm:text-3xl font-medium text-gray-900 mb-2">
-                {almostThere
-                  ? "Almost there"
-                  : "We think you might like these offers:"}
+                {showingSearch
+                  ? "Search rewards"
+                  : almostThere
+                    ? "Almost there"
+                    : "We think you might like these offers:"}
               </h2>
               <p className="text-gray-500 text-sm sm:text-base font-light max-w-xl">
-                {almostThere
-                  ? "You’re close to unlocking these rewards. A couple more surveys and they’re yours."
-                  : "Redeem with the credits you just earned — no need to leave this page."}
+                {showingSearch
+                  ? "Redeem any matching offer right here — you don’t need to leave this page."
+                  : almostThere
+                    ? "You’re close to unlocking these rewards. A couple more surveys and they’re yours."
+                    : "Redeem with the credits you just earned — no need to leave this page."}
               </p>
             </div>
             <div className="w-full lg:max-w-sm flex flex-col gap-3">
@@ -211,10 +236,9 @@ export default function SurveyComplete() {
                   <div key={offer._id} className="w-full">
                     <VoucherCard
                       offer={offer}
+                      userCredits={credits}
+                      showStoreLink={false}
                       onRedeem={handleSelectOffer}
-                      onViewStore={(businessId) =>
-                        navigate(`/shop/merchant/${businessId}`)
-                      }
                     />
                     {shortfall > 0 && (
                       <p className="mt-2 text-xs sm:text-sm font-medium text-orange-600">
@@ -251,7 +275,18 @@ export default function SurveyComplete() {
           onClose={() => setSelectedOffer(null)}
           onRedeemed={() => {
             const spent = selectedOffer.creditsRequired || 0;
+            const redeemedId = selectedOffer._id;
             setCredits((current) => Math.max(0, current - spent));
+            setOffers((current) =>
+              current.map((offer) =>
+                offer._id === redeemedId
+                  ? {
+                      ...offer,
+                      totalRedeemed: (offer.totalRedeemed || 0) + 1,
+                    }
+                  : offer
+              )
+            );
             refreshUser();
           }}
           onSuccess={() => setSelectedOffer(null)}

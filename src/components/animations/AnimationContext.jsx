@@ -1,4 +1,4 @@
-import { createContext, useRef } from 'react';
+import React, { createContext, useRef } from 'react';
 
 const DEFAULT_CONFIG = {
   direction: 'vertical',

@@ -1,5 +1,3 @@
-import { ensureCsrfToken } from './csrf';
-
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 const SESSION_HINT = 'USE_COOKIE_AUTH';
@@ -48,11 +46,9 @@ export const clearAuth = async () => {
   clearLocalStorage();
 
   try {
-    const token = await ensureCsrfToken();
     await fetch(`${API_BASE_URL}/auth/logout`, {
       method: 'POST',
       credentials: 'include',
-      headers: token ? { 'X-CSRF-Token': token } : {},
     });
   } catch {
     // Non-fatal: local hint is already cleared

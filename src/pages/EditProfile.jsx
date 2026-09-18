@@ -9,26 +9,24 @@ const GENDER_OPTIONS = ["Male", "Female", "Other", "Prefer not to say"];
 
 // Mirror your backend enums — expand as needed from userValidationLists.js
 const EDUCATION_LEVELS = [
-  "No formal education",
-  "Primary",
-  "Lower Secondary",
-  "Secondary",
-  "Higher Secondary",
-  "Bachelor's",
-  "Master's",
-  "PhD or above",
+  "Illiterate",
+  "Literate without formal schooling / Grade 4",
+  "Grade 9",
+  "Grade 12",
+  "Bachelors / Diploma",
+  "Masters",
+  "PhD",
 ];
 
 const MARITAL_STATUSES = ["Single", "Married", "Divorced", "Widowed", "Separated"];
 
 const INCOME_SOURCES = [
-  "Employment",
-  "Self-employment",
-  "Business",
-  "Agriculture",
-  "Remittance",
-  "Pension",
-  "Other",
+  "Me",
+  "Father",
+  "Mother",
+  "Spouse/partner",
+  "Sibling",
+  "Other guardian or relative",
 ];
 
 const OCCUPATIONS = [
@@ -48,14 +46,16 @@ const LANGUAGES = ["Nepali", "Maithili", "Bhojpuri", "Tharu", "Tamang", "English
 const NATIONALITIES = ["Nepali", "Indian", "Chinese", "Other"];
 
 const HOUSEHOLD_DURABLES = [
-  "Television",
+  "Electricity Connection",
+  "Ceiling Fan",
+  "Gas Stove",
   "Refrigerator",
-  "Washing Machine",
-  "Air Conditioner",
-  "Car",
-  "Motorcycle",
+  "Land in Rural Area",
+  "Television",
   "Computer / Laptop",
-  "Internet Connection",
+  "Two-wheeler Vehicle",
+  "Four-wheeler Vehicle",
+  "Air Conditioner",
 ];
 
 // ─── Reusable field components ────────────────────────────────────────────────
@@ -477,15 +477,18 @@ const EditProfile = () => {
                   </Select>
                 </div>
                 <div>
-                  <Label>Main Income Source</Label>
+                  <Label>Main Income Source of your household</Label>
                   <Select
                     value={demo.mainIncomeSource}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const value = e.target.value;
                       setDemo((p) => ({
                         ...p,
-                        mainIncomeSource: e.target.value,
-                      }))
-                    }
+                        mainIncomeSource: value,
+                        // Clear earner education when "Me" (same as onboarding)
+                        ...(value === "Me" ? { mainIncomeSourceEducation: "" } : {}),
+                      }));
+                    }}
                   >
                     <option value="">Select source</option>
                     {INCOME_SOURCES.map((s) => (
@@ -493,9 +496,9 @@ const EditProfile = () => {
                     ))}
                   </Select>
                 </div>
-                {demo.mainIncomeSource === "Employment" && (
+                {demo.mainIncomeSource && demo.mainIncomeSource !== "Me" && (
                   <div className="sm:col-span-2">
-                    <Label>Education Level of Income Source</Label>
+                    <Label>Education Level of {demo.mainIncomeSource}</Label>
                     <Select
                       value={demo.mainIncomeSourceEducation}
                       onChange={(e) =>

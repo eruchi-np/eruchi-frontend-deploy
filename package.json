@@ -16,7 +16,6 @@
     "gsap": "^3.15.0",
     "html5-qrcode": "^2.3.8",
     "js-cookie": "^3.0.5",
-    "latest": "^0.2.0",
     "lucide-react": "^0.294.0",
     "motion": "^12.42.2",
     "react": "^18.2.0",

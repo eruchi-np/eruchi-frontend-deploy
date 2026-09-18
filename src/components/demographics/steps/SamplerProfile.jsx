@@ -3,7 +3,7 @@ import SearchableSelect from '../ui/SearchableSelect';
 import EnhancedSelect from '../ui/EnhancedSelect';
 import { occupationOptions } from '../../../utils/occupation-data';
 
-const SamplerProfile = ({ formData, updateFormData }) => {
+const SamplerProfile = ({ formData, updateFormData, errors = {} }) => {
 const educationOptions = [
   { value: 'Illiterate', label: 'Illiterate' },
   { value: 'Literate without formal schooling / Grade 4', label: 'Literate without formal schooling / Grade 4' },
@@ -34,8 +34,8 @@ const languageOptions = [
 ];
 
   return (
-    <div>
-      <h2 className="text-xl font-semibold text-gray-900 mb-6">Sampler Profile</h2>
+    <div className="onboard-step">
+      <h2>About You</h2>
       
       <div className="space-y-6">
         {/* First Language */}
@@ -47,6 +47,7 @@ const languageOptions = [
             placeholder="Select your first language"
             label="First Language"
           />
+          {errors.firstLanguage && <p className="onboard-error">{errors.firstLanguage}</p>}
         </div>
 
         {/* Highest Level of Completed Education */}
@@ -58,6 +59,7 @@ const languageOptions = [
             placeholder="Select education level"
             label="Highest Level of Completed Education"
           />
+          {errors.education && <p className="onboard-error">{errors.education}</p>}
         </div>
 
         {/* Marital Status */}
@@ -69,6 +71,7 @@ const languageOptions = [
             placeholder="Select marital status"
             label="Marital Status"
           />
+          {errors.maritalStatus && <p className="onboard-error">{errors.maritalStatus}</p>}
         </div>
 
         {/* Occupation - Searchable Select */}
@@ -83,22 +86,16 @@ const languageOptions = [
             placeholder="Search or select your occupation..."
             searchPlaceholder="Search occupations..."
           />
-          {formData.occupation && (
-            <p className="text-sm text-green-600 font-medium mt-2">
-            </p>
-          )}
+          {errors.occupation && <p className="onboard-error">{errors.occupation}</p>}
         </div>
       </div>
 
-      {/* Progress indicator */}
-      <div className="mt-10 pt-6 border-t border-gray-200">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Step 1 of 4</span>
-          <span className="font-medium text-blue-600">Sampler Profile</span>
-        </div>
-        <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-          <div className="bg-blue-600 h-2 rounded-full w-1/4"></div>
-        </div>
+      <div className="onboard-step-meta">
+        <span>Step 1 of 3</span>
+        <strong>About You</strong>
+      </div>
+      <div className="onboard-progress">
+        <span style={{ width: "33%" }} />
       </div>
     </div>
   );

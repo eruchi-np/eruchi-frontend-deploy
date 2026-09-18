@@ -1,11 +1,13 @@
-import { useRef, useEffect, useContext } from 'react';
+import React, { useRef, useEffect, useContext } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { gsap } from 'gsap';
 import { AnimationContext } from './AnimationContext';
 
 function PageTransitionInner() {
+  const location = useLocation();
   const wrapperRef = useRef(null);
   const { configRef } = useContext(AnimationContext);
+  const skipEnter = location.pathname === "/shop";
 
   useEffect(() => {
     const el = wrapperRef.current;
@@ -13,7 +15,7 @@ function PageTransitionInner() {
 
     const cfg = configRef.current;
 
-    if (cfg.skip) return;
+    if (cfg.skip || skipEnter) return;
 
     const axis = cfg.direction === 'horizontal' ? 'x' : 'y';
     const offset = cfg.reverse ? -cfg.distance : cfg.distance;
@@ -42,5 +44,5 @@ function PageTransitionInner() {
 
 export default function PageTransition() {
   const location = useLocation();
-  return <PageTransitionInner key={location.key} />;
+  return <PageTransitionInner key={location.pathname} />;
 }

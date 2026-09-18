@@ -1,27 +1,38 @@
-import React, { useState, useRef } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
 import QRCode from "react-qr-code";
 import { X, Loader2, CheckCircle2 } from "lucide-react";
 import { voucherAPI } from "../../services/api";
-import AnimatedContent from "../animations/AnimatedContent";
 import { VOUCHER_TERMS } from "../../constants/voucherTerms";
+import { CARD_COLORS } from "../shop/RewardCard";
+import { playClaimBody, playClaimOpen } from "../shop/shopCinema";
+import { getOfferStock } from "../../utils/pickSurveyOffers";
+import "../shop/shop.css";
 
-// Vibrant ticket palettes — bg, darker accent, and soft ray color
 const TICKET_PALETTES = [
-  { bg: "#00704A", accent: "#005C3C", text: "#FFFFFF" }, // green
-  { bg: "#E50914", accent: "#B8070F", text: "#FFFFFF" }, // red
-  { bg: "#1E88E5", accent: "#1565C0", text: "#FFFFFF" }, // blue
-  { bg: "#FB8C00", accent: "#EF6C00", text: "#FFFFFF" }, // orange
-  { bg: "#212121", accent: "#000000", text: "#FFFFFF" }, // black
-  { bg: "#EC407A", accent: "#D81B60", text: "#FFFFFF" }, // pink
-  { bg: "#6A1B9A", accent: "#4A148C", text: "#FFFFFF" }, // purple
-  { bg: "#00897B", accent: "#00695C", text: "#FFFFFF" }, // teal
-  { bg: "#3949AB", accent: "#283593", text: "#FFFFFF" }, // indigo
-  { bg: "#C62828", accent: "#8E0000", text: "#FFFFFF" }, // maroon
+  { bg: "#00704A", accent: "#005C3C", text: "#FFFFFF" },
+  { bg: "#E50914", accent: "#B8070F", text: "#FFFFFF" },
+  { bg: "#1E88E5", accent: "#1565C0", text: "#FFFFFF" },
+  { bg: "#FB8C00", accent: "#EF6C00", text: "#FFFFFF" },
+  { bg: "#212121", accent: "#000000", text: "#FFFFFF" },
+  { bg: "#EC407A", accent: "#D81B60", text: "#FFFFFF" },
+  { bg: "#6A1B9A", accent: "#4A148C", text: "#FFFFFF" },
+  { bg: "#00897B", accent: "#00695C", text: "#FFFFFF" },
+  { bg: "#3949AB", accent: "#283593", text: "#FFFFFF" },
+  { bg: "#C62828", accent: "#8E0000", text: "#FFFFFF" },
 ];
 
-// Deterministic: same brand name → same color, always
+const WEEKDAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
 const getBrandPalette = (brandName = "") => {
   let hash = 0;
   for (let i = 0; i < brandName.length; i++) {
@@ -31,21 +42,108 @@ const getBrandPalette = (brandName = "") => {
   return TICKET_PALETTES[Math.abs(hash) % TICKET_PALETTES.length];
 };
 
-export default function VoucherRedeemModal({ offer, userCredits, onClose, onSuccess, onRedeemed }) {
+function claimColor(index, offer) {
+  if (Number.isFinite(index)) {
+    return CARD_COLORS[Math.abs(index) % CARD_COLORS.length];
+  }
+  const key = String(offer?._id || offer?.business?.brandName || offer?.business?.name || "");
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash << 5) - hash + key.charCodeAt(i);
+    hash |= 0;
+  }
+  return CARD_COLORS[Math.abs(hash) % CARD_COLORS.length];
+}
+
+function prettyCategory(value) {
+  if (!value) return "Partner reward";
+  return String(value)
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function discountHeadline(offer) {
+  if (offer.discountType === "percentage") return `${offer.discountValue}% OFF`;
+  if (offer.discountType === "free_item") {
+    return offer.discountValue ? `FREE ${String(offer.discountValue).toUpperCase()}` : "FREE";
+  }
+  if (offer.discountType === "value_combo") return "VALUE COMBO";
+  if (offer.discountValue != null && offer.discountValue !== "") {
+    return `Rs. ${offer.discountValue} OFF`;
+  }
+  return "REWARD";
+}
+
+function formatAvailable(days) {
+  if (!Array.isArray(days) || days.length === 0) return "See partner for hours";
+  const indexes = WEEKDAYS.map((day, i) => (days.includes(day) ? i : -1)).filter((i) => i >= 0);
+  if (indexes.length === 0) return days.join(", ");
+  const min = Math.min(...indexes);
+  const max = Math.max(...indexes);
+  if (indexes.length === max - min + 1) {
+    if (min === 0 && max === 6) return "Every day";
+    if (min === 0 && max === 4) return "Monday – Friday";
+    return `${WEEKDAYS[min]} – ${WEEKDAYS[max]}`;
+  }
+  return days.join(", ");
+}
+
+export default function VoucherRedeemModal({
+  offer,
+  userCredits,
+  onClose,
+  onSuccess,
+  onRedeemed,
+  index,
+}) {
   const [step, setStep] = useState("confirm");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [voucher, setVoucher] = useState(null);
   const [agreed, setAgreed] = useState(false);
   const qrRef = useRef(null);
+  const backdropRef = useRef(null);
+  const cardRef = useRef(null);
   const navigate = useNavigate();
+
+  const brandName = offer.business?.brandName || offer.business?.name || "Partner";
+  const category = prettyCategory(offer.business?.category);
+  const description =
+    String(offer.description || offer.business?.description || "").trim() ||
+    "Turn your earned credits into a little more of what you love.";
+  const location = String(offer.business?.address || "").trim() || "Kathmandu, Nepal";
+  const validity =
+    offer.expiryDays != null
+      ? `${offer.expiryDays} day${offer.expiryDays === 1 ? "" : "s"} after claiming`
+      : "See partner for details";
+  const available = formatAvailable(offer.business?.operatingDays);
+  const accent = claimColor(index, offer);
+  const stockInfo = useMemo(() => getOfferStock(offer), [offer]);
+  const isOut = stockInfo !== null && stockInfo.remaining === 0;
+  const notEnoughCredits = userCredits < offer.creditsRequired;
+  const canRedeem = !notEnoughCredits && !isOut;
 
   const discountLabel =
     offer.discountType === "percentage"
       ? `${offer.discountValue}% off`
       : `Rs. ${offer.discountValue} off`;
 
-  const notEnoughCredits = userCredits < offer.creditsRequired;
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (event) => {
+      if (event.key === "Escape") onClose?.();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [onClose]);
+
+  useLayoutEffect(() => playClaimOpen(backdropRef.current, cardRef.current), [offer?._id]);
+
+  useLayoutEffect(() => playClaimBody(cardRef.current, step), [step]);
 
   const handleRedeem = async () => {
     setLoading(true);
@@ -62,6 +160,11 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
     }
   };
 
+  const goSurveys = () => {
+    onClose?.();
+    navigate("/standalone-surveys");
+  };
+
   const downloadVoucher = async () => {
     const svg = qrRef.current?.querySelector("svg");
     if (!svg) return;
@@ -71,7 +174,6 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
     const RADIUS = 28;
     const QR_SIZE = 220;
 
-    const brandName = offer.business?.brandName || offer.business?.name || "Official Brand";
     const brandLogoUrl =
       offer.business?.brandLogo || offer.business?.logo || offer.business?.businessLogo || null;
     const palette = getBrandPalette(brandName);
@@ -93,7 +195,6 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
       return lines;
     };
 
-    // ---- Header layout (branded colored header) ----
     const HEADER_TOP_PAD = 30;
     const LOGO_SIZE = 68;
     const HEADER_BOTTOM_PAD = 26;
@@ -106,15 +207,14 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
     const HEADER_H =
       HEADER_TOP_PAD +
       LOGO_SIZE +
-      16 + // logo -> brand gap
-      18 + // brand name line
-      4 + // brand -> title gap
+      16 +
+      18 +
+      4 +
       titleLines.length * TITLE_LINE_H +
-      10 + // title -> discount gap
-      22 + // discount line
+      10 +
+      22 +
       HEADER_BOTTOM_PAD;
 
-    // ---- Description box ----
     const BOX_X = 32;
     const BOX_W = CARD_W - 64;
     const BOX_PAD_X = 16;
@@ -130,7 +230,6 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
     const descBoxH =
       descLines.length > 0 ? descLines.length * DESC_LINE_H + BOX_PAD_Y * 2 : 0;
 
-    // ---- Body layout ----
     const BODY_PAD_TOP = 28;
     const DIVIDER_GAP = 24;
     const HINT_H = 40;
@@ -147,7 +246,6 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
       EXPIRY_H +
       BODY_BOTTOM_PAD;
 
-    // Fetch brand logo
     const logoImg = brandLogoUrl
       ? await new Promise((resolve) => {
           const img = new Image();
@@ -158,14 +256,16 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
         })
       : null;
 
-    // Serialize QR SVG → Image
     const svgStr = new XMLSerializer().serializeToString(svg);
     const svgUrl = URL.createObjectURL(
       new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" })
     );
     const qrImg = await new Promise((resolve) => {
       const img = new Image();
-      img.onload = () => { URL.revokeObjectURL(svgUrl); resolve(img); };
+      img.onload = () => {
+        URL.revokeObjectURL(svgUrl);
+        resolve(img);
+      };
       img.src = svgUrl;
     });
 
@@ -180,15 +280,12 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
     ctx.roundRect(0, 0, CARD_W, CARD_H, RADIUS);
     ctx.clip();
 
-    // White body background
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, CARD_W, CARD_H);
 
-    // Colored header
     ctx.fillStyle = palette.bg;
     ctx.fillRect(0, 0, CARD_W, HEADER_H);
 
-    // Radial ray decoration (mirrors the on-screen sunburst)
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, CARD_W, HEADER_H);
@@ -213,7 +310,6 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
 
     let y = HEADER_TOP_PAD;
 
-    // Logo circle
     ctx.fillStyle = "#ffffff";
     ctx.beginPath();
     ctx.arc(CX, y + LOGO_SIZE / 2, LOGO_SIZE / 2, 0, Math.PI * 2);
@@ -233,7 +329,6 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
     }
     y += LOGO_SIZE + 16;
 
-    // Brand name
     ctx.fillStyle = "#ffffff";
     ctx.globalAlpha = 0.9;
     ctx.font = "700 12px system-ui, sans-serif";
@@ -241,7 +336,6 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
     ctx.globalAlpha = 1;
     y += 22;
 
-    // Title (wraps if long)
     ctx.fillStyle = "#ffffff";
     ctx.font = "bold 24px system-ui, sans-serif";
     for (const line of titleLines) {
@@ -250,14 +344,12 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
     }
     y += 6;
 
-    // Discount
     ctx.fillStyle = "#ffffff";
     ctx.globalAlpha = 0.9;
     ctx.font = "700 17px system-ui, sans-serif";
     ctx.fillText(discountLabel, CX, y);
     ctx.globalAlpha = 1;
 
-    // ---- Body content ----
     y = HEADER_H + BODY_PAD_TOP;
 
     if (descLines.length > 0) {
@@ -276,7 +368,6 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
       y += descBoxH + 20;
     }
 
-    // Divider
     ctx.strokeStyle = "#e2e8f0";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -285,33 +376,32 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
     ctx.stroke();
     y += DIVIDER_GAP;
 
-    // QR code
     const qrX = (CARD_W - QR_SIZE) / 2;
     ctx.drawImage(qrImg, qrX, y, QR_SIZE, QR_SIZE);
     y += QR_SIZE;
 
-    // Hint
     ctx.fillStyle = "#3399FF";
     ctx.globalAlpha = 0.8;
     ctx.font = "600 13px system-ui, sans-serif";
     ctx.fillText("Show this QR to store staff to redeem", CX, y + 26);
     ctx.globalAlpha = 1;
 
-    // Expiry
     if (voucher.expiresAt) {
       ctx.fillStyle = "#0f172a";
       ctx.font = "600 14px system-ui, sans-serif";
       ctx.fillText(
         `Expires ${new Date(voucher.expiresAt).toLocaleDateString(undefined, {
-          day: "numeric", month: "short", year: "numeric",
+          day: "numeric",
+          month: "short",
+          year: "numeric",
         })}`,
-        CX, y + 50
+        CX,
+        y + 50
       );
     }
 
     ctx.restore();
 
-    // Card border
     ctx.strokeStyle = "#e2e8f0";
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -325,143 +415,153 @@ export default function VoucherRedeemModal({ offer, userCredits, onClose, onSucc
   };
 
   return createPortal(
-    <div
-      onClick={onClose}
-      className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999] cursor-pointer"
-    >
-      <AnimatedContent
-        direction="vertical"
-        distance={35}
-        duration={0.4}
-        className="bg-white max-w-sm w-full rounded-3xl p-5 sm:p-7 mx-4 shadow-xl pointer-events-auto cursor-default max-h-[90vh] overflow-y-auto"
-        onClick={(e) => e.stopPropagation()}
+    <div className="reward-claim-backdrop" onClick={onClose}>
+      <div ref={backdropRef} className="reward-claim-dim" aria-hidden="true" />
+      <div
+        className="reward-claim-motion"
+        onClick={(event) => event.stopPropagation()}
       >
-        <div key={step}>
-          {/* ── Confirm step ── */}
+        <article ref={cardRef} className="reward-claim" style={{ "--claim": accent }}>
+        <aside className="reward-claim-brand">
+          <p className="reward-claim-kicker">Eruchi exclusive</p>
+          <div className="reward-claim-arch">
+            <span>{brandName}</span>
+          </div>
+          <p className="reward-claim-tagline">
+            A little reward.
+            <br />
+            A great experience.
+          </p>
+          <p className="reward-claim-mark">Claim it. Enjoy it.</p>
+        </aside>
+
+        <div className="reward-claim-body">
+          <button
+            type="button"
+            className="reward-claim-close"
+            onClick={onClose}
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+
           {step === "confirm" && (
             <>
-              <div className="flex items-start justify-between mb-5">
+              <p className="reward-claim-category">{category}</p>
+              <h2 className="reward-claim-title">{brandName}</h2>
+              <p className="reward-claim-copy">{description}</p>
+
+              <div className="reward-claim-deal">
+                <strong>{discountHeadline(offer)}</strong>
+                <span>{offer.title}</span>
+              </div>
+
+              <dl className="reward-claim-meta">
                 <div>
-                  {offer.business?.name && (
-                    <p className="text-[9px] font-bold tracking-widest uppercase text-[#3399FF] mb-1">
-                      {offer.business?.brandName || offer.business?.name}
-                    </p>
-                  )}
-                  <h2 className="text-lg font-bold text-gray-900">{offer.title}</h2>
+                  <dt>Validity</dt>
+                  <dd>{validity}</dd>
                 </div>
-                <button
-                  onClick={onClose}
-                  className="text-gray-400 hover:text-gray-600 ml-4 p-1 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+                <div>
+                  <dt>Available</dt>
+                  <dd>{available}</dd>
+                </div>
+                <div>
+                  <dt>Location</dt>
+                  <dd>{location}</dd>
+                </div>
+              </dl>
 
-              <p className="text-[#3399FF] font-semibold mb-3">{discountLabel}</p>
-
-              {/* Description — context before confirming */}
-              {offer.description && (
-                <div className="bg-blue-50/50 border border-blue-100 rounded-2xl px-4 py-3 mb-5">
-                  <p className="text-xs text-gray-500 leading-relaxed">
-                    {offer.description}
-                  </p>
+              {canRedeem && (
+                <div className="reward-claim-legal">
+                  <label className="reward-claim-agree">
+                    <input
+                      type="checkbox"
+                      checked={agreed}
+                      onChange={(event) => setAgreed(event.target.checked)}
+                    />
+                    I have read and agree to the
+                  </label>
+                  <details className="reward-claim-terms">
+                    <summary>Terms &amp; Conditions</summary>
+                    <ul>
+                      {VOUCHER_TERMS.map((term, i) => (
+                        <li key={i}>{term}</li>
+                      ))}
+                    </ul>
+                  </details>
                 </div>
               )}
 
-              <div className="flex items-center justify-between py-3 border-t border-b border-gray-100 mb-4">
-                <span className="text-sm text-gray-500">Cost</span>
-                <span className="text-sm font-semibold text-gray-900">
-                  {offer.creditsRequired} credits
-                </span>
+              {error ? <p className="reward-claim-error">{error}</p> : null}
+              {notEnoughCredits && !isOut ? (
+                <p className="reward-claim-error">Not enough credits</p>
+              ) : null}
+
+              <div className="reward-claim-foot">
+                <div>
+                  <p className="reward-claim-credits">{offer.creditsRequired || 0} Credits</p>
+                  <p className="reward-claim-balance">Your balance: {userCredits} credits</p>
+                </div>
+                {isOut ? (
+                  <button type="button" className="reward-claim-cta" disabled>
+                    Sold out
+                  </button>
+                ) : notEnoughCredits ? (
+                  <button type="button" className="reward-claim-cta" onClick={goSurveys}>
+                    Surveys
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="reward-claim-cta"
+                    onClick={handleRedeem}
+                    disabled={loading || !agreed}
+                  >
+                    {loading && <Loader2 size={16} className="animate-spin" />}
+                    Redeem
+                  </button>
+                )}
               </div>
-              <div className="flex items-center justify-between mb-5">
-                <span className="text-sm text-gray-400">Balance</span>
-                <span className="text-sm text-gray-500">{userCredits} credits</span>
-              </div>
 
-              <details className="text-xs text-gray-500 border border-gray-100 rounded-2xl px-4 py-3 mb-4">
-                <summary className="cursor-pointer font-medium text-gray-600">Terms & Conditions</summary>
-                <ul className="mt-2 list-disc pl-4 space-y-1">
-                  {VOUCHER_TERMS.map((term, i) => (
-                    <li key={i}>{term}</li>
-                  ))}
-                </ul>
-              </details>
-              <label className="flex items-start gap-2 mb-4 text-xs text-gray-600 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={agreed}
-                  onChange={(e) => setAgreed(e.target.checked)}
-                  className="mt-0.5"
-                />
-                I have read and agree to the Terms & Conditions
-              </label>
-
-              {error && <p className="text-sm text-red-500 mb-3">{error}</p>}
-
-              <button
-                onClick={handleRedeem}
-                disabled={notEnoughCredits || loading || !agreed}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-full text-white text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-opacity hover:opacity-90"
-                style={{ backgroundColor: "#3399FF" }}
-              >
-                {loading && <Loader2 size={16} className="animate-spin" />}
-                Redeem
-              </button>
-
-              {notEnoughCredits && (
-                <p className="text-sm text-red-500 mt-2 text-center">
-                  Not enough credits
-                </p>
-              )}
+              <p className="reward-claim-note">
+                Present your voucher at the venue. Terms and conditions apply.
+              </p>
             </>
           )}
 
-          {/* ── Success step ── */}
           {step === "success" && voucher && (
-            <>
-              <div className="flex items-start justify-between mb-5">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 size={24} className="text-green-500 shrink-0" />
-                  <h2 className="text-lg font-bold text-gray-900">Voucher Redeemed!</h2>
-                </div>
+            <div className="reward-claim-success">
+              <div className="reward-claim-success-head">
+                <CheckCircle2 size={22} />
+                <h2>Voucher redeemed</h2>
+              </div>
+              <div ref={qrRef} className="reward-claim-qr">
+                <QRCode
+                  value={JSON.stringify({ v: voucher._id, t: voucher.redemptionToken })}
+                  size={168}
+                />
+              </div>
+              <p className="reward-claim-copy">Show this QR to store staff to redeem.</p>
+              <div className="reward-claim-success-actions">
+                <button type="button" className="reward-claim-secondary" onClick={downloadVoucher}>
+                  Download voucher
+                </button>
                 <button
-                  onClick={onClose}
-                  className="text-gray-400 hover:text-gray-600 ml-4 p-1 rounded-lg hover:bg-gray-50 transition-colors"
+                  type="button"
+                  className="reward-claim-cta"
+                  onClick={() => {
+                    onSuccess?.();
+                    navigate("/vouchers");
+                  }}
                 >
-                  <X size={20} />
+                  View my vouchers
                 </button>
               </div>
-
-              <div className="flex justify-center mb-5">
-                <div
-                  ref={qrRef}
-                  className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm"
-                >
-                  <QRCode
-                    value={JSON.stringify({ v: voucher._id, t: voucher.redemptionToken })}
-                    size={180}
-                  />
-                </div>
-              </div>
-
-              <button
-                onClick={downloadVoucher}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-full border border-gray-300 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors mb-2"
-              >
-                Download Voucher
-              </button>
-              <button
-                onClick={() => { onSuccess(); navigate("/vouchers"); }}
-                className="w-full py-3 rounded-full text-white text-sm font-medium hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: "#3399FF" }}
-              >
-                View My Vouchers
-              </button>
-            </>
+            </div>
           )}
         </div>
-      </AnimatedContent>
+        </article>
+      </div>
     </div>,
     document.body
   );

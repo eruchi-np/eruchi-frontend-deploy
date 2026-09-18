@@ -1,6 +1,5 @@
 import { useEffect } from 'react';
-
-const SITE_ORIGIN = 'https://eruchi.com.np';
+import { getSiteOrigin } from '../utils/siteOrigin';
 
 function upsertMeta(selector, attrs) {
   let el = document.head.querySelector(selector);
@@ -51,8 +50,9 @@ export default function usePageMeta({
     upsertMeta('meta[property="og:title"]', { property: 'og:title', content: pageTitle });
     upsertMeta('meta[property="og:type"]', { property: 'og:type', content: 'website' });
 
+    const origin = getSiteOrigin();
     const path = canonicalPath || window.location.pathname;
-    const canonical = `${SITE_ORIGIN}${path}`;
+    const canonical = `${origin}${path}`;
     upsertLink('canonical', canonical);
     upsertMeta('meta[property="og:url"]', { property: 'og:url', content: canonical });
 
@@ -69,8 +69,8 @@ export default function usePageMeta({
         '@context': 'https://schema.org',
         '@type': 'Organization',
         name: 'eRuchi',
-        url: SITE_ORIGIN,
-        logo: `${SITE_ORIGIN}/logo.png`,
+        url: origin,
+        logo: `${origin}/logo.png`,
         description,
       });
     } else if (jsonLd) {
@@ -78,5 +78,3 @@ export default function usePageMeta({
     }
   }, [title, description, index, canonicalPath, skip]);
 }
-
-export { SITE_ORIGIN };

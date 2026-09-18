@@ -1,54 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { Loader2 } from 'lucide-react';
-import axios from 'axios';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { Loader2 } from "lucide-react";
+import axios from "axios";
+import toast from "react-hot-toast";
 import { getPostLoginPath } from "../utils/auth";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from 'react-router-dom';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Link } from 'react-router-dom';
+import { useNavigate, Link } from "react-router-dom";
+import { zodResolver } from "@hookform/resolvers/zod";
+import OnboardingShell from "../components/onboarding/OnboardingShell";
+import "../components/onboarding/onboarding.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-// Updated the error message to include the Privacy Policy
-const formSchema = z.object({
-  firstName: z.string().min(2, "First Name must be at least 2 characters").max(50),
-  lastName: z.string().min(2, "Last Name must be at least 2 characters").max(50),
-  password: z
-    .string()
-    .min(8, "Password must be at least 8 characters")
-    .regex(/[A-Za-z]/, "Password must include a letter")
-    .regex(/\d/, "Password must include a number"),
-  confirmPassword: z.string().min(1, "Confirm Password is required"),
-  phone: z.string().regex(/^\+?\d{9,15}$/, "Phone Number must be valid (9–15 digits, optional +)"),
-  email: z.string().email("Invalid email address"),
-  gender: z.enum(["Male", "Female", "Other", "Prefer not to say"], {
-    required_error: "Please select your gender",
-  }),
-  dob: z.string().min(1, "Date of Birth is required").refine((val) => {
-    const birth = new Date(val);
-    const today = new Date();
-    let age = today.getFullYear() - birth.getFullYear();
-    const m = today.getMonth() - birth.getMonth();
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
-    return age >= 13;
-  }, "You must be at least 13 years old"),
-  nationality: z.enum(["Nepali", "Other"]).optional(),
-  termsAccepted: z.literal(true, {
-    errorMap: () => ({ message: "You must accept the terms, conditions, and privacy policy" }),
-  }),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords do not match",
-  path: ["confirmPassword"],
-});
+const formSchema = z
+  .object({
+    firstName: z.string().min(2, "First Name must be at least 2 characters").max(50),
+    lastName: z.string().min(2, "Last Name must be at least 2 characters").max(50),
+    password: z
+      .string()
+      .min(8, "Password must be at least 8 characters")
+      .regex(/[A-Za-z]/, "Password must include a letter")
+      .regex(/\d/, "Password must include a number"),
+    confirmPassword: z.string().min(1, "Confirm Password is required"),
+    email: z.string().email("Invalid email address"),
+    nationality: z.preprocess(
+      (value) => (value === "" || value == null ? undefined : value),
+      z.enum(["Nepali", "Other"]).optional()
+    ),
+    termsAccepted: z.literal(true, {
+      errorMap: () => ({ message: "You must accept the terms, conditions, and privacy policy" }),
+    }),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 const Signup = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
-  const [signupError, setSignupError] = useState('');
-  
+  const [signupError, setSignupError] = useState("");
+
   useEffect(() => {
     if (!authLoading && user) {
       navigate(getPostLoginPath(user), { replace: true });
@@ -56,7 +49,7 @@ const Signup = () => {
   }, [authLoading, user, navigate]);
 
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const {
     register,
     handleSubmit,
@@ -64,19 +57,18 @@ const Signup = () => {
     watch,
   } = useForm({
     resolver: zodResolver(formSchema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
   });
 
   const termsAcceptedValue = watch("termsAccepted");
 
   const onSubmit = async (data) => {
     setIsLoading(true);
-    setSignupError('');
+    setSignupError("");
 
-    const emailPrefix = data.email.split('@')[0];
-    const safeUsername = emailPrefix
-      .replace(/[^a-zA-Z0-9]/g, '')
-      .slice(0, 30)
-      .padEnd(3, '0');
+    const emailPrefix = data.email.split("@")[0];
+    const safeUsername = emailPrefix.replace(/[^a-zA-Z0-9]/g, "").slice(0, 30).padEnd(3, "0");
 
     try {
       const payload = {
@@ -85,284 +77,137 @@ const Signup = () => {
         password: data.password,
         firstName: data.firstName,
         lastName: data.lastName,
-        phone: data.phone,
-        gender: data.gender,
-        dateOfBirth: data.dob,
         nationality: data.nationality || null,
       };
 
-      console.log("[DEBUG] Sending registration payload:", payload);
-
       const response = await axios.post(`${API_BASE_URL}/auth/register`, payload);
       const userEmail = response.data.data.user.email;
-      toast.success('Registration successful! Please verify your email.');
+      toast.success("Registration successful! Please verify your email.");
       navigate(`/email-verification?email=${encodeURIComponent(userEmail)}`);
-      
     } catch (err) {
       const errorData = err.response?.data;
-      let errorMessage = 'Registration failed. Please try again.';
+      let errorMessage = "Registration failed. Please try again.";
 
       if (errorData?.errors) {
-        errorMessage = errorData.errors.map(e => e.msg).join(', ');
+        errorMessage = errorData.errors.map((e) => e.msg).join(", ");
       } else if (errorData?.message) {
         errorMessage = errorData.message;
       }
 
       setSignupError(errorMessage);
-      console.error('Signup failed:', err, errorData);
+      console.error("Signup failed:", err, errorData);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <section className="py-10 sm:py-16 pb-28 bg-white text-black">
-      <div className="flex justify-center items-center px-4">
-        <div className="flex w-full max-w-lg mx-auto space-y-8 sm:space-y-12 flex-col">
-          
-          <h1 className="text-3xl sm:text-4xl font-bold leading-tight">
-            Glad to have you with us!
-          </h1>
+    <OnboardingShell>
+      <div className="onboard-card">
+        <h1 className="onboard-title">Glad to have you with us!</h1>
+        <p className="onboard-copy">Create your account. Phone, date of birth, and gender come next.</p>
 
-          <form className="grid grid-cols-1 space-y-7" onSubmit={handleSubmit(onSubmit)}>
-            <div className="grid grid-cols-1 space-y-6">
-              
-              {/* First Name */}
-              <div>
-                <input
-                  type="text"
-                  placeholder="First Name"
-                  {...register("firstName")}
-                  className={`w-full text-lg font-medium outline-none p-4 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 ${
-                    errors.firstName ? "border-red-500" : "border-gray-300 focus:border-black"
-                  }`}
-                />
-                {errors.firstName && (
-                  <p className="text-sm text-red-500 mt-2 font-medium px-4">
-                    {errors.firstName.message}
-                  </p>
-                )}
-              </div>
+        <form className="onboard-form" onSubmit={handleSubmit(onSubmit)}>
+          <div className={`onboard-field ${errors.firstName ? "is-error" : ""}`}>
+            <label htmlFor="firstName">First name</label>
+            <input id="firstName" type="text" placeholder="First name" autoComplete="given-name" {...register("firstName")} />
+            {errors.firstName && <p className="onboard-error">{errors.firstName.message}</p>}
+          </div>
 
-              {/* Last Name */}
-              <div>
-                <input
-                  type="text"
-                  placeholder="Last Name"
-                  {...register("lastName")}
-                  className={`w-full text-lg font-medium outline-none p-4 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 ${
-                    errors.lastName ? "border-red-500" : "border-gray-300 focus:border-black"
-                  }`}
-                />
-                {errors.lastName && (
-                  <p className="text-sm text-red-500 mt-2 font-medium px-4">
-                    {errors.lastName.message}
-                  </p>
-                )}
-              </div>
+          <div className={`onboard-field ${errors.lastName ? "is-error" : ""}`}>
+            <label htmlFor="lastName">Last name</label>
+            <input id="lastName" type="text" placeholder="Last name" autoComplete="family-name" {...register("lastName")} />
+            {errors.lastName && <p className="onboard-error">{errors.lastName.message}</p>}
+          </div>
 
-              {/* Email */}
-              <div>
-                <input
-                  type="email"
-                  placeholder="Email Address"
-                  {...register("email")}
-                  className={`w-full text-lg font-medium outline-none p-4 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 ${
-                    errors.email ? "border-red-500" : "border-gray-300 focus:border-black"
-                  }`}
-                />
-                {errors.email && (
-                  <p className="text-sm text-red-500 mt-2 font-medium px-4">
-                    {errors.email.message}
-                  </p>
-                )}
-              </div>
+          <div className={`onboard-field ${errors.email ? "is-error" : ""}`}>
+            <label htmlFor="email">Email address</label>
+            <input id="email" type="email" placeholder="you@example.com" autoComplete="email" {...register("email")} />
+            {errors.email && <p className="onboard-error">{errors.email.message}</p>}
+          </div>
 
-              {/* Phone Number */}
-              <div>
-                <input
-                  type="tel"
-                  placeholder="Phone Number"
-                  {...register("phone")}
-                  className={`w-full text-lg font-medium outline-none p-4 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 ${
-                    errors.phone ? "border-red-500" : "border-gray-300 focus:border-black"
-                  }`}
-                />
-                {errors.phone && (
-                  <p className="text-sm text-red-500 mt-2 font-medium px-4">
-                    {errors.phone.message}
-                  </p>
-                )}
-              </div>
+          <div className={`onboard-field ${errors.password ? "is-error" : ""}`}>
+            <label htmlFor="password">Password</label>
+            <input id="password" type="password" placeholder="Password" autoComplete="new-password" {...register("password")} />
+            {errors.password && <p className="onboard-error">{errors.password.message}</p>}
+          </div>
 
-              {/* Password */}
-              <div>
-                <input
-                  type="password"
-                  placeholder="Password"
-                  {...register("password")}
-                  className={`w-full text-lg font-medium outline-none p-4 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 ${
-                    errors.password ? "border-red-500" : "border-gray-300 focus:border-black"
-                  }`}
-                />
-                {errors.password && (
-                  <p className="text-sm text-red-500 mt-2 font-medium px-4">
-                    {errors.password.message}
-                  </p>
-                )}
-              </div>
+          <div className={`onboard-field ${errors.confirmPassword ? "is-error" : ""}`}>
+            <label htmlFor="confirmPassword">Confirm password</label>
+            <input
+              id="confirmPassword"
+              type="password"
+              placeholder="Confirm password"
+              autoComplete="new-password"
+              {...register("confirmPassword")}
+            />
+            {errors.confirmPassword && <p className="onboard-error">{errors.confirmPassword.message}</p>}
+          </div>
 
-              {/* Confirm Password */}
-              <div>
-                <input
-                  type="password"
-                  placeholder="Confirm Password"
-                  {...register("confirmPassword")}
-                  className={`w-full text-lg font-medium outline-none p-4 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 ${
-                    errors.confirmPassword ? "border-red-500" : "border-gray-300 focus:border-black"
-                  }`}
-                />
-                {errors.confirmPassword && (
-                  <p className="text-sm text-red-500 mt-2 font-medium px-4">
-                    {errors.confirmPassword.message}
-                  </p>
-                )}
-              </div>
+          <div className="onboard-field">
+            <label htmlFor="nationality">Nationality</label>
+            <select id="nationality" {...register("nationality")} defaultValue="">
+              <option value="">Select nationality</option>
+              <option value="Nepali">Nepali</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
 
-              {/* Gender Select */}
-              <div>
-                <span className="block text-xs font-semibold text-gray-400 px-4 mb-[-4px]">Gender</span>
-                <select
-                  id="gender"
-                  {...register("gender")}
-                  className={`w-full text-lg font-medium outline-none p-4 border-b-2 bg-transparent transition-all duration-200 ${
-                    errors.gender ? "border-red-500" : "border-gray-300 focus:border-black"
-                  }`}
-                  defaultValue=""
+          <div className="flex flex-col space-y-2">
+            <div className="flex items-start">
+              <input
+                type="checkbox"
+                id="termsAccepted"
+                {...register("termsAccepted")}
+                className={`h-5 w-5 mt-0.5 text-black border-2 border-gray-300 rounded focus:ring-2 focus:ring-black cursor-pointer ${
+                  errors.termsAccepted ? "border-red-500" : ""
+                }`}
+              />
+              <label htmlFor="termsAccepted" className="ml-3 block text-base font-medium text-[var(--muted)]">
+                I agree to the{" "}
+                <Link to="/terms" className="font-semibold text-[var(--navy)] underline" target="_blank" rel="noopener noreferrer">
+                  Terms and Conditions
+                </Link>{" "}
+                &{" "}
+                <Link
+                  to="/privacy-policy"
+                  className="font-semibold text-[var(--navy)] underline"
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                  <option value="" disabled>Select Gender</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                  <option value="Prefer not to say">Prefer not to say</option>
-                </select>
-                {errors.gender && (
-                  <p className="text-sm text-red-500 mt-2 font-medium px-4">
-                    {errors.gender.message}
-                  </p>
-                )}
-              </div>
-
-              {/* Date of Birth */}
-              <div>
-                <span className="block text-xs font-semibold text-gray-400 px-4 mb-[-4px]">Date of Birth</span>
-                <input
-                  type="date"
-                  id="dob"
-                  {...register("dob")}
-                  className={`w-full text-lg font-medium outline-none p-4 border-b-2 bg-transparent transition-all duration-200 ${
-                    errors.dob ? "border-red-500" : "border-gray-300 focus:border-black"
-                  }`}
-                />
-                {errors.dob && (
-                  <p className="text-sm text-red-500 mt-2 font-medium px-4">
-                    {errors.dob.message}
-                  </p>
-                )}
-              </div>
-
-              {/* Nationality Select */}
-              <div>
-                <span className="block text-xs font-semibold text-gray-400 px-4 mb-[-4px]">Nationality</span>
-                <select
-                  id="nationality"
-                  {...register("nationality")}
-                  className="w-full text-lg font-medium outline-none p-4 border-b-2 border-gray-300 focus:border-black bg-transparent transition-all duration-200 text-black"
-                  defaultValue=""
-                >
-                  <option value="">Select Nationality</option>
-                  <option value="Nepali">Nepali</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
+                  Privacy Policy
+                </Link>
+              </label>
             </div>
+            {errors.termsAccepted && <p className="onboard-error">{errors.termsAccepted.message}</p>}
+          </div>
 
-            {/* UPDATED: Terms and Conditions Checkbox */}
-            <div className="flex flex-col space-y-2 pt-2 px-2">
-              <div className="flex items-start">
-                <input
-                  type="checkbox"
-                  id="termsAccepted"
-                  {...register("termsAccepted")}
-                  className={`h-5 w-5 mt-0.5 text-black border-2 border-gray-300 rounded focus:ring-2 focus:ring-black cursor-pointer ${
-                    errors.termsAccepted ? "border-red-500" : ""
-                  }`}
-                />
-                <label htmlFor="termsAccepted" className="ml-3 block text-base font-medium text-gray-600">
-                  I agree to the{" "}
-                  <Link 
-                    to="/terms" 
-                    className="font-semibold text-black hover:text-gray-700 underline transition-colors duration-200" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                  >
-                    Terms and Conditions
-                  </Link>
-                  {" "}&{" "}
-                  <Link 
-                    to="/privacy-policy" 
-                    className="font-semibold text-black hover:text-gray-700 underline transition-colors duration-200" 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                  >
-                    Privacy Policy
-                  </Link>
-                </label>
-              </div>
-              {errors.termsAccepted && (
-                <p className="text-sm text-red-500 font-medium pt-1">
-                  {errors.termsAccepted.message}
-                </p>
-              )}
-            </div>
+          <div className="onboard-links">
+            <span />
+            <Link to="/login">Already have an account?</Link>
+          </div>
 
-            {/* Inline Navigation Context Link */}
-            <div className="w-full flex justify-end text-gray-600 px-2">
-              <Link 
-                to="/login" 
-                className="font-semibold hover:text-black transition-colors duration-200 underline decoration-gray-400 hover:decoration-black"
-              >
-                Already have an account?
-              </Link>
-            </div>
+          {signupError && <p className="onboard-error">{signupError}</p>}
 
-            {signupError && (
-              <p className="text-sm text-red-500 font-medium">{signupError}</p>
-            )}
-
-            {/* Submit button */}
+          <div className="onboard-actions">
             <button
               type="submit"
-              className={`w-full mt-4 p-4 font-bold text-lg rounded-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-all duration-200 ${
-                isLoading || !termsAcceptedValue
-                  ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-                  : 'bg-black text-white hover:bg-gray-800 hover:shadow-lg transform hover:scale-[1.02]'
-              }`}
+              className="home-pill home-pill-lg home-pill-navy"
               disabled={isLoading || !termsAcceptedValue}
             >
               {isLoading ? (
-                <div className="flex justify-center items-center">
-                  <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                <span className="inline-flex items-center">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   Loading...
-                </div>
+                </span>
               ) : (
-                'Register'
+                "Register"
               )}
             </button>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
-    </section>
+    </OnboardingShell>
   );
 };
 

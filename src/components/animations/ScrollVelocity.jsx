@@ -1,4 +1,4 @@
-import { useRef, useLayoutEffect, useState } from 'react';
+import React, { useRef, useLayoutEffect, useState } from 'react';
 import {
   motion,
   useScroll,

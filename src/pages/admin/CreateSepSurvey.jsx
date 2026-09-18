@@ -31,7 +31,8 @@ const CreateSepSurvey = () => {
     ]
   });
 
-  const { surveyId } = useParams();
+  const params = useParams();
+  const surveyId = params.surveyId || params.id;
   const isEditMode = Boolean(surveyId);
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [editLocked, setEditLocked] = useState(false);
@@ -259,7 +260,7 @@ const CreateSepSurvey = () => {
       navigate('/admin');
     } catch (err) {
       console.error('Create sep survey error:', err);
-      const msg = err.response?.data?.message || 'Failed to create survey';
+      const msg = err.response?.data?.message || (isEditMode ? 'Failed to update survey' : 'Failed to create survey');
       toast.error(msg);
     } finally {
       setLoading(false);

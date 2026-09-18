@@ -4,15 +4,11 @@ const initialFormData = {
   livingSituation: '',
   householdSize: '',
   hasChildrenUnder12: '',
-  occupationCategory: '',
   ownsPets: '',
   transportation: [],
-  lifeChanges: [],
   dailySchedule: ''
 };
 
-// Unlike useDemographics, this survey is non-blocking — no draft persistence,
-// no step gating. Just plain form state for a single-page survey.
 const useAdditionalProfile = () => {
   const [formData, setFormData] = useState(initialFormData);
 

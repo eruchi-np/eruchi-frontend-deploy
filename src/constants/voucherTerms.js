@@ -1,3 +1,5 @@
+import { SUPPORT_EMAIL } from "../utils/siteConfig";
+
 export const VOUCHER_TERMS = [
   "The offer cannot be redeemed for cash.",
   "The offer cannot be combined or exchanged with other offers or ongoing promotions at the merchant.",
@@ -7,5 +9,5 @@ export const VOUCHER_TERMS = [
   "Each voucher is valid for a single redemption and cannot be applied more than once to the same purchase.",
   "This offer can be redeemed once per user at this merchant every 14 days.",
   "The merchant reserves the right to verify the redemption code before honouring the offer.",
-  "For support, contact us at support@eruchi.com.np.",
+  `For support, contact us at ${SUPPORT_EMAIL}.`,
 ];

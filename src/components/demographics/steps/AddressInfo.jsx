@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, MapPin, AlertCircle } from 'lucide-react';
 import { groupedMunicipalities, getMaxWards, municipalityData } from '../../../utils/municipalityData';
 
-const AddressInfo = ({ formData, updateFormData }) => {
+const AddressInfo = ({ formData, updateFormData, errors = {} }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showMunicipalityDropdown, setShowMunicipalityDropdown] = useState(false);
   const [wardError, setWardError] = useState('');
@@ -86,9 +86,9 @@ const AddressInfo = ({ formData, updateFormData }) => {
   };
 
   return (
-    <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Address Information</h2>
-      <p className="text-gray-600 mb-8">Tell us where you live in Nepal</p>
+    <div className="onboard-step">
+      <h2>Address</h2>
+      <p className="onboard-copy">Tell us where you live in Nepal</p>
       
       <div className="space-y-8">
         {/* Municipality Selection */}
@@ -174,6 +174,10 @@ const AddressInfo = ({ formData, updateFormData }) => {
             )}
           </div>
 
+          {errors.municipality && !formData.municipality && (
+            <p className="onboard-error">{errors.municipality}</p>
+          )}
+
           {/* Selected Municipality Info */}
           {selectedMunicipality && (
             <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
@@ -222,10 +226,10 @@ const AddressInfo = ({ formData, updateFormData }) => {
           </div>
 
           {/* Ward Validation Messages */}
-          {wardError && (
+          {(wardError || errors.wardNumber) && (
             <div className="mt-2 flex items-center text-red-600 text-sm">
               <AlertCircle className="h-4 w-4 mr-1" />
-              {wardError}
+              {wardError || errors.wardNumber}
             </div>
           )}
 
@@ -243,15 +247,12 @@ const AddressInfo = ({ formData, updateFormData }) => {
         </div>
       </div>
 
-      {/* Progress indicator */}
-      <div className="mt-10 pt-6 border-t border-gray-200">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Step 2 of 4</span>
-          <span className="font-medium text-blue-600">Address Information</span>
-        </div>
-        <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-          <div className="bg-blue-600 h-2 rounded-full w-2/4"></div>
-        </div>
+      <div className="onboard-step-meta">
+        <span>Step 2 of 3</span>
+        <strong>Address</strong>
+      </div>
+      <div className="onboard-progress">
+        <span style={{ width: "66%" }} />
       </div>
     </div>
   );

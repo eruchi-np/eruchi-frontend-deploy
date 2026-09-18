@@ -1,13 +1,7 @@
 <!doctype html>
 <html lang="en">
   <head>
-    <!-- Google Tag Manager -->
-<script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-5NT24MPD');</script>
-<!-- End Google Tag Manager -->
+    <!-- ANALYTICS_GTM_HEAD -->
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/icon.png" />
     <!-- POPPINS FONT – THIS IS THE MAGIC -->
@@ -15,40 +9,21 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="referrer" content="no-referrer-when-downgrade" />
     <title>eRuchi</title>
     <meta name="description" content="Earn Ruchi Credits by sharing feedback through surveys, then redeem them at partner cafes, gyms, and shops in Nepal." />
     <meta name="robots" content="index, follow" />
-    <link rel="canonical" href="https://eruchi.com.np/" />
+    <link rel="canonical" href="%VITE_SITE_ORIGIN%/" />
     <meta property="og:title" content="eRuchi" />
     <meta property="og:description" content="Earn Ruchi Credits by sharing feedback through surveys, then redeem them at partner cafes, gyms, and shops in Nepal." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://eruchi.com.np/" />
-    <meta property="og:image" content="https://eruchi.com.np/logo.png" />
-    <!-- Meta Pixel Code -->
-    <script>
-    !function(f,b,e,v,n,t,s)
-    {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-    n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-    if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-    n.queue=[];t=b.createElement(e);t.async=!0;
-    t.src=v;s=b.getElementsByTagName(e)[0];
-    s.parentNode.insertBefore(t,s)}(window, document,'script',
-    'https://connect.facebook.net/en_US/fbevents.js');
-    fbq('init', '4160020660801265');
-    fbq('track', 'PageView');
-    </script>
-    <!-- End Meta Pixel Code -->
+    <meta property="og:url" content="%VITE_SITE_ORIGIN%/" />
+    <meta property="og:image" content="%VITE_SITE_ORIGIN%/logo.png" />
+    <!-- ANALYTICS_PIXEL_HEAD -->
   </head>
   <body>
-    <!-- Google Tag Manager (noscript) -->
-<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-5NT24MPD"
-height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-<!-- End Google Tag Manager (noscript) -->
-    <!-- Meta Pixel noscript -->
-    <noscript><img height="1" width="1" style="display:none"
-    src="https://www.facebook.com/tr?id=4160020660801265&ev=PageView&noscript=1"
-    /></noscript>
-    <!-- End Meta Pixel noscript -->
+    <!-- ANALYTICS_GTM_NOSCRIPT -->
+    <!-- ANALYTICS_PIXEL_NOSCRIPT -->
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

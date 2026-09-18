@@ -1,10 +1,21 @@
 import React, { useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { Ticket, QrCode, Download, X } from "lucide-react";
 import QRCode from "react-qr-code";
 import { adminAPI } from "../../../services/api";
 import toast from "react-hot-toast";
 
-const VoucherManagement = ({ vouchers, voucherLoading, voucherStatusFilter, handleVoucherStatusFilter, NAVY }) => {
+import Pagination from "../../../components/ui/Pagination";
+
+const VoucherManagement = ({
+  vouchers,
+  voucherLoading,
+  voucherStatusFilter,
+  handleVoucherStatusFilter,
+  pagination,
+  onPageChange,
+  NAVY,
+}) => {
   const [qrModal, setQrModal] = useState(null); // { qrValue, voucherId, title }
   const qrModalRef = useRef(null);
 
@@ -99,7 +110,7 @@ const VoucherManagement = ({ vouchers, voucherLoading, voucherStatusFilter, hand
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 truncate">{snap.title || "Voucher"}</p>
-                      <p className="text-sm text-gray-500">{voucher.user?.firstName} {voucher.user?.lastName} · {discountLabel}</p>
+                      <p className="text-sm text-gray-500">{voucher.user?.firstName} {voucher.user?.lastName} · {voucher.business?.name ? `${voucher.business.name} · ` : ""}{discountLabel}</p>
                       <p className="text-xs text-gray-400 mt-0.5">Expires {new Date(voucher.expiresAt).toLocaleDateString()}</p>
                     </div>
                   </div>
@@ -120,8 +131,19 @@ const VoucherManagement = ({ vouchers, voucherLoading, voucherStatusFilter, hand
         </div>
       )}
 
-      {qrModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in duration-200" onClick={() => setQrModal(null)}>
+      <div className="px-6 pb-4">
+        <Pagination
+          page={pagination?.currentPage || 1}
+          totalPages={pagination?.totalPages || 1}
+          total={pagination?.total}
+          pageSize={20}
+          onChange={onPageChange}
+          label="vouchers"
+        />
+      </div>
+
+      {qrModal && createPortal(
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[80] p-4 animate-in fade-in duration-200" onClick={() => setQrModal(null)}>
           <div className="bg-white rounded-3xl p-8 max-w-sm w-full flex flex-col items-center gap-4 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between w-full">
               <h3 className="font-bold text-gray-900 truncate flex-1 mr-4">{qrModal.title || "Voucher QR"}</h3>
@@ -137,7 +159,8 @@ const VoucherManagement = ({ vouchers, voucherLoading, voucherStatusFilter, hand
               <Download className="h-4 w-4" /> Download PNG
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
