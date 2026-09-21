@@ -53,6 +53,7 @@ function getRequest(url, options = {}) {
 export const authAPI = {
   login: (data, config = {}) => api.post('/auth/login', data, config),
   register: (data, config = {}) => api.post('/auth/register', data, config),
+  logout: (config = {}) => api.post('/auth/logout', {}, { skipErrorToast: true, ...config }),
   forgotPassword: (data, config = {}) => api.post('/auth/forgot-password', data, config),
   resetPassword: (token, data, config = {}) => api.put(`/auth/reset-password/${token}`, data, config),
 };

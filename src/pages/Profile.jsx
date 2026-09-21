@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertCircle, Check, Loader2, Shield, ShieldCheck } from "lucide-react";
 import { sepSurveyAPI, surveyAPI, userAPI, voucherAPI } from "../services/api";
-import { clearAuth } from "../utils/auth";
 import { getNextStreakBonus } from "../utils/streakBonus";
 import { useAuth } from "../context/AuthContext";
 import HomeFooter from "../components/homepage/HomeFooter";
@@ -175,7 +174,7 @@ function ProfileShell({ children, footer, shellRef }) {
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { refreshUser } = useAuth();
+  const { refreshUser, logout } = useAuth();
   const scrollerRef = useRef(null);
   const pageRef = useRef(null);
   const [user, setUser] = useState(null);
@@ -271,9 +270,8 @@ export default function Profile() {
   }, [loading, user?.id]);
 
   const handleLogout = async () => {
-    await clearAuth();
-    window.dispatchEvent(new Event("authChange"));
-    navigate("/login");
+    await logout();
+    navigate("/login", { replace: true });
   };
 
   const handleProfileComplete = async () => {

@@ -387,3 +387,115 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Auth pages (login / signup) — scoped so onboarding steps stay unchanged */
+.onboard-card--auth {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  max-width: 480px;
+  margin: 0 auto;
+  padding-top: 12px;
+}
+
+.onboard-auth-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.onboard-card--auth .onboard-title {
+  margin: 0;
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.12;
+}
+
+.onboard-card--auth .onboard-copy {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.onboard-card--auth .onboard-tabs {
+  margin: 0;
+}
+
+.onboard-card--auth .onboard-divider {
+  margin: 4px 0;
+}
+
+.onboard-card--auth .onboard-form {
+  gap: 18px;
+}
+
+.onboard-card--auth .onboard-links {
+  margin: 0;
+  padding-top: 2px;
+}
+
+.onboard-card--auth .onboard-actions {
+  margin-top: 4px;
+}
+
+.onboard-card--auth .onboard-actions .home-pill {
+  width: 100%;
+  justify-content: center;
+}
+
+.onboard-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.onboard-terms {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.onboard-terms-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.onboard-terms-row input[type="checkbox"] {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--navy);
+  cursor: pointer;
+}
+
+.onboard-terms-row label {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.5;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.onboard-terms-row label a {
+  color: var(--navy);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 720px) {
+  .onboard-card--auth {
+    padding-top: 4px;
+    gap: 18px;
+  }
+
+  .onboard-row {
+    grid-template-columns: 1fr;
+    gap: 18px;
+  }
+}

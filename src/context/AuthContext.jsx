@@ -1,6 +1,7 @@
 // src/context/AuthContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { authAPI } from '../services/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -71,16 +72,16 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const logout = async () => {
-    try {
-      await axios.post(`${API_BASE_URL}/auth/logout`, {}, { withCredentials: true });
-    } catch {
-      // still clear locally
-    }
     clearSessionHint();
     localStorage.removeItem('is_business');
     localStorage.removeItem('business_name');
     setUser(null);
-    window.dispatchEvent(new Event('authChange'));
+
+    try {
+      await authAPI.logout({ skipAuthRedirect: true });
+    } catch {
+      // still clear locally
+    }
   };
 
   return (

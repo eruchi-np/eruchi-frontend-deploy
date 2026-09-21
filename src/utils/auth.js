@@ -1,3 +1,5 @@
+import axios from 'axios';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 const SESSION_HINT = 'USE_COOKIE_AUTH';
@@ -46,10 +48,8 @@ export const clearAuth = async () => {
   clearLocalStorage();
 
   try {
-    await fetch(`${API_BASE_URL}/auth/logout`, {
-      method: 'POST',
-      credentials: 'include',
-    });
+    // Axios has CSRF attached in main.jsx — raw fetch omits X-CSRF-Token and logout fails.
+    await axios.post(`${API_BASE_URL}/auth/logout`, {}, { withCredentials: true });
   } catch {
     // Non-fatal: local hint is already cleared
   }

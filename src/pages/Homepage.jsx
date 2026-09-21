@@ -1,19 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  Camera,
-  ChevronLeft,
-  ChevronRight,
-  Coffee,
-  Gift,
-  Heart,
-  Music,
-  Shield,
-  Smile,
-  Star,
-  Wallet,
-  Zap,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import HomeStreakBadge from "../components/homepage/HomeStreakBadge";
 import HomeStreakBonus from "../components/homepage/HomeStreakBonus";
 import HomeBlob from "../components/homepage/HomeBlob";
@@ -32,8 +19,6 @@ import creditsLogo from "../assets/home/features/credits.png";
 import rewardsLogo from "../assets/home/features/rewards.png";
 import trustedLogo from "../assets/home/features/trusted.png";
 import "../components/homepage/homepage.css";
-
-const STRIP_ICONS = [Heart, Zap, Coffee, Camera, Wallet, Gift, Smile, Music, Shield, Star];
 
 const REWARDS = [
   {
@@ -165,12 +150,6 @@ export default function Homepage() {
         </div>
 
         <div className="home-sheet">
-        <div className="home-icons" aria-hidden="true">
-          {STRIP_ICONS.map((Icon, i) => (
-            <Icon key={i} />
-          ))}
-        </div>
-
         <section className="home-section home-meet" id="meet">
           <HomeDots />
 

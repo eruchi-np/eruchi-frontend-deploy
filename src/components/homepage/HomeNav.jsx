@@ -27,8 +27,19 @@ export default function HomeNav({ variant = "page" }) {
       return undefined;
     }
     const onScroll = () => {
-      const threshold =
-        pathname === "/profile" ? 168 : window.innerHeight * 0.62;
+      // Auth/onboarding skies are short (~160–240px). Using the home hero
+      // threshold (~62vh) leaves the transparent overlay nav floating over
+      // the white form after the sky has scrolled away.
+      const shortSkyPaths = new Set([
+        "/signup",
+        "/login",
+        "/email-verification",
+        "/complete-basic-info",
+        "/complete-profile",
+        "/additional-profile",
+        "/profile",
+      ]);
+      const threshold = shortSkyPaths.has(pathname) ? 120 : window.innerHeight * 0.62;
       setScrolled(window.scrollY > threshold);
     };
     onScroll();
@@ -46,6 +57,11 @@ export default function HomeNav({ variant = "page" }) {
   const goStarted = () => {
     trackEvent("cta_click", "/get_started");
     navigate("/signup");
+  };
+
+  const goLogin = () => {
+    trackEvent("cta_click", "/login");
+    navigate("/login");
   };
 
   const goProfile = () => {
@@ -142,13 +158,22 @@ export default function HomeNav({ variant = "page" }) {
                 <span className="home-nav-avatar-letter">{avatarLetter}</span>
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={onCta}
-                className={`home-pill home-pill-sm ${lightNav ? "home-pill-white" : "home-pill-navy"}`}
-              >
-                Get Started
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={onCta}
+                  className={`home-pill home-pill-sm ${lightNav ? "home-pill-white" : "home-pill-navy"}`}
+                >
+                  Get Started
+                </button>
+                <button
+                  type="button"
+                  onClick={goLogin}
+                  className={`home-pill home-pill-sm ${lightNav ? "home-pill-ghost-light" : "home-pill-ghost"}`}
+                >
+                  Login
+                </button>
+              </>
             )}
             <button
               type="button"
@@ -218,6 +243,18 @@ export default function HomeNav({ variant = "page" }) {
           >
             {ctaLabel}
           </button>
+          {!isLoggedIn && !isBusiness && (
+            <button
+              type="button"
+              className="home-pill home-pill-lg home-pill-ghost mt-3 w-full"
+              onClick={() => {
+                setMenuOpen(false);
+                goLogin();
+              }}
+            >
+              Login
+            </button>
+          )}
         </div>
       )}
     </>

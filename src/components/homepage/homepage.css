@@ -57,7 +57,7 @@
 
 .home-nav-overlay.is-scrolled,
 .home-nav-overlay.is-open {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   box-shadow: 0 1px 0 rgba(12, 21, 32, 0.06);
@@ -142,6 +142,8 @@
 .home-nav-end {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
 }
 
 .home-logo {
@@ -202,6 +204,26 @@
   background: #fff;
   color: var(--navy);
   box-shadow: 0 8px 24px rgba(12, 21, 32, 0.12);
+}
+
+.home-pill-ghost {
+  background: transparent;
+  color: var(--navy);
+  border: 1.5px solid #d8dde3;
+}
+
+.home-pill-ghost:hover {
+  background: #f4f6f8;
+}
+
+.home-pill-ghost-light {
+  background: transparent;
+  color: #fff;
+  border: 1.5px solid rgba(255, 255, 255, 0.7);
+}
+
+.home-pill-ghost-light:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 
 .home-pill-navy {
@@ -565,28 +587,6 @@ button.streak-badge {
   50% {
     transform: translate(-50%, -50%) scale(1.07);
   }
-}
-
-.home-icons {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: clamp(18px, 3.2vw, 42px);
-  padding: 8px 24px 8px;
-  color: var(--icon);
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.home-icons::-webkit-scrollbar {
-  display: none;
-}
-
-.home-icons svg {
-  width: 28px;
-  height: 28px;
-  stroke-width: 1.35;
-  flex-shrink: 0;
 }
 
 .home-section {

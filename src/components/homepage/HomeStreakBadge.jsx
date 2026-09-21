@@ -7,8 +7,7 @@ import "./homepage.css";
 export default function HomeStreakBadge({ streak = 0, onClick }) {
   const badgeRef = useRef(null);
   const count = Math.max(0, Math.floor(Number(streak) || 0));
-  const tier = getStreakBadgeTier(count);
-  if (!tier) return null;
+  const tier = getStreakBadgeTier(count) || "spark";
 
   const badge = (
     <button

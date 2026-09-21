@@ -69,7 +69,7 @@ export default function HomeFooter() {
       </div>
 
       <div className="home-footer-bottom">
-        <p>© {new Date().getFullYear()} eRuchi. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} E. Ruchi Pvt. Ltd. All rights reserved.</p>
         <nav>
           <Link to="/terms">Terms of Service</Link>
           <Link to="/privacy-policy">Privacy Policy</Link>

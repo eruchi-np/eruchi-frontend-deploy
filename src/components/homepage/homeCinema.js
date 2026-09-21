@@ -45,7 +45,19 @@ export function initHomeCinema(root) {
 
   if (prefersReducedMotion()) {
     dotsWrap?.classList.add("is-live");
-    if (badge) badge.style.opacity = "1";
+    if (badge && anchor) {
+      const t = streakTargets(badge, anchor);
+      gsap.set(badge, {
+        opacity: 1,
+        x: t.endX,
+        y: t.endY,
+        scale: 0.9,
+        rotation: 8,
+        pointerEvents: "auto",
+      });
+    } else if (badge) {
+      badge.style.opacity = "1";
+    }
     return () => {};
   }
 
@@ -101,18 +113,21 @@ export function initHomeCinema(root) {
       const apply = (progress) => {
         const t = streakTargets(badge, anchor);
         const p = progress;
+        // Hidden in the hero; fades in as you scroll toward the corner dock.
+        const opacity = Math.min(1, Math.max(0, (p - 0.08) / 0.28));
         gsap.set(badge, {
           x: t.startX + (t.endX - t.startX) * p,
           y: t.startY + (t.endY - t.startY) * p,
           scale: 1 - 0.1 * p,
           rotation: 8 * p,
+          opacity,
+          pointerEvents: opacity > 0.2 ? "auto" : "none",
           force3D: true,
         });
       };
 
-      gsap.set(badge, { opacity: 0, rotation: 0, scale: 1 });
+      gsap.set(badge, { opacity: 0, x: 0, scale: 1, pointerEvents: "none" });
       apply(0);
-      intro.to(badge, { opacity: 1, duration: 0.55, ease: "power2.out" }, "-=0.25");
 
       ScrollTrigger.create({
         trigger: stage,
@@ -124,15 +139,6 @@ export function initHomeCinema(root) {
         onRefresh: (self) => apply(self.progress),
       });
     }
-
-    gsap.from(".home-icons svg", {
-      y: 18,
-      opacity: 0,
-      duration: 0.55,
-      stagger: 0.045,
-      ease: "power3.out",
-      scrollTrigger: { trigger: ".home-icons", start: "top 88%", once: true },
-    });
 
     const dots = root.querySelectorAll(".home-dot");
     if (dots.length && dotsWrap) {

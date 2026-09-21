@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import { getPostLoginPath } from "../utils/auth";
@@ -41,6 +41,8 @@ const Signup = () => {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [signupError, setSignupError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -103,21 +105,25 @@ const Signup = () => {
 
   return (
     <OnboardingShell>
-      <div className="onboard-card">
-        <h1 className="onboard-title">Glad to have you with us!</h1>
-        <p className="onboard-copy">Create your account. Phone, date of birth, and gender come next.</p>
+      <div className="onboard-card onboard-card--auth">
+        <div className="onboard-auth-head">
+          <h1 className="onboard-title">Glad to have you with us!</h1>
+          <p className="onboard-copy">Create your account. Phone, date of birth, and gender come next.</p>
+        </div>
 
         <form className="onboard-form" onSubmit={handleSubmit(onSubmit)}>
-          <div className={`onboard-field ${errors.firstName ? "is-error" : ""}`}>
-            <label htmlFor="firstName">First name</label>
-            <input id="firstName" type="text" placeholder="First name" autoComplete="given-name" {...register("firstName")} />
-            {errors.firstName && <p className="onboard-error">{errors.firstName.message}</p>}
-          </div>
+          <div className="onboard-row">
+            <div className={`onboard-field ${errors.firstName ? "is-error" : ""}`}>
+              <label htmlFor="firstName">First name</label>
+              <input id="firstName" type="text" placeholder="First name" autoComplete="given-name" {...register("firstName")} />
+              {errors.firstName && <p className="onboard-error">{errors.firstName.message}</p>}
+            </div>
 
-          <div className={`onboard-field ${errors.lastName ? "is-error" : ""}`}>
-            <label htmlFor="lastName">Last name</label>
-            <input id="lastName" type="text" placeholder="Last name" autoComplete="family-name" {...register("lastName")} />
-            {errors.lastName && <p className="onboard-error">{errors.lastName.message}</p>}
+            <div className={`onboard-field ${errors.lastName ? "is-error" : ""}`}>
+              <label htmlFor="lastName">Last name</label>
+              <input id="lastName" type="text" placeholder="Last name" autoComplete="family-name" {...register("lastName")} />
+              {errors.lastName && <p className="onboard-error">{errors.lastName.message}</p>}
+            </div>
           </div>
 
           <div className={`onboard-field ${errors.email ? "is-error" : ""}`}>
@@ -128,19 +134,45 @@ const Signup = () => {
 
           <div className={`onboard-field ${errors.password ? "is-error" : ""}`}>
             <label htmlFor="password">Password</label>
-            <input id="password" type="password" placeholder="Password" autoComplete="new-password" {...register("password")} />
+            <div className="onboard-password-wrap">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                placeholder="Password"
+                autoComplete="new-password"
+                {...register("password")}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="onboard-password-toggle"
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
             {errors.password && <p className="onboard-error">{errors.password.message}</p>}
           </div>
 
           <div className={`onboard-field ${errors.confirmPassword ? "is-error" : ""}`}>
             <label htmlFor="confirmPassword">Confirm password</label>
-            <input
-              id="confirmPassword"
-              type="password"
-              placeholder="Confirm password"
-              autoComplete="new-password"
-              {...register("confirmPassword")}
-            />
+            <div className="onboard-password-wrap">
+              <input
+                id="confirmPassword"
+                type={showConfirmPassword ? "text" : "password"}
+                placeholder="Confirm password"
+                autoComplete="new-password"
+                {...register("confirmPassword")}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                className="onboard-password-toggle"
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+              >
+                {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              </button>
+            </div>
             {errors.confirmPassword && <p className="onboard-error">{errors.confirmPassword.message}</p>}
           </div>
 
@@ -153,28 +185,16 @@ const Signup = () => {
             </select>
           </div>
 
-          <div className="flex flex-col space-y-2">
-            <div className="flex items-start">
-              <input
-                type="checkbox"
-                id="termsAccepted"
-                {...register("termsAccepted")}
-                className={`h-5 w-5 mt-0.5 text-black border-2 border-gray-300 rounded focus:ring-2 focus:ring-black cursor-pointer ${
-                  errors.termsAccepted ? "border-red-500" : ""
-                }`}
-              />
-              <label htmlFor="termsAccepted" className="ml-3 block text-base font-medium text-[var(--muted)]">
+          <div className="onboard-terms">
+            <div className="onboard-terms-row">
+              <input type="checkbox" id="termsAccepted" {...register("termsAccepted")} />
+              <label htmlFor="termsAccepted">
                 I agree to the{" "}
-                <Link to="/terms" className="font-semibold text-[var(--navy)] underline" target="_blank" rel="noopener noreferrer">
+                <Link to="/terms" target="_blank" rel="noopener noreferrer">
                   Terms and Conditions
                 </Link>{" "}
                 &{" "}
-                <Link
-                  to="/privacy-policy"
-                  className="font-semibold text-[var(--navy)] underline"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
+                <Link to="/privacy-policy" target="_blank" rel="noopener noreferrer">
                   Privacy Policy
                 </Link>
               </label>

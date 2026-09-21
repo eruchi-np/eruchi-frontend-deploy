@@ -171,9 +171,11 @@ const Login = () => {
 
   return (
     <OnboardingShell>
-      <div className="onboard-card">
-        <h1 className="onboard-title">Please sign in to continue</h1>
-        <p className="onboard-copy">Use your personal account or a business login.</p>
+      <div className="onboard-card onboard-card--auth">
+        <div className="onboard-auth-head">
+          <h1 className="onboard-title">Please sign in to continue</h1>
+          <p className="onboard-copy">Use your personal account or a business login.</p>
+        </div>
 
         <div className="onboard-tabs">
           <button
@@ -196,7 +198,6 @@ const Login = () => {
           <>
             {googleOAuthHint && <GoogleOAuthHint />}
             <GoogleSignInButton
-              className="mt-4"
               onSuccess={(userData) => {
                 toast.success("Login successful!");
                 navigate(getPostLoginPath(userData), { replace: true });
