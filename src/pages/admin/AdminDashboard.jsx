@@ -88,6 +88,7 @@ const AdminDashboard = () => {
   const [scanPagination, setScanPagination] = useState(null);
 
   const fetchStats = async () => {
+    if (!can("stats")) return;
     try {
       const res = await adminAPI.getStats({ skipErrorToast: true });
       setDashboardStats(res.data.data);
@@ -207,7 +208,8 @@ const AdminDashboard = () => {
   useEffect(() => {
     const boot = async () => {
       try {
-        const tasks = [fetchStats()];
+        const tasks = [];
+        if (can("stats")) tasks.push(fetchStats());
         if (can("users")) tasks.push(fetchUsers("", 1));
         if (can("surveys")) tasks.push(fetchSurveys());
         await Promise.all(tasks);

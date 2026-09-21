@@ -7,19 +7,10 @@ import { useAuth } from "../context/AuthContext";
 import HomeFooter from "../components/homepage/HomeFooter";
 import StreakGuardModal from "../components/profile/StreakGuardModal";
 import { initProfileCinema } from "../components/profile/profileCinema";
-import CreditRewardBadge from "../components/onboarding/CreditRewardBadge";
-import {
-  PROFILE_COMPLETION_1_CREDITS,
-  PROFILE_COMPLETION_2_CREDITS,
-  PROFILE_COMPLETION_2_QUESTION_COUNT,
-} from "../utils/onboardingCredits";
-import DemographicsWizard from "../components/demographics/DemographicsWizard";
-import AdditionalProfileSurvey from "../components/demographics/AdditionalProfileSurvey";
 import sectionIcon from "../assets/home/features/opinions.png";
 import skyBg from "../assets/home/sky.jpg";
 import "../components/homepage/homepage.css";
 import "../components/profile/profile.css";
-import "../components/onboarding/onboarding.css";
 import { adminHomePath, isStaffAdmin } from "../utils/adminRoles";
 
 const WEEK_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
@@ -175,7 +166,7 @@ function ProfileShell({ children, footer, shellRef }) {
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { refreshUser, logout } = useAuth();
+  const { refreshUser, logout, user: authUser } = useAuth();
   const scrollerRef = useRef(null);
   const pageRef = useRef(null);
   const [user, setUser] = useState(null);
@@ -186,8 +177,6 @@ export default function Profile() {
   const [error, setError] = useState(null);
   const [scrollPct, setScrollPct] = useState(0);
   const [thumbW, setThumbW] = useState(32);
-  const [showWizard, setShowWizard] = useState(false);
-  const [showAdditionalSurvey, setShowAdditionalSurvey] = useState(false);
   const [showStreakGuard, setShowStreakGuard] = useState(false);
 
   useEffect(() => {
@@ -202,6 +191,16 @@ export default function Profile() {
 
         const userData = profileRes?.data?.data?.user;
         if (!userData) throw new Error("Invalid user data");
+
+        if (!userData.isProfileComplete) {
+          navigate("/complete-profile", { replace: true });
+          return;
+        }
+        if (!userData.isAdditionalProfileComplete) {
+          navigate("/additional-profile", { replace: true });
+          return;
+        }
+
         setUser(userData);
 
         const nextVouchers = voucherRes?.data?.data || [];
@@ -275,16 +274,16 @@ export default function Profile() {
     navigate("/login", { replace: true });
   };
 
-  const handleProfileComplete = async () => {
-    await refreshUser();
-    setUser((prev) => ({ ...prev, isProfileComplete: true }));
-    setShowWizard(false);
-  };
-
-  const handleAdditionalProfileComplete = async () => {
-    await refreshUser();
-    setUser((prev) => ({ ...prev, isAdditionalProfileComplete: true }));
-    setShowAdditionalSurvey(false);
+  const handleLoadRetry = () => {
+    if (authUser && !authUser.isProfileComplete) {
+      navigate("/complete-profile", { replace: true });
+      return;
+    }
+    if (authUser && !authUser.isAdditionalProfileComplete) {
+      navigate("/additional-profile", { replace: true });
+      return;
+    }
+    window.location.reload();
   };
 
   if (loading) {
@@ -308,8 +307,8 @@ export default function Profile() {
             <AlertCircle className="h-16 w-16 text-gray-300 mx-auto mb-4" />
             <h3 className="text-xl font-medium mb-2">Failed to load your profile</h3>
             <p className="text-gray-500 text-sm mb-6">{error}</p>
-            <button type="button" className="home-pill home-pill-sm home-pill-navy" onClick={() => window.location.reload()}>
-              Retry
+            <button type="button" className="home-pill home-pill-sm home-pill-navy" onClick={handleLoadRetry}>
+              {authUser && !authUser.isProfileComplete ? "Complete profile" : "Retry"}
             </button>
           </div>
         </div>
@@ -324,7 +323,6 @@ export default function Profile() {
   const credits = Number(user.credits) || 0;
   const nextBonus = getNextStreakBonus(streak);
   const streakGoal = nextBonus.rewardCounter + nextBonus.remaining;
-  const needsOnboarding = !user.isProfileComplete || !user.isAdditionalProfileComplete;
   const previewSurveys = surveys.slice(0, 4);
 
   const handleGuardPurchased = (data) => {
@@ -415,66 +413,6 @@ export default function Profile() {
             </div>
           </div>
         </section>
-
-        {needsOnboarding && (
-          <div className="flex flex-col gap-4 mb-10">
-            {!user.isProfileComplete && (
-              <div className="profile-onboard rounded-[28px] p-6 sm:p-8">
-                {!showWizard ? (
-                  <div className="profile-onboard-head">
-                    <div>
-                      <div className="onboard-kicker">
-                        <CreditRewardBadge amount={PROFILE_COMPLETION_1_CREDITS} />
-                      </div>
-                      <h2>Complete your profile.</h2>
-                      <p>
-                        Tell us more about you — earn {PROFILE_COMPLETION_1_CREDITS} Ruchi Credits,
-                        and we&apos;ll match you to more relevant surveys.
-                      </p>
-                    </div>
-                    <button type="button" className="home-pill home-pill-sm home-pill-navy shrink-0" onClick={() => setShowWizard(true)}>
-                      Complete profile
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-full bg-white p-3 rounded-2xl border border-gray-100">
-                    <DemographicsWizard onComplete={handleProfileComplete} />
-                  </div>
-                )}
-              </div>
-            )}
-            {!user.isAdditionalProfileComplete && (
-              <div className="profile-onboard rounded-[28px] p-6 sm:p-8">
-                {!showAdditionalSurvey ? (
-                  <div className="profile-onboard-head">
-                    <div>
-                      <div className="onboard-kicker">
-                        <CreditRewardBadge amount={PROFILE_COMPLETION_2_CREDITS} />
-                      </div>
-                      <h2>A few more questions.</h2>
-                      <p>
-                        Earn {PROFILE_COMPLETION_2_CREDITS} Ruchi Credits —{" "}
-                        {PROFILE_COMPLETION_2_QUESTION_COUNT} quick questions about your daily life.
-                        Takes about 2 minutes.
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      className="home-pill home-pill-sm home-pill-lime shrink-0"
-                      onClick={() => setShowAdditionalSurvey(true)}
-                    >
-                      Claim your credits
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-full bg-white p-3 rounded-2xl border border-gray-100">
-                    <AdditionalProfileSurvey onComplete={handleAdditionalProfileComplete} />
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
 
         <section className="profile-section">
           <div className="profile-section-head">

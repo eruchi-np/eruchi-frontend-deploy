@@ -272,13 +272,11 @@ const CreateSepSurvey = () => {
         status: formData.status,
         credits: Number(formData.credits),
         startDate: publishedAt.toISOString(),
-        availableDays,
         endDate: needsPublicWindow ? derivedEndDate.toISOString() : null,
-        estimatedMinutes: formData.estimatedMinutes !== '' ? Number(formData.estimatedMinutes) : null,
         visibility: formData.visibility,
         alsoPublishToOthers:
           formData.visibility === 'targeted' ? Boolean(formData.alsoPublishToOthers) : false,
-        validityDays: Number(formData.validityDays),
+        validityDays: Number(formData.validityDays) || 7,
         clusterIds:
           formData.visibility === 'targeted' && formData.status === 'published'
             ? formData.clusterIds
@@ -300,6 +298,9 @@ const CreateSepSurvey = () => {
           return base;
         })
       };
+      if (formData.estimatedMinutes !== '' && formData.estimatedMinutes != null) {
+        payload.estimatedMinutes = Number(formData.estimatedMinutes);
+      }
 
       let sends = [];
       if (isEditMode) {
@@ -328,7 +329,15 @@ const CreateSepSurvey = () => {
       navigate('/admin');
     } catch (err) {
       console.error('Create sep survey error:', err);
-      const msg = err.response?.data?.message || (isEditMode ? 'Failed to update survey' : 'Failed to create survey');
+      const data = err.response?.data;
+      const detail =
+        Array.isArray(data?.errors) && data.errors.length
+          ? data.errors.join('. ')
+          : null;
+      const msg =
+        detail ||
+        data?.message ||
+        (isEditMode ? 'Failed to update survey' : 'Failed to create survey');
       toast.error(msg);
     } finally {
       setLoading(false);

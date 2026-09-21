@@ -1,0 +1,10 @@
+cd "C:\Users\Lenovo Loq\Desktop\eruchi-frontend-deploy-main"
+
+git status
+git add -A
+git reset HEAD -- .env
+git status
+
+git commit -m "Sync eruchi-main frontend Sprint 6 into deploy main."
+
+git push origin main
