@@ -1,58 +1,26 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import OnboardingShell from "../../onboarding/OnboardingShell";
 
 const WelcomeToERuchi = () => {
   const navigate = useNavigate();
-  const [dialogOpacityClass, setDialogOpacityClass] = useState('opacity-0');
 
-  useEffect(() => {
-    setDialogOpacityClass('opacity-0');
-    const timer = setTimeout(() => {
-      setDialogOpacityClass('opacity-100');
-    }, 50);
-    return () => clearTimeout(timer);
-  }, []);
-
-  const handleContinue = () => {
-    setDialogOpacityClass('opacity-0');
-    setTimeout(() => {
-      navigate('/');
-    }, 500);
-  };
-
-  return createPortal(
-    <div
-      className={`
-        fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#3399ff] p-0
-        transition-opacity duration-500 ease-in-out 
-        ${dialogOpacityClass}
-      `}
-    >
-      <div className="w-full h-full flex flex-col items-center justify-center">
-        <div className="flex flex-col items-center justify-center max-w-lg mx-auto px-4">
-          <h1 className="text-3xl sm:text-4xl font-bold mb-8 text-white text-center">Welcome to eRuchi!</h1>
-          <div className="text-base sm:text-xl mb-12 space-y-6 text-white text-center">
-            <p>
-              Thank you for completing your profile and telling us what's at the <strong>core</strong> of what defines you.
-            </p>
-            <p>
-              Your selections will help us match you with product samples that truly fit your personality and passions.
-            </p>
-            <p>
-              Get ready to discover amazing products tailored just for you!
-            </p>
-          </div>
-          <button
-            onClick={handleContinue}
-            className="bg-white text-[#3399ff] hover:bg-gray-100 text-xl px-12 py-4 rounded-xl font-bold mx-auto transition-colors transform hover:scale-105"
-          >
-            Start Exploring
+  return (
+    <OnboardingShell>
+      <div className="onboard-card onboard-welcome-copy">
+        <h1 className="onboard-title">You&apos;re in.</h1>
+        <p className="onboard-copy">
+          Thanks for telling us a little more about you. We&apos;ll use this to match you with
+          surveys that actually fit your life.
+        </p>
+        <p className="onboard-copy">Your first survey is ready — it takes under 2 minutes.</p>
+        <div className="onboard-actions">
+          <button type="button" className="home-pill home-pill-lg home-pill-lime" onClick={() => navigate("/")}>
+            Start exploring
           </button>
         </div>
       </div>
-    </div>,
-    document.body
+    </OnboardingShell>
   );
 };
 

@@ -1,12 +1,47 @@
 const STORAGE_KEY = "eruchi_survey_complete";
 const MAX_AGE_MS = 30 * 60 * 1000;
 
-export function goToSurveyComplete(navigate, { creditsEarned, previousStreak }) {
+function toNumber(value, fallback = 0) {
+  const next = Number(value);
+  return Number.isFinite(next) ? next : fallback;
+}
+
+export function completionFromSubmitResponse(res, fallback = {}) {
+  const data = res?.data?.data || {};
+  return {
+    creditsEarned: toNumber(
+      data.creditsEarned ?? fallback.creditsEarned,
+      0
+    ),
+    previousStreak: toNumber(
+      data.previousStreak ?? fallback.previousStreak,
+      0
+    ),
+    streakCount:
+      data.streakCount != null || fallback.streakCount != null
+        ? toNumber(data.streakCount ?? fallback.streakCount)
+        : undefined,
+    credits:
+      data.credits != null || fallback.credits != null
+        ? toNumber(data.credits ?? fallback.credits)
+        : undefined,
+    streakBonus: toNumber(data.streakBonus ?? fallback.streakBonus, 0),
+  };
+}
+
+export function goToSurveyComplete(
+  navigate,
+  { creditsEarned, previousStreak, streakCount, credits, streakBonus }
+) {
   const payload = {
-    creditsEarned: Number(creditsEarned) || 0,
-    previousStreak: Number(previousStreak) || 0,
+    creditsEarned: toNumber(creditsEarned, 0),
+    previousStreak: toNumber(previousStreak, 0),
+    streakBonus: toNumber(streakBonus, 0),
     completedAt: Date.now(),
   };
+
+  if (streakCount != null) payload.streakCount = toNumber(streakCount, 0);
+  if (credits != null) payload.credits = toNumber(credits, 0);
 
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));

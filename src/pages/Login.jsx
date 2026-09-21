@@ -2,16 +2,19 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import toast from 'react-hot-toast';
+import toast from "react-hot-toast";
 import { getPostLoginPath, persistAuthSession } from "../utils/auth";
 import { useAuth } from "../context/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
-import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from "lucide-react";
 import { businessAPI } from "../services/api";
 import GoogleOAuthHint from "../components/auth/GoogleOAuthHint";
 import GoogleSignInButton from "../components/auth/GoogleSignInButton";
 import { consumeIncompleteGoogleOAuthAttempt } from "../utils/googleOAuth";
+import OnboardingShell from "../components/onboarding/OnboardingShell";
+import { parseStep } from "../utils/onboardingSchemas";
+import "../components/onboarding/onboarding.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -26,27 +29,32 @@ const loginSchema = z.object({
     .max(50, "Password must be less than 50 characters"),
 });
 
+const businessLoginSchema = z.object({
+  email: z.string().trim().email("Enter a valid business email"),
+  password: z.string().min(1, "Password is required"),
+});
+
 const Login = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
-  const [activeTab, setActiveTab] = useState('user');
-  const [loginError, setLoginError] = useState('');
+  const [activeTab, setActiveTab] = useState("user");
+  const [loginError, setLoginError] = useState("");
   const [googleOAuthHint, setGoogleOAuthHint] = useState(false);
 
   useEffect(() => {
-    const oauthError = searchParams.get('error');
+    const oauthError = searchParams.get("error");
     const bouncedBack = consumeIncompleteGoogleOAuthAttempt();
-    if (oauthError === 'google_auth_failed' || bouncedBack) {
+    if (oauthError === "google_auth_failed" || bouncedBack) {
       setGoogleOAuthHint(true);
     } else if (oauthError) {
-      setLoginError('Sign-in failed. Please try again.');
+      setLoginError("Sign-in failed. Please try again.");
     }
   }, [searchParams]);
 
   useEffect(() => {
-    if (localStorage.getItem('is_business') === 'true') {
-      navigate('/business/dashboard', { replace: true });
+    if (localStorage.getItem("is_business") === "true") {
+      navigate("/business/dashboard", { replace: true });
       return;
     }
     if (!authLoading && user) {
@@ -56,14 +64,15 @@ const Login = () => {
 
   const [isLoading, setIsLoading] = useState(false);
   const [needsVerification, setNeedsVerification] = useState(false);
-  const [attemptedEmail, setAttemptedEmail] = useState('');
+  const [attemptedEmail, setAttemptedEmail] = useState("");
   const [isResending, setIsResending] = useState(false);
-  const [resendError, setResendError] = useState('');
+  const [resendError, setResendError] = useState("");
 
-  const [bizEmail, setBizEmail] = useState('');
-  const [bizPassword, setBizPassword] = useState('');
+  const [bizEmail, setBizEmail] = useState("");
+  const [bizPassword, setBizPassword] = useState("");
   const [bizLoading, setBizLoading] = useState(false);
-  const [bizError, setBizError] = useState('');
+  const [bizError, setBizError] = useState("");
+  const [bizFieldErrors, setBizFieldErrors] = useState({});
   const [showPassword, setShowPassword] = useState(false);
   const [showBizPassword, setShowBizPassword] = useState(false);
 
@@ -73,32 +82,38 @@ const Login = () => {
     formState: { errors },
   } = useForm({
     resolver: zodResolver(loginSchema),
+    mode: "onBlur",
+    reValidateMode: "onBlur",
   });
 
   const onSubmit = async (data) => {
     setIsLoading(true);
     setNeedsVerification(false);
-    setLoginError('');
+    setLoginError("");
     setAttemptedEmail(data.username);
 
     try {
-      const response = await axios.post(`${API_BASE_URL}/auth/login`, {
-        email: data.username,
-        password: data.password,
-      }, { withCredentials: true });
+      const response = await axios.post(
+        `${API_BASE_URL}/auth/login`,
+        {
+          email: data.username,
+          password: data.password,
+        },
+        { withCredentials: true }
+      );
 
       const userData = response?.data?.data?.user;
 
       persistAuthSession(userData);
       toast.success("Login successful!");
       navigate(getPostLoginPath(userData), { replace: true });
-
     } catch (error) {
-      const errorMessage = error.response?.data?.message ||
-                          error.response?.data?.errors?.[0]?.msg ||
-                          'Login failed. Please check your email and password.';
+      const errorMessage =
+        error.response?.data?.message ||
+        error.response?.data?.errors?.[0]?.msg ||
+        "Login failed. Please check your email and password.";
 
-      if (errorMessage.includes('verify your email')) {
+      if (errorMessage.includes("verify your email")) {
         setNeedsVerification(true);
       } else {
         setLoginError(errorMessage);
@@ -110,14 +125,12 @@ const Login = () => {
 
   const handleResend = async () => {
     setIsResending(true);
-    setResendError('');
+    setResendError("");
     try {
       await axios.post(`${API_BASE_URL}/auth/resend-verification`, { email: attemptedEmail });
-      toast.success('Verification email resent!');
+      toast.success("Verification email resent!");
     } catch (error) {
-      setResendError(
-        error.response?.data?.message || 'Failed to resend verification email.'
-      );
+      setResendError(error.response?.data?.message || "Failed to resend verification email.");
     } finally {
       setIsResending(false);
     }
@@ -125,7 +138,18 @@ const Login = () => {
 
   const handleBusinessLogin = async (e) => {
     e.preventDefault();
-    setBizError('');
+    const fieldErrors = parseStep(businessLoginSchema, {
+      email: bizEmail,
+      password: bizPassword,
+    });
+    if (Object.keys(fieldErrors).length) {
+      setBizFieldErrors(fieldErrors);
+      setBizError("");
+      return;
+    }
+
+    setBizFieldErrors({});
+    setBizError("");
     setBizLoading(true);
     try {
       const response = await businessAPI.login(
@@ -133,234 +157,211 @@ const Login = () => {
         { skipErrorToast: true, skipAuthRedirect: true }
       );
 
-      // Store business session flags so the navbar and guard can detect the session
-      localStorage.setItem('is_business', 'true');
-      localStorage.setItem('business_name', response.data.business.name);
-      window.dispatchEvent(new Event('authChange'));
+      localStorage.setItem("is_business", "true");
+      localStorage.setItem("business_name", response.data.business.name);
+      window.dispatchEvent(new Event("authChange"));
 
-      navigate('/business/dashboard');
+      navigate("/business/dashboard");
     } catch (err) {
-      setBizError(err.response?.data?.message || 'Invalid credentials');
+      setBizError(err.response?.data?.message || "Invalid credentials");
     } finally {
       setBizLoading(false);
     }
   };
 
   return (
-    <>
-      <section className="py-10 sm:py-16 pb-28 bg-white text-black">
-        <div className="flex justify-center items-center px-4">
-          <div className="flex w-full max-w-lg mx-auto space-y-8 sm:space-y-12 flex-col">
-            <h1 className="text-3xl sm:text-4xl font-bold leading-tight text-black">
-              Please sign in to continue
-            </h1>
+    <OnboardingShell>
+      <div className="onboard-card">
+        <h1 className="onboard-title">Please sign in to continue</h1>
+        <p className="onboard-copy">Use your personal account or a business login.</p>
 
-            {/* Tab switcher */}
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => setActiveTab('user')}
-                className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
-                  activeTab === 'user'
-                    ? 'bg-black text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Personal
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab('business')}
-                className={`flex-1 py-2.5 rounded-xl font-semibold text-sm transition-colors ${
-                  activeTab === 'business'
-                    ? 'bg-black text-white'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                Business
-              </button>
+        <div className="onboard-tabs">
+          <button
+            type="button"
+            onClick={() => setActiveTab("user")}
+            className={`onboard-tab ${activeTab === "user" ? "is-on" : ""}`}
+          >
+            Personal
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("business")}
+            className={`onboard-tab ${activeTab === "business" ? "is-on" : ""}`}
+          >
+            Business
+          </button>
+        </div>
+
+        {activeTab === "user" && (
+          <>
+            {googleOAuthHint && <GoogleOAuthHint />}
+            <GoogleSignInButton
+              className="mt-4"
+              onSuccess={(userData) => {
+                toast.success("Login successful!");
+                navigate(getPostLoginPath(userData), { replace: true });
+              }}
+              onError={() => setGoogleOAuthHint(true)}
+            />
+
+            <div className="onboard-divider">
+              <span>Or continue with email</span>
             </div>
 
-            {activeTab === 'user' && (
-              <>
-                {googleOAuthHint && <GoogleOAuthHint />}
-                <GoogleSignInButton
-                  onSuccess={(userData) => {
-                    toast.success("Login successful!");
-                    navigate(getPostLoginPath(userData), { replace: true });
-                  }}
-                  onError={() => setGoogleOAuthHint(true)}
+            <form className="onboard-form" onSubmit={handleSubmit(onSubmit)}>
+              <div className={`onboard-field ${errors.username ? "is-error" : ""}`}>
+                <label htmlFor="username">Username or email</label>
+                <input
+                  id="username"
+                  type="text"
+                  placeholder="you@example.com"
+                  autoComplete="username"
+                  {...register("username")}
                 />
+                {errors.username && <p className="onboard-error">{errors.username.message}</p>}
+              </div>
 
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-gray-300"></div>
-                  </div>
-                  <div className="relative flex justify-center text-sm">
-                    <span className="px-4 bg-white text-gray-500 font-medium">Or continue with email</span>
-                  </div>
-                </div>
-
-                <form className="grid grid-cols-1 space-y-7" onSubmit={handleSubmit(onSubmit)}>
-                  <div className="grid grid-cols-1 space-y-6">
-                    <div>
-                      <input
-                        type="text"
-                        placeholder="Username/Email Address"
-                        {...register("username")}
-                        className={`w-full text-lg font-medium outline-none p-4 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 ${
-                          errors.username ? "border-red-500" : "border-gray-300 focus:border-black"
-                        }`}
-                      />
-                      {errors.username && (
-                        <p className="text-sm text-red-500 mt-2 font-medium">{errors.username.message}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <div className="relative">
-                        <input
-                          type={showPassword ? "text" : "password"}
-                          placeholder="Password"
-                          {...register("password")}
-                          className={`w-full outline-none text-lg font-medium p-4 pr-12 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 ${
-                            errors.password ? "border-red-500" : "border-gray-300 focus:border-black"
-                          }`}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword((prev) => !prev)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-700"
-                          aria-label={showPassword ? "Hide password" : "Show password"}
-                        >
-                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                        </button>
-                      </div>
-                      {errors.password && (
-                        <p className="text-sm text-red-500 mt-2 font-medium">{errors.password.message}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {loginError && (
-                    <p className="text-sm text-red-500 font-medium">{loginError}</p>
-                  )}
-
-                  {needsVerification && (
-                    <div className="bg-yellow-50 p-4 rounded-lg">
-                      <p className="text-yellow-700 mb-2">Please verify your email to login.</p>
-                      <button
-                        type="button"
-                        onClick={handleResend}
-                        disabled={isResending}
-                        className={`w-full py-2 px-4 rounded-lg font-medium transition-all ${
-                          isResending ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'
-                        }`}
-                      >
-                        {isResending ? (
-                          <div className="flex items-center justify-center">
-                            <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                            Resending...
-                          </div>
-                        ) : 'Resend Verification Email'}
-                      </button>
-                      {resendError && (
-                        <p className="text-sm text-red-500 font-medium mt-2">{resendError}</p>
-                      )}
-                    </div>
-                  )}
-
-                  <div className="w-full flex justify-between text-gray-600 flex-wrap gap-2">
-                    <Link to="/reset-password" className="font-semibold hover:text-black transition-colors duration-200 underline decoration-gray-400 hover:decoration-black">
-                      Forgot password?
-                    </Link>
-                    <Link to="/signup" className="font-semibold hover:text-black transition-colors duration-200 underline decoration-gray-400 hover:decoration-black">
-                      Don't have an account?
-                    </Link>
-                  </div>
-
+              <div className={`onboard-field ${errors.password ? "is-error" : ""}`}>
+                <label htmlFor="password">Password</label>
+                <div className="onboard-password-wrap">
+                  <input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Password"
+                    autoComplete="current-password"
+                    {...register("password")}
+                  />
                   <button
-                    type="submit"
-                    className={`w-full mt-4 p-4 font-bold text-lg rounded-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-all duration-200 ${
-                      isLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-black hover:bg-gray-800 hover:shadow-lg transform hover:scale-[1.02]'
-                    } text-white`}
-                    disabled={isLoading}
+                    type="button"
+                    onClick={() => setShowPassword((prev) => !prev)}
+                    className="onboard-password-toggle"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
                   >
-                    {isLoading ? (
-                      <div className="flex justify-center items-center">
-                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                        Loading...
-                      </div>
-                    ) : 'Login'}
+                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
-                </form>
-              </>
-            )}
-
-            {activeTab === 'business' && (
-              <form className="grid grid-cols-1 space-y-7" onSubmit={handleBusinessLogin}>
-                <div className="grid grid-cols-1 space-y-6">
-                  <div>
-                    <input
-                      type="email"
-                      placeholder="Business Email"
-                      value={bizEmail}
-                      onChange={(e) => setBizEmail(e.target.value)}
-                      required
-                      className="w-full text-lg font-medium outline-none p-4 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 border-gray-300 focus:border-black"
-                    />
-                  </div>
-
-                  <div>
-                    <div className="relative">
-                      <input
-                        type={showBizPassword ? "text" : "password"}
-                        placeholder="Password"
-                        value={bizPassword}
-                        onChange={(e) => setBizPassword(e.target.value)}
-                        required
-                        className="w-full outline-none text-lg font-medium p-4 pr-12 border-b-2 bg-transparent transition-all duration-200 placeholder:text-gray-400 border-gray-300 focus:border-black"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowBizPassword((prev) => !prev)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-gray-400 hover:text-gray-700"
-                        aria-label={showBizPassword ? "Hide password" : "Show password"}
-                      >
-                        {showBizPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-                      </button>
-                    </div>
-                  </div>
                 </div>
+                {errors.password && <p className="onboard-error">{errors.password.message}</p>}
+              </div>
 
-                {bizError && (
-                  <p className="text-sm text-red-500 font-medium">
-                    {bizError === 'Account pending admin approval'
-                      ? 'Your account is pending admin approval. Please contact support.'
-                      : bizError}
-                  </p>
-                )}
+              {loginError && <p className="onboard-error">{loginError}</p>}
 
+              {needsVerification && (
+                <div className="onboard-verify">
+                  <p className="mb-3">Please verify your email to login.</p>
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    disabled={isResending}
+                    className="home-pill home-pill-sm home-pill-navy"
+                  >
+                    {isResending ? (
+                      <span className="inline-flex items-center">
+                        <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                        Resending...
+                      </span>
+                    ) : (
+                      "Resend Verification Email"
+                    )}
+                  </button>
+                  {resendError && <p className="onboard-error">{resendError}</p>}
+                </div>
+              )}
+
+              <div className="onboard-links">
+                <Link to="/reset-password">Forgot password?</Link>
+                <Link to="/signup">Don&apos;t have an account?</Link>
+              </div>
+
+              <div className="onboard-actions">
                 <button
                   type="submit"
-                  className={`w-full mt-4 p-4 font-bold text-lg rounded-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black transition-all duration-200 ${
-                    bizLoading ? 'bg-gray-400 cursor-not-allowed' : 'bg-black hover:bg-gray-800 hover:shadow-lg transform hover:scale-[1.02]'
-                  } text-white`}
-                  disabled={bizLoading}
+                  className="home-pill home-pill-lg home-pill-navy"
+                  disabled={isLoading}
                 >
-                  {bizLoading ? (
-                    <div className="flex justify-center items-center">
-                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                  {isLoading ? (
+                    <span className="inline-flex items-center">
+                      <Loader2 className="w-4 h-4 animate-spin mr-2" />
                       Loading...
-                    </div>
-                  ) : 'Login'}
+                    </span>
+                  ) : (
+                    "Login"
+                  )}
                 </button>
-              </form>
+              </div>
+            </form>
+          </>
+        )}
+
+        {activeTab === "business" && (
+          <form className="onboard-form" onSubmit={handleBusinessLogin}>
+            <div className={`onboard-field ${bizFieldErrors.email ? "is-error" : ""}`}>
+              <label htmlFor="bizEmail">Business email</label>
+              <input
+                id="bizEmail"
+                type="email"
+                placeholder="business@example.com"
+                value={bizEmail}
+                onChange={(e) => {
+                  setBizEmail(e.target.value);
+                  setBizFieldErrors((prev) => ({ ...prev, email: "" }));
+                }}
+              />
+              {bizFieldErrors.email && <p className="onboard-error">{bizFieldErrors.email}</p>}
+            </div>
+
+            <div className={`onboard-field ${bizFieldErrors.password ? "is-error" : ""}`}>
+              <label htmlFor="bizPassword">Password</label>
+              <div className="onboard-password-wrap">
+                <input
+                  id="bizPassword"
+                  type={showBizPassword ? "text" : "password"}
+                  placeholder="Password"
+                  value={bizPassword}
+                  onChange={(e) => {
+                    setBizPassword(e.target.value);
+                    setBizFieldErrors((prev) => ({ ...prev, password: "" }));
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowBizPassword((prev) => !prev)}
+                  className="onboard-password-toggle"
+                  aria-label={showBizPassword ? "Hide password" : "Show password"}
+                >
+                  {showBizPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              {bizFieldErrors.password && <p className="onboard-error">{bizFieldErrors.password}</p>}
+            </div>
+
+            {bizError && (
+              <p className="onboard-error">
+                {bizError === "Account pending admin approval"
+                  ? "Your account is pending admin approval. Please contact support."
+                  : bizError}
+              </p>
             )}
-          </div>
-        </div>
-      </section>
-    </>
+
+            <div className="onboard-actions">
+              <button
+                type="submit"
+                className="home-pill home-pill-lg home-pill-navy"
+                disabled={bizLoading}
+              >
+                {bizLoading ? (
+                  <span className="inline-flex items-center">
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    Loading...
+                  </span>
+                ) : (
+                  "Login"
+                )}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </OnboardingShell>
   );
 };
 

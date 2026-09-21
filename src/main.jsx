@@ -5,10 +5,9 @@ import App from './App.jsx'
 import './index.css'
 import { AuthProvider } from './context/AuthContext';
 import ErrorBoundary from './components/layout/ErrorBoundary';
-import { attachCsrf, ensureCsrfToken, installCsrfFetch } from './utils/csrf';
+import { attachCsrf, ensureCsrfToken } from './utils/csrf';
 
 attachCsrf(axios);
-installCsrfFetch();
 ensureCsrfToken().catch(() => {});
 
 if (typeof window !== 'undefined' && 'scrollRestoration' in window.history) {

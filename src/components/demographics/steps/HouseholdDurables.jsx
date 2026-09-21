@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { HelpCircle, Check } from 'lucide-react';
 import EnhancedSelect from '../ui/EnhancedSelect';
 
-const HouseholdDurables = ({ formData, updateFormData }) => {
+const HouseholdDurables = ({ formData, updateFormData, errors = {} }) => {
   const [showTooltip, setShowTooltip] = useState(false);
 
   const durableGoodsOptions = [
@@ -61,9 +61,9 @@ const educationOptions = [
   const showEarnerEducation = formData.mainHouseholdEarner && formData.mainHouseholdEarner !== 'Me';
 
   return (
-    <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Household and Durables</h2>
-      <p className="text-gray-600 mb-8">Tell us about your household assets and income source</p>
+    <div className="onboard-step">
+      <h2>Household and Durables</h2>
+      <p className="onboard-copy">Tell us about your household assets and income source</p>
       
       <div className="space-y-8">
         {/* Durable Goods Selection */}
@@ -73,40 +73,33 @@ const educationOptions = [
             (including you and your immediate family)? Select all that apply:
           </label>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="onboard-pills">
             {durableGoodsOptions.map((good) => {
               const isSelected = formData.durableGoods?.includes(good) || false;
               
               return (
-                <div
+                <button
+                  type="button"
                   key={good}
-                  className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 flex items-center justify-between ${
-                    isSelected
-                      ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50'
-                  }`}
+                  className={`onboard-pill ${isSelected ? 'is-on' : ''}`}
                   onClick={() => handleDurableGoodToggle(good)}
                 >
-                  <span className="font-medium">{good}</span>
-                  {isSelected && (
-                    <Check className="h-5 w-5 text-blue-500 flex-shrink-0" />
-                  )}
-                </div>
+                  <span className="onboard-check">
+                    {isSelected && <Check className="w-3 h-3" />}
+                  </span>
+                  {good}
+                </button>
               );
             })}
           </div>
 
           {/* Selected Count */}
           {formData.durableGoods && formData.durableGoods.length > 0 && (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center">
-                <Check className="h-4 w-4 text-blue-600 mr-2" />
-                <span className="text-blue-800 font-medium">
-                  {formData.durableGoods.length} item{formData.durableGoods.length !== 1 ? 's' : ''} selected
-                </span>
-              </div>
-            </div>
+            <p className="mt-3 text-sm font-medium text-[var(--navy)]">
+              {formData.durableGoods.length} item{formData.durableGoods.length !== 1 ? 's' : ''} selected
+            </p>
           )}
+          {errors.durableGoods && <p className="onboard-error">{errors.durableGoods}</p>}
         </div>
 
         {/* Main Household Earner */}
@@ -144,6 +137,9 @@ const educationOptions = [
             placeholder="Select main household earner"
             label=""
           />
+          {errors.mainHouseholdEarner && (
+            <p className="onboard-error">{errors.mainHouseholdEarner}</p>
+          )}
         </div>
 
         {/* Conditional Education Field */}
@@ -167,6 +163,7 @@ const educationOptions = [
                 </div>
               </div>
             )}
+            {errors.earnerEducation && <p className="onboard-error">{errors.earnerEducation}</p>}
           </div>
         )}
 
@@ -195,15 +192,12 @@ const educationOptions = [
         </div>
       </div>
 
-      {/* Progress indicator */}
-      <div className="mt-10 pt-6 border-t border-gray-200">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-500">Step 3 of 4</span>
-          <span className="font-medium text-blue-600">Household & Durables</span>
-        </div>
-        <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-          <div className="bg-blue-600 h-2 rounded-full w-3/4"></div>
-        </div>
+      <div className="onboard-step-meta">
+        <span>Step 3 of 3</span>
+        <strong>Household & Durables</strong>
+      </div>
+      <div className="onboard-progress">
+        <span style={{ width: "100%" }} />
       </div>
     </div>
   );

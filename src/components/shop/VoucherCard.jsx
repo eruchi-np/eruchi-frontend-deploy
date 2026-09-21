@@ -24,7 +24,13 @@ const getBrandPalette = (brandName = "") => {
   return TICKET_PALETTES[Math.abs(hash) % TICKET_PALETTES.length];
 };
 
-export default function VoucherCard({ offer, onRedeem, onViewStore }) {
+export default function VoucherCard({
+  offer,
+  onRedeem,
+  onViewStore,
+  userCredits,
+  showStoreLink = true,
+}) {
   const discountLabel =
     offer.discountType === "percentage"
       ? `${offer.discountValue}%`
@@ -49,6 +55,8 @@ export default function VoucherCard({ offer, onRedeem, onViewStore }) {
 
   const isOut = stockInfo !== null && stockInfo.remaining === 0;
   const isLowStock = stockInfo !== null && !isOut && stockInfo.remaining <= 10;
+  const unaffordable =
+    userCredits != null && (offer.creditsRequired || 0) > userCredits;
   const brandName =
     offer.business?.brandName || offer.business?.name || "Official Brand";
   const brandLogo = offer.business?.logo || offer.business?.logoUrl || null;
@@ -56,7 +64,7 @@ export default function VoucherCard({ offer, onRedeem, onViewStore }) {
   const businessId = offer.business?._id;
   const openStore = (e) => {
     e.stopPropagation();
-    if (businessId) onViewStore?.(businessId);
+    if (showStoreLink && businessId) onViewStore?.(businessId);
   };
 
   return (
@@ -90,7 +98,7 @@ export default function VoucherCard({ offer, onRedeem, onViewStore }) {
           <button
             type="button"
             onClick={openStore}
-            disabled={!businessId}
+            disabled={!showStoreLink || !businessId}
             className="text-[8px] xs:text-[10px] sm:text-xs font-semibold tracking-[0.2em] sm:tracking-[0.25em] uppercase line-clamp-1 max-w-full underline-offset-2 hover:underline disabled:no-underline disabled:cursor-default"
             style={{ color: palette.text, opacity: 0.9 }}
           >
@@ -99,9 +107,9 @@ export default function VoucherCard({ offer, onRedeem, onViewStore }) {
           <button
             type="button"
             onClick={openStore}
-            disabled={!businessId}
+            disabled={!showStoreLink || !businessId}
             className="w-[45%] max-w-24 aspect-square rounded-full bg-white flex items-center justify-center shadow-md transition-transform duration-300 group-hover:scale-105 disabled:cursor-default"
-            aria-label={`View ${brandName} store`}
+            aria-label={showStoreLink ? `View ${brandName} store` : brandName}
           >
             {brandLogo ? (
               <img
@@ -149,7 +157,7 @@ export default function VoucherCard({ offer, onRedeem, onViewStore }) {
             className="bg-white text-[10px] xs:text-xs sm:text-sm font-semibold px-3 xs:px-4 sm:px-6 py-1 sm:py-1.5 rounded-full shadow-sm max-w-full transition-transform duration-300 group-hover:scale-105"
             style={{ color: palette.accent }}
           >
-            Redeem
+            {unaffordable ? "Almost there" : "Redeem"}
           </span>
         </div>
 
@@ -172,7 +180,7 @@ export default function VoucherCard({ offer, onRedeem, onViewStore }) {
         <button
           type="button"
           onClick={openStore}
-          disabled={!businessId}
+          disabled={!showStoreLink || !businessId}
           className="text-gray-400 text-[9px] sm:text-[11px] font-medium tracking-wide uppercase line-clamp-1 text-left hover:text-gray-700 disabled:hover:text-gray-400"
         >
           {brandName}
@@ -204,7 +212,7 @@ export default function VoucherCard({ offer, onRedeem, onViewStore }) {
           </div>
         )}
 
-        {offer.business?._id && (
+        {showStoreLink && offer.business?._id && (
           <button
             type="button"
             onClick={(e) => {

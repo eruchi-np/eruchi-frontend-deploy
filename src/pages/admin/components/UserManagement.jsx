@@ -24,6 +24,7 @@ const UserManagement = ({
   handleBulkUpdateStatus,
   getStatusColor,
   NAVY,
+  onSelectUser,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
@@ -31,6 +32,13 @@ const UserManagement = ({
   const [openDropdown, setOpenDropdown] = useState(null);
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [bulkActionOpen, setBulkActionOpen] = useState(false);
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      fetchUsers(statusFilter, 1, searchTerm);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
 
   useEffect(() => {
     const handleClickOutside = () => {
@@ -48,17 +56,10 @@ const UserManagement = ({
     setStatusFilter(status);
     setFilterDropdownOpen(false);
     setSelectedUsers([]);
-    fetchUsers(status, 1);
+    fetchUsers(status, 1, searchTerm);
   };
 
-  const filteredUsers = users.filter((user) => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      user.firstName?.toLowerCase().includes(searchLower) ||
-      user.lastName?.toLowerCase().includes(searchLower) ||
-      user.email?.toLowerCase().includes(searchLower)
-    );
-  });
+  const eligibleUsers = users.filter((user) => user.activeCampaign?.status);
 
   const handleSelectUser = (userId) => {
     setSelectedUsers((prev) =>
@@ -67,7 +68,6 @@ const UserManagement = ({
   };
 
   const handleSelectAll = () => {
-    const eligibleUsers = filteredUsers.filter((user) => user.activeCampaign?.status);
     if (selectedUsers.length === eligibleUsers.length) {
       setSelectedUsers([]);
     } else {
@@ -79,6 +79,14 @@ const UserManagement = ({
     await handleBulkUpdateStatus(selectedUsers, status);
     setSelectedUsers([]);
     setBulkActionOpen(false);
+  };
+
+  const toggleDropdown = (id) => {
+    setOpenDropdown((prev) => (prev === id ? null : id));
+  };
+
+  const goToPage = (page) => {
+    handlePageChange(page, statusFilter, searchTerm);
   };
 
   return (
@@ -155,7 +163,7 @@ const UserManagement = ({
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search users..."
+                  placeholder="Search name, email, username..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:border-transparent w-full sm:w-64"
@@ -209,19 +217,19 @@ const UserManagement = ({
           </div>
         </div>
 
-        {filteredUsers.filter((u) => u.activeCampaign?.status).length > 0 && (
+        {eligibleUsers.length > 0 && (
           <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
             <button onClick={handleSelectAll} className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
-              <div className="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors" style={selectedUsers.length === filteredUsers.filter((u) => u.activeCampaign?.status).length ? { backgroundColor: NAVY, borderColor: NAVY } : { borderColor: "#d1d5db", backgroundColor: "white" }}>
-                {selectedUsers.length === filteredUsers.filter((u) => u.activeCampaign?.status).length && <Check className="h-3 w-3 text-white" />}
+              <div className="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors" style={selectedUsers.length === eligibleUsers.length ? { backgroundColor: NAVY, borderColor: NAVY } : { borderColor: "#d1d5db", backgroundColor: "white" }}>
+                {selectedUsers.length === eligibleUsers.length && <Check className="h-3 w-3 text-white" />}
               </div>
-              Select All ({filteredUsers.filter((u) => u.activeCampaign?.status).length} users)
+              Select All ({eligibleUsers.length} users)
             </button>
           </div>
         )}
 
         <div className="divide-y divide-gray-100">
-          {filteredUsers.length === 0 ? (
+          {users.length === 0 ? (
             <div className="text-center py-16">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Users className="h-8 w-8 text-gray-400" />
@@ -230,7 +238,7 @@ const UserManagement = ({
               <p className="text-gray-500 text-sm">Try adjusting your search or filters</p>
             </div>
           ) : (
-            filteredUsers.map((user) => (
+            users.map((user) => (
               <div key={user._id} className="p-4 sm:p-6 hover:bg-gray-50/70 transition-colors">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -245,11 +253,17 @@ const UserManagement = ({
                       {user.firstName?.charAt(0)?.toUpperCase() || "U"}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-gray-900 truncate">{user.firstName} {user.lastName}</h3>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <Mail className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
-                        <p className="text-sm text-gray-500 truncate">{user.email}</p>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={() => onSelectUser?.(user._id)}
+                        className="text-left w-full"
+                      >
+                        <h3 className="font-semibold text-gray-900 truncate hover:underline">{user.firstName} {user.lastName}</h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Mail className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                          <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                        </div>
+                      </button>
                     </div>
                   </div>
 
@@ -258,7 +272,10 @@ const UserManagement = ({
                       {user.activeCampaign?.status ? (
                         <div className="flex items-center gap-2">
                           <div className={`w-2 h-2 rounded-full ${getStatusColor(user.activeCampaign.status)}`}></div>
-                          <span className="text-sm font-medium text-gray-700 capitalize">{user.activeCampaign.status}</span>
+                          <span className="text-sm font-medium text-gray-700 capitalize">
+                            {user.activeCampaign.status}
+                            {user.activeCampaign.campaign?.title ? ` · ${user.activeCampaign.campaign.title}` : ""}
+                          </span>
                         </div>
                       ) : (
                         <div className="flex items-center gap-2">
@@ -272,6 +289,14 @@ const UserManagement = ({
                       <Award className="h-4 w-4 text-amber-500" />
                       <span className="text-sm font-semibold text-gray-900">{user.credits || 0}</span>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => onSelectUser?.(user._id)}
+                      className="text-sm font-medium px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50"
+                    >
+                      Details
+                    </button>
 
                     {user.activeCampaign?.status && (
                       <div className="relative">
@@ -321,16 +346,16 @@ const UserManagement = ({
               <span className="font-semibold text-gray-900">{totalUsers}</span> users
             </p>
             <div className="flex items-center gap-2">
-              <button onClick={() => handlePageChange(currentPage - 1)} disabled={currentPage === 1} className="px-4 py-2 rounded-lg font-medium text-white disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed" style={currentPage === 1 ? {} : { backgroundColor: NAVY }}>Previous</button>
+              <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage === 1} className="px-4 py-2 rounded-lg font-medium text-white disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed" style={currentPage === 1 ? {} : { backgroundColor: NAVY }}>Previous</button>
               <div className="flex items-center gap-1">
                 {[...Array(Math.min(5, totalPages))].map((_, idx) => {
                   let pageNum = totalPages <= 5 ? idx + 1 : currentPage <= 3 ? idx + 1 : currentPage >= totalPages - 2 ? totalPages - 4 + idx : currentPage - 2 + idx;
                   return (
-                    <button key={pageNum} onClick={() => handlePageChange(pageNum)} className="w-10 h-10 rounded-lg font-medium transition-colors" style={currentPage === pageNum ? { backgroundColor: NAVY, color: "white" } : { backgroundColor: "#f3f4f6", color: "#374151" }}>{pageNum}</button>
+                    <button key={pageNum} onClick={() => goToPage(pageNum)} className="w-10 h-10 rounded-lg font-medium transition-colors" style={currentPage === pageNum ? { backgroundColor: NAVY, color: "white" } : { backgroundColor: "#f3f4f6", color: "#374151" }}>{pageNum}</button>
                   );
                 })}
               </div>
-              <button onClick={() => handlePageChange(currentPage + 1)} disabled={currentPage === totalPages} className="px-4 py-2 rounded-lg font-medium text-white disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed" style={currentPage === totalPages ? {} : { backgroundColor: NAVY }}>Next</button>
+              <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage === totalPages} className="px-4 py-2 rounded-lg font-medium text-white disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed" style={currentPage === totalPages ? {} : { backgroundColor: NAVY }}>Next</button>
             </div>
           </div>
         </div>

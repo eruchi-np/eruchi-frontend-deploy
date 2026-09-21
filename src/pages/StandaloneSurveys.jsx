@@ -1,385 +1,423 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { sepSurveyAPI } from '../services/api';
-import {
-  Loader2,
-  Award,
-  AlertCircle,
-  SearchX,
-  ChevronDown,
-  FileText,
-  MessageSquare,
-  Calendar,
-  Clock,
-  ArrowRight,
-} from 'lucide-react';
-import toast from 'react-hot-toast';
-import AnimatedContent from '../components/animations/AnimatedContent';
-import Pagination from '../components/ui/Pagination';
-import { parsePage, writeSearchParams } from '../utils/searchParams';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { ChevronDown, Search, SearchX } from "lucide-react";
+import toast from "react-hot-toast";
+import { sepSurveyAPI, userAPI } from "../services/api";
+import { StreakArc, pageWindow } from "../components/shop/CreditArc";
+import HomeFooter from "../components/homepage/HomeFooter";
+import { flipShopCatalog, initShopCinema, scrollShopToCatalog } from "../components/shop/shopCinema";
+import { useAuth } from "../context/AuthContext";
+import { parsePage, writeSearchParams } from "../utils/searchParams";
+import { trackEvent } from "../utils/visitorEvents";
+import skyBg from "../assets/home/sky.jpg";
+import "../components/homepage/homepage.css";
+import "../components/shop/shop.css";
 
-const headingStyle = {
-  fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-  fontSize: 'clamp(28px, 8vw, 58px)',
-  fontWeight: 500,
-  lineHeight: 1.15,
-};
+const SURVEY_PAGE_SIZE = 8;
 
-const descriptionStyle = {
-  fontSize: 'clamp(15px, 1.5vw, 20px)',
-  fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-  fontWeight: 300,
-};
-
-const SURVEY_CARD_BG = '#3399ff';
-
-const daysRemaining = (endDate) => {
-  if (!endDate) return null;
-  return Math.ceil((new Date(endDate) - new Date()) / (1000 * 60 * 60 * 24));
-};
-
-function MetaPill({ icon: Icon, label }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[11px] font-medium text-neutral-700 sm:text-xs">
-      <Icon className="h-3.5 w-3.5 text-neutral-500" />
-      {label}
-    </span>
-  );
+function isSurveyOpen(survey) {
+  const now = new Date();
+  if (survey.isMerchantFeedback) return true;
+  if (survey.status !== "published") return false;
+  if (survey.startDate && now < new Date(survey.startDate)) return false;
+  if (survey.endDate && now > new Date(survey.endDate)) return false;
+  return true;
 }
 
-function SurveyCard({ survey, onStart }) {
-  const left = daysRemaining(survey.endDate);
-  const isExpired = left !== null && left <= 0;
-  const Icon = survey.isMerchantFeedback ? MessageSquare : FileText;
+function minutesLabel(survey) {
+  const mins = Number(survey.estimatedMinutes);
+  if (!Number.isFinite(mins) || mins <= 0) return "—";
+  return `${mins}Min`;
+}
+
+function SurveyRow({ survey, onView }) {
+  const expired = !isSurveyOpen(survey);
 
   return (
-    <div
-      role="button"
-      tabIndex={isExpired ? -1 : 0}
-      aria-disabled={isExpired}
-      onClick={() => !isExpired && onStart(survey)}
-      onKeyDown={(e) => {
-        if (!isExpired && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault();
-          onStart(survey);
-        }
-      }}
-      className={`group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-neutral-200 bg-white outline-none transition-all duration-300 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#134074] ${
-        isExpired
-          ? 'cursor-not-allowed opacity-60'
-          : 'cursor-pointer hover:-translate-y-1 hover:border-neutral-300 hover:shadow-lg'
-      }`}
+    <article
+      className={`surveys-row ${expired ? "is-expired" : ""}`}
+      data-survey-id={survey._id}
+      onClick={() => !expired && onView(survey)}
     >
-      {/* ── Colored ticket header ── */}
-      <div
-        className="relative flex items-center gap-4 px-6 pb-8 pt-6 sm:px-8 overflow-hidden"
-        style={{ backgroundColor: SURVEY_CARD_BG }}
-      >
-        <div className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white shadow-md transition-transform duration-300 group-hover:scale-105">
-          <Icon className="h-6 w-6" style={{ color: SURVEY_CARD_BG }} />
-        </div>
-
-        <div className="relative min-w-0 flex-1">
-          {survey.isMerchantFeedback && (
-            <span className="mb-1.5 inline-block rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white backdrop-blur-sm">
-              {survey.feedbackBusinessName
-                ? `Feedback · ${survey.feedbackBusinessName}`
-                : 'Feedback requested'}
+      <span className="surveys-row-icon" aria-hidden="true" />
+      <div className="surveys-row-copy">
+        <h3>
+          {survey.title}
+          {survey.isMerchantFeedback ? (
+            <span className="surveys-row-tag">
+              {survey.feedbackBusinessName ? `Feedback · ${survey.feedbackBusinessName}` : "Feedback"}
             </span>
-          )}
-          <h2 className="line-clamp-2 text-[18px] font-semibold leading-tight text-white sm:text-[20px]">
-            {survey.title}
-          </h2>
-        </div>
+          ) : null}
+        </h3>
+        <p>{survey.description}</p>
       </div>
-
-      {/* ── Perforation ── */}
-      <div className="relative z-10 flex h-0 items-center">
-        <span
-          className="absolute -left-2.5 h-5 w-5 -translate-x-1/2 rounded-full bg-white"
-          style={{ boxShadow: 'inset 0 0 0 1px rgb(229 229 229)' }}
-        />
-        <span
-          className="absolute -right-2.5 h-5 w-5 translate-x-1/2 rounded-full bg-white"
-          style={{ boxShadow: 'inset 0 0 0 1px rgb(229 229 229)' }}
-        />
-        <div className="mx-3 w-full border-t-2 border-dashed border-neutral-200" />
+      <div className="surveys-row-meta">
+        <span className="surveys-row-time">{minutesLabel(survey)}</span>
+        <span className="surveys-row-credits">{survey.credits || 0}</span>
       </div>
-
-      {/* ── Body ── */}
-      <div className="flex flex-1 flex-col justify-between px-4 pb-5 pt-5 sm:px-8 sm:pb-6 sm:pt-7">
-        <div>
-          <p className="mb-5 line-clamp-2 min-h-[40px] text-sm text-neutral-500 sm:text-base">
-            {survey.description}
-          </p>
-
-          <div className="mb-6 flex flex-wrap gap-2">
-            <MetaPill icon={Award} label={`${survey.credits} credits`} />
-            <MetaPill
-              icon={Calendar}
-              label={
-                left === null
-                  ? 'No deadline'
-                  : left > 0
-                    ? `${left} day${left !== 1 ? 's' : ''} left`
-                    : 'Expired'
-              }
-            />
-            {survey.estimatedMinutes && (
-              <MetaPill icon={Clock} label={`~${survey.estimatedMinutes} min`} />
-            )}
-          </div>
-        </div>
-
-        <button
-          type="button"
-          disabled={isExpired}
-          onClick={(e) => {
-            e.stopPropagation();
-            onStart(survey);
-          }}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-sm font-medium text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto sm:self-end"
-          style={{ backgroundColor: SURVEY_CARD_BG }}
-        >
-          {isExpired ? 'Closed' : 'Start survey'}
-          {!isExpired && (
-            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
-          )}
-        </button>
-      </div>
-    </div>
+      <button
+        type="button"
+        className="surveys-row-view"
+        disabled={expired}
+        onClick={() => onView(survey)}
+      >
+        {expired ? "closed" : "view"}
+      </button>
+    </article>
   );
 }
 
-const SURVEY_PAGE_SIZE = 12;
-
-const StandaloneSurveys = () => {
+export default function StandaloneSurveys() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const pageRef = useRef(null);
+  const listRef = useRef(null);
+  const rectsRef = useRef(new Map());
+  const lastCatalogPage = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const page = parsePage(searchParams.get('page'));
-  const sortOrder = searchParams.get('sort') || 'default';
-  const setListParams = (patch) =>
-    writeSearchParams(setSearchParams, patch, { page: 1, sort: 'default' });
-
+  const search = searchParams.get("q") || "";
+  const sortOrder = searchParams.get("sort") || "latest";
+  const catalogPage = parsePage(searchParams.get("page"));
+  const [searchDraft, setSearchDraft] = useState(search);
   const [surveys, setSurveys] = useState([]);
+  const [streak, setStreak] = useState(Number(user?.streakCount) || 0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [retryTick, setRetryTick] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalSurveys, setTotalSurveys] = useState(0);
-  const navigate = useNavigate();
+
+  const setListParams = useCallback(
+    (patch) =>
+      writeSearchParams(setSearchParams, patch, {
+        q: "",
+        sort: "latest",
+        page: 1,
+      }),
+    [setSearchParams]
+  );
 
   useEffect(() => {
-    const fetchSurveys = async () => {
+    setSearchDraft(search);
+  }, [search]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchDraft === search) return;
+      setListParams({ q: searchDraft, page: 1 });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchDraft, search, setListParams]);
+
+  useEffect(() => {
+    trackEvent("page_view", "/standalone-surveys");
+    const html = document.documentElement;
+    const prevHtmlOverflow = html.style.overflowX;
+    const prevBodyOverflow = document.body.style.overflowX;
+    const rootEl = document.getElementById("root");
+    const prevRootOverflow = rootEl ? rootEl.style.overflowX : "";
+    html.style.overflowX = "clip";
+    document.body.style.overflowX = "clip";
+    if (rootEl) rootEl.style.overflowX = "clip";
+
+    const revert = initShopCinema(pageRef.current);
+    return () => {
+      revert();
+      html.style.overflowX = prevHtmlOverflow;
+      document.body.style.overflowX = prevBodyOverflow;
+      if (rootEl) rootEl.style.overflowX = prevRootOverflow;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (window.location.hash) {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    }
+    window.scrollTo(0, 0);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setLoading(true);
-        setError(null);
-        const res = await sepSurveyAPI.getAvailable({
-          page,
-          limit: SURVEY_PAGE_SIZE,
-          skipErrorToast: true,
-        });
+        const [surveysResult, profileResult] = await Promise.allSettled([
+          sepSurveyAPI.getAvailable({
+            page: 1,
+            limit: 200,
+            skipErrorToast: true,
+          }),
+          userAPI.getProfile({ skipAuthRedirect: true, skipErrorToast: true }),
+        ]);
+
+        if (cancelled) return;
+
+        if (surveysResult.status !== "fulfilled") {
+          setSurveys([]);
+          setError("Could not load available surveys. Please try again later.");
+          toast.error("Failed to load surveys");
+          return;
+        }
+
+        const res = surveysResult.value;
         setSurveys(res.data.data || []);
-        setTotalPages(res.data.pagination?.totalPages || 1);
-        setTotalSurveys(res.data.pagination?.totalSurveys || res.data.data?.length || 0);
+
+        if (profileResult.status === "fulfilled" && profileResult.value) {
+          const nextUser =
+            profileResult.value.data?.data?.user || profileResult.value.data?.user;
+          setStreak(nextUser?.streakCount ?? user?.streakCount ?? 0);
+        } else {
+          setStreak(user?.streakCount || 0);
+        }
       } catch (err) {
-        console.error('Failed to load standalone surveys:', err);
-        setError('Could not load available surveys. Please try again later.');
-        toast.error('Failed to load surveys');
+        if (cancelled) return;
+        console.error("Failed to load standalone surveys:", err);
+        setSurveys([]);
+        setError("Could not load available surveys. Please try again later.");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchSurveys();
-  }, [page, retryTick]);
+    fetchData();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, retryTick]);
 
-  const sortedSurveys = useMemo(() => {
-    const now = new Date();
+  const filteredCatalog = useMemo(() => {
+    const q = searchDraft.toLowerCase().replace(/\s/g, "");
+    let items = surveys.filter(isSurveyOpen);
 
-    const items = surveys.filter((survey) => {
-      if (survey.isMerchantFeedback) return true;
-      if (survey.status !== 'published') return false;
-      if (survey.startDate && now < new Date(survey.startDate)) return false;
-      if (survey.endDate && now > new Date(survey.endDate)) return false;
-      return true;
-    });
+    if (q) {
+      items = items.filter((survey) =>
+        `${survey.title || ""} ${survey.description || ""} ${survey.credits || ""} ${
+          survey.estimatedMinutes || ""
+        } ${survey.feedbackBusinessName || ""}`
+          .toLowerCase()
+          .replace(/\s/g, "")
+          .includes(q)
+      );
+    }
 
-    if (sortOrder === 'credits-desc') items.sort((a, b) => b.credits - a.credits);
-    else if (sortOrder === 'credits-asc') items.sort((a, b) => a.credits - b.credits);
+    if (sortOrder === "credits-desc") {
+      items = [...items].sort((a, b) => (b.credits || 0) - (a.credits || 0));
+    } else if (sortOrder === "credits-asc") {
+      items = [...items].sort((a, b) => (a.credits || 0) - (b.credits || 0));
+    } else {
+      items = [...items].sort((a, b) =>
+        String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
+      );
+    }
 
     return items;
-  }, [surveys, sortOrder]);
+  }, [searchDraft, sortOrder, surveys]);
 
-  const totalCredits = useMemo(
-    () => sortedSurveys.reduce((sum, s) => sum + (s.credits || 0), 0),
-    [sortedSurveys],
-  );
+  const listPage = searchDraft === search ? catalogPage : 1;
+  const catalogTotal = filteredCatalog.length;
+  const catalogPages = Math.max(1, Math.ceil(catalogTotal / SURVEY_PAGE_SIZE) || 1);
+  const safePage = Math.min(listPage, catalogPages);
+  const rangeStart = catalogTotal === 0 ? 0 : (safePage - 1) * SURVEY_PAGE_SIZE;
+  const pagedCatalog = filteredCatalog.slice(rangeStart, rangeStart + SURVEY_PAGE_SIZE);
+  const rangeEnd = rangeStart + pagedCatalog.length;
 
-  if (loading) {
-    return (
-      <div
-        className="flex min-h-screen items-center justify-center bg-white px-4"
-        style={{ fontFamily: "'Inter', sans-serif" }}
-      >
-        <AnimatedContent direction="vertical" distance={20} duration={0.6} className="text-center">
-          <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-neutral-900" />
-          <p className="font-medium text-neutral-600" style={descriptionStyle}>
-            Loading available surveys...
-          </p>
-        </AnimatedContent>
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (lastCatalogPage.current == null) {
+      lastCatalogPage.current = catalogPage;
+      return;
+    }
+    if (lastCatalogPage.current === catalogPage) return;
+    lastCatalogPage.current = catalogPage;
+    scrollShopToCatalog(pageRef.current, { behavior: "smooth" });
+  }, [catalogPage]);
 
-  if (error) {
-    return (
-      <div
-        className="flex min-h-screen items-center justify-center bg-white px-4 py-8"
-        style={{ fontFamily: "'Inter', sans-serif" }}
-      >
-        <AnimatedContent
-          direction="vertical"
-          distance={30}
-          duration={0.6}
-          className="w-full max-w-md text-center"
-        >
-          <AlertCircle className="mx-auto mb-6 h-16 w-16 text-neutral-900" />
-          <h2
-            style={{ fontSize: 'clamp(32px, 4vw, 48px)', fontWeight: 300, lineHeight: 1.1 }}
-            className="mb-4 text-neutral-900"
-          >
-            Oops!
-          </h2>
-          <p className="mb-8 text-neutral-600" style={descriptionStyle}>
-            {error}
-          </p>
-          <button
-            onClick={() => setRetryTick((n) => n + 1)}
-            className="mx-auto w-full max-w-xs rounded-full px-6 py-4 font-medium text-white transition-transform hover:scale-[1.02]"
-            style={{ backgroundColor: '#134074' }}
-          >
-            Try Again
-          </button>
-        </AnimatedContent>
-      </div>
-    );
-  }
+  const pageIds = pagedCatalog.map((survey) => survey._id).join();
+  useLayoutEffect(() => {
+    if (loading) {
+      rectsRef.current = new Map();
+      return;
+    }
+    flipShopCatalog(listRef.current, rectsRef);
+  }, [loading, pageIds, error, searchDraft, sortOrder]);
+
+  const goCatalog = () => {
+    scrollShopToCatalog(pageRef.current, { behavior: "smooth" });
+  };
+
+  const openSurvey = (survey) => {
+    if (!isSurveyOpen(survey)) return;
+    navigate(`/standalone-survey/${survey._id}`);
+  };
 
   return (
-    <div className="min-h-screen bg-white pb-8" style={{ fontFamily: "'Inter', sans-serif" }}>
-      <div className="mx-auto max-w-[1314px] px-4 py-10 sm:px-8 lg:px-10 lg:py-16">
-        {/* Header */}
-        <div className="mb-12 grid items-end justify-between gap-8 border-b border-neutral-200 pb-12 lg:grid-cols-[1fr_340px]">
-          <AnimatedContent direction="vertical" distance={40} duration={0.8} className="flex flex-col">
-            <h1 className="mb-4 text-neutral-900" style={headingStyle}>
-              Available <span className="text-[#3399ff]">Surveys</span>.
-            </h1>
-            <p className="max-w-2xl leading-snug text-neutral-600" style={descriptionStyle}>
-              Share your thoughts, influence brands, and earn credits. Select a
-              survey below to get started and unlock your rewards.
-            </p>
-
-            {sortedSurveys.length > 0 && (
-              <div className="mt-6 flex flex-wrap gap-2">
-                <MetaPill icon={FileText} label={`${sortedSurveys.length} open`} />
-                <MetaPill icon={Award} label={`${totalCredits} credits available`} />
+    <div className="home-page shop-page" ref={pageRef}>
+      <div className="home-stage">
+        <div className="home-hero-pin">
+          <section className="home-hero shop-hero" style={{ "--sky": `url(${skyBg})` }}>
+            <div className="home-hero-sky" aria-hidden="true" />
+            <div className="home-hero-motion shop-hero-motion">
+              <div className="shop-hero-inner">
+                <div className="shop-hero-copy">
+                  <h1>
+                    <span className="shop-hero-line-wrap">
+                      <span className="shop-hero-line">Your next favourite.</span>
+                    </span>
+                    <span className="shop-hero-line-wrap">
+                      <span className="shop-hero-line">Already earned.</span>
+                    </span>
+                  </h1>
+                  <p>
+                    A coffee on your way. A climb after work. Turn your everyday opinions into a
+                    little more of what you love.
+                  </p>
+                  <button type="button" className="home-pill home-pill-lg home-pill-white" onClick={goCatalog}>
+                    Surveys
+                  </button>
+                </div>
+                <StreakArc streak={streak} />
               </div>
-            )}
-          </AnimatedContent>
-
-          {surveys.length > 0 && (
-            <AnimatedContent
-              direction="vertical"
-              distance={40}
-              duration={0.8}
-              delay={0.15}
-              className="w-full"
-            >
-              <div className="relative">
-                <select
-                  value={sortOrder}
-                  onChange={(e) => setListParams({ sort: e.target.value, page: 1 })}
-                  className="w-full cursor-pointer appearance-none rounded-full border border-gray-200 bg-white py-3.5 pl-4 pr-10 text-sm text-gray-900 outline-none transition-colors focus:border-gray-300 lg:py-4 lg:pl-5 lg:text-base"
-                >
-                  <option value="default">Default ordering</option>
-                  <option value="credits-desc">Reward: High → Low</option>
-                  <option value="credits-asc">Reward: Low → High</option>
-                </select>
-                <ChevronDown
-                  className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
-                  size={16}
-                />
-              </div>
-            </AnimatedContent>
-          )}
+            </div>
+          </section>
         </div>
 
-        {/* Grid */}
-        {sortedSurveys.length === 0 ? (
-          <AnimatedContent direction="vertical" distance={30} duration={0.7} delay={0.2}>
-            <div className="mx-auto max-w-3xl rounded-3xl border-2 border-dashed border-neutral-200 bg-neutral-50/60 p-10 text-center sm:p-16">
-              <SearchX className="mx-auto mb-6 h-20 w-20 text-neutral-300" />
-              <h3
-                className="mb-4 text-neutral-900"
-                style={{ fontSize: 'clamp(24px, 3vw, 36px)', fontWeight: 400 }}
-              >
-                No surveys right now
-              </h3>
-              <p className="mb-8 text-neutral-600" style={descriptionStyle}>
-                Check back soon! New surveys tailored to your profile will appear
-                here when they&apos;re published.
-              </p>
-              <button
-                onClick={() => navigate('/profile')}
-                className="rounded-full px-8 py-4 font-medium text-white transition-transform hover:scale-[1.02]"
-                style={{ backgroundColor: '#134074' }}
-              >
-                Return to Dashboard
-              </button>
-            </div>
-          </AnimatedContent>
-        ) : (
-          <>
-          <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-2">
-            {sortedSurveys.map((survey, index) => (
-              <AnimatedContent
-                key={survey._id}
-                direction="vertical"
-                distance={40}
-                duration={0.6}
-                delay={0.15 + (index % 2) * 0.1}
-                className="flex w-full flex-col"
-              >
-                <SurveyCard
-                  survey={survey}
-                  onStart={(s) => navigate(`/standalone-survey/${s._id}`)}
+        <div className="home-sheet shop-sheet">
+          <div className="shop-catalog">
+            <div className="shop-head">
+              <div>
+                <div className="shop-title-row">
+                  <span className="shop-dots" aria-hidden="true">
+                    {Array.from({ length: 16 }, (_, i) => (
+                      <i key={i} style={{ "--i": i }} />
+                    ))}
+                  </span>
+                  <h2>Available Surveys</h2>
+                </div>
+                <p className="shop-head-copy">
+                  Every survey you have been a part of, all in one place.
+                </p>
+              </div>
+              <label className="shop-search">
+                <span className="sr-only">Search surveys</span>
+                <input
+                  value={searchDraft}
+                  onChange={(event) => setSearchDraft(event.target.value)}
+                  placeholder="Upark, restaurant, cafe..."
                 />
-              </AnimatedContent>
-            ))}
-          </div>
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            total={totalSurveys}
-            pageSize={SURVEY_PAGE_SIZE}
-            onChange={(nextPage) => setListParams({ page: nextPage })}
-            label="surveys"
-          />
-          </>
-        )}
-
-        {sortedSurveys.length > 0 && (
-          <AnimatedContent direction="vertical" distance={20} duration={0.6} delay={0.4}>
-            <div className="mt-12 text-center sm:mt-16">
-              <p className="text-sm font-medium tracking-wide text-gray-400 sm:text-base">
-                More surveys coming soon
-              </p>
+                <Search size={16} />
+              </label>
             </div>
-          </AnimatedContent>
-        )}
+
+            <div className="shop-toolbar">
+              <p className="shop-showing">
+                {loading
+                  ? "Loading surveys"
+                  : catalogTotal === 0
+                    ? "Showing 0 surveys"
+                    : `Showing ${rangeStart + 1}-${rangeEnd} of ${catalogTotal} surveys`}
+              </p>
+              <label className="shop-sort">
+                <span>Sort by:</span>
+                <select
+                  value={sortOrder === "default" ? "latest" : sortOrder}
+                  onChange={(event) => setListParams({ sort: event.target.value, page: 1 })}
+                >
+                  <option value="latest">Latest surveys</option>
+                  <option value="credits-desc">Credits: High to Low</option>
+                  <option value="credits-asc">Credits: Low to High</option>
+                </select>
+                <ChevronDown size={14} />
+              </label>
+            </div>
+
+            {error ? (
+              <div className="shop-status">
+                <SearchX className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <h3>Couldn’t load surveys</h3>
+                <p>{error}</p>
+                <button
+                  type="button"
+                  className="home-pill home-pill-sm home-pill-navy"
+                  onClick={() => setRetryTick((n) => n + 1)}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : loading ? (
+              <div className="shop-spinner" aria-label="Loading surveys" />
+            ) : filteredCatalog.length > 0 ? (
+              <>
+                <div className="surveys-list" ref={listRef}>
+                  {pagedCatalog.map((survey) => (
+                    <SurveyRow key={survey._id} survey={survey} onView={openSurvey} />
+                  ))}
+                </div>
+                <div className="shop-foot">
+                  <p className="shop-soon">More surveys coming soon</p>
+                  {catalogPages > 1 && (
+                    <nav className="shop-pager" aria-label="surveys pagination">
+                      <button
+                        type="button"
+                        className="shop-page-prev"
+                        onClick={() => setListParams({ page: safePage - 1 })}
+                        disabled={safePage === 1}
+                      >
+                        Previous
+                      </button>
+                      {pageWindow(safePage, catalogPages).map((pageNum) => (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          className={`shop-page-num ${safePage === pageNum ? "is-active" : ""}`}
+                          onClick={() => setListParams({ page: pageNum })}
+                        >
+                          {pageNum}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className="shop-page-next"
+                        onClick={() => setListParams({ page: safePage + 1 })}
+                        disabled={safePage === catalogPages}
+                      >
+                        Next
+                      </button>
+                    </nav>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="shop-status">
+                <SearchX className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <h3>No surveys right now</h3>
+                <p>
+                  {searchDraft.trim()
+                    ? "Nothing matches your search. Try clearing it to see all surveys."
+                    : "New surveys tailored to your profile will appear here when they’re published."}
+                </p>
+                {searchDraft.trim() ? (
+                  <button
+                    type="button"
+                    className="home-pill home-pill-sm home-pill-navy"
+                    onClick={() => setListParams({ q: "", sort: "latest", page: 1 })}
+                  >
+                    Clear search
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="home-pill home-pill-sm home-pill-navy"
+                    onClick={() => navigate("/profile")}
+                  >
+                    Return to profile
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+
+      <HomeFooter />
     </div>
   );
-};
-
-export default StandaloneSurveys;
+}

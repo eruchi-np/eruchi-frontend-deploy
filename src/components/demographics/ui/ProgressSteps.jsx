@@ -2,10 +2,9 @@ import React from 'react';
 
 const ProgressSteps = ({ currentStep }) => {
   const steps = [
-    'Sampler Profile',
+    'About You',
     'Address',
-    'Household & Durables',
-    'Psychographics'
+    'Household & Durables'
   ];
 
   return (

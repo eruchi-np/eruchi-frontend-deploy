@@ -1,12 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { campaignAPI } from '../../services/api';
+import { useNavigate, useParams } from 'react-router-dom';
+import { campaignAPI, adminAPI } from '../../services/api';
 import { ArrowLeft, Plus, Trash2, Save, Type, FileText, CheckSquare, Sliders, AlertCircle, Eye, Settings as SettingsIcon, Clock, Timer, Award } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+const toDateInput = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
 const CreateCampaign = () => {
   const navigate = useNavigate();
+  const { campaignId } = useParams();
+  const isEditMode = Boolean(campaignId);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
@@ -29,6 +42,57 @@ const CreateCampaign = () => {
       }
     ]
   });
+
+  useEffect(() => {
+    if (!isEditMode) return;
+    const load = async () => {
+      try {
+        const res = await adminAPI.getCampaign(campaignId, { skipErrorToast: true });
+        const { campaign, survey } = res.data.data || {};
+        if (!campaign) {
+          toast.error('Campaign not found');
+          navigate('/admin?tab=campaigns');
+          return;
+        }
+        setFormData({
+          title: campaign.title || '',
+          description: campaign.description || '',
+          status: campaign.status || 'available',
+          endDate: toDateInput(campaign.endDate),
+          isMandatory: survey?.isMandatory || false,
+          surveyDelayDays: survey?.surveyDelayDays ?? 0,
+          surveyTimeoutDays: survey?.surveyTimeoutDays ?? 0,
+          creditsToAward: survey?.creditsToAward ?? 100,
+          creditsToDeduct: survey?.creditsToDeduct ?? 50,
+          questions: survey?.questions?.length
+            ? survey.questions.map((q) => ({
+                questionText: q.questionText || '',
+                questionType: q.questionType || 'text_short',
+                options: q.options || [],
+                maxSelections: q.maxSelections ?? 1,
+                minValue: q.minValue ?? 0,
+                maxValue: q.maxValue ?? 5,
+              }))
+            : [
+                {
+                  questionText: '',
+                  questionType: 'text_short',
+                  options: [],
+                  maxSelections: 1,
+                  minValue: 0,
+                  maxValue: 5,
+                },
+              ],
+        });
+      } catch (err) {
+        toast.error('Failed to load campaign');
+        navigate('/admin?tab=campaigns');
+      } finally {
+        setInitialLoading(false);
+      }
+    };
+    load();
+  }, [isEditMode, campaignId, navigate]);
 
   const questionTypes = [
     { value: 'text_short', label: 'Short Text', icon: Type, description: 'Brief text response' },
@@ -200,9 +264,13 @@ const CreateCampaign = () => {
         })
       };
 
-      const response = await campaignAPI.createCampaign(payload);
-      toast.success('Campaign created successfully!');
-      navigate('/admin');
+      if (isEditMode) {
+        await adminAPI.updateCampaign(campaignId, payload);
+      } else {
+        await campaignAPI.createCampaign(payload);
+      }
+      toast.success(isEditMode ? 'Campaign updated successfully!' : 'Campaign created successfully!');
+      navigate('/admin?tab=campaigns');
     } catch (error) {
       console.error('Error creating campaign:', error);
       
@@ -245,6 +313,14 @@ const CreateCampaign = () => {
     return statusOptions.find(s => s.value === formData.status);
   };
 
+  if (initialLoading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="w-14 h-14 border-4 border-gray-200 rounded-full animate-spin" style={{ borderTopColor: '#1B2A4A' }} />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -252,14 +328,14 @@ const CreateCampaign = () => {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
-              onClick={() => navigate('/admin')}
+              onClick={() => navigate('/admin?tab=campaigns')}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
             >
               <ArrowLeft className="h-5 w-5 text-gray-600" />
             </button>
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Create Campaign</h1>
-              <p className="text-sm text-gray-500">Design your sampling campaign and survey</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{isEditMode ? 'Edit Campaign' : 'Create Campaign'}</h1>
+              <p className="text-sm text-gray-500">{isEditMode ? 'Update campaign details and survey' : 'Design your sampling campaign and survey'}</p>
             </div>
           </div>
         </div>
@@ -362,7 +438,7 @@ const CreateCampaign = () => {
                     type="date"
                     value={formData.endDate}
                     onChange={(e) => handleInputChange('endDate', e.target.value)}
-                    min={getMinDate()}
+                    min={isEditMode ? undefined : getMinDate()}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#3399ff] focus:border-transparent transition-all"
                     required
                   />
@@ -726,9 +802,9 @@ const CreateCampaign = () => {
             <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-emerald-50">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div>
-                  <h3 className="text-lg font-bold text-gray-900">Ready to Launch?</h3>
+                  <h3 className="text-lg font-bold text-gray-900">{isEditMode ? 'Save changes' : 'Ready to Launch?'}</h3>
                   <p className="text-sm text-gray-600 mt-0.5">
-                    Campaign with {formData.questions.length} question{formData.questions.length !== 1 ? 's' : ''} ready to create
+                    Campaign with {formData.questions.length} question{formData.questions.length !== 1 ? 's' : ''} ready to {isEditMode ? 'update' : 'create'}
                   </p>
                   {!formData.endDate && (
                     <div className="flex items-center gap-1.5 mt-2 text-red-600">
@@ -740,7 +816,7 @@ const CreateCampaign = () => {
                 <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                   <button
                     type="button"
-                    onClick={() => navigate('/admin')}
+                    onClick={() => navigate('/admin?tab=campaigns')}
                     className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-all"
                   >
                     Cancel
@@ -753,12 +829,12 @@ const CreateCampaign = () => {
                     {loading ? (
                       <>
                         <div className="animate-spin rounded-full h-5 w-5 border-2 border-white border-t-transparent"></div>
-                        <span>Creating Campaign...</span>
+                        <span>{isEditMode ? 'Saving...' : 'Creating Campaign...'}</span>
                       </>
                     ) : (
                       <>
                         <Save className="h-5 w-5" />
-                        <span>Create Campaign</span>
+                        <span>{isEditMode ? 'Save Campaign' : 'Create Campaign'}</span>
                       </>
                     )}
                   </button>

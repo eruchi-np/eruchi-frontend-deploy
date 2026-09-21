@@ -16,7 +16,6 @@ export const ensureCsrfToken = async () => {
         csrfToken = res.data?.csrfToken || '';
         return csrfToken;
       })
-      .catch(() => '')
       .finally(() => {
         inflight = null;
       });
@@ -24,12 +23,10 @@ export const ensureCsrfToken = async () => {
   return inflight;
 };
 
-const MUTATING = ['POST', 'PUT', 'PATCH', 'DELETE'];
-
 export const attachCsrf = (instance) => {
   instance.interceptors.request.use(async (config) => {
     const method = (config.method || 'get').toUpperCase();
-    if (!MUTATING.includes(method)) return config;
+    if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) return config;
     const token = await ensureCsrfToken();
     if (token) {
       config.headers = config.headers || {};
@@ -38,29 +35,4 @@ export const attachCsrf = (instance) => {
     config.withCredentials = true;
     return config;
   });
-};
-
-/** Attach CSRF + credentials to window.fetch calls against the API. */
-export const installCsrfFetch = () => {
-  if (typeof window === 'undefined' || window.__eruchiCsrfFetch) return;
-  window.__eruchiCsrfFetch = true;
-  const originalFetch = window.fetch.bind(window);
-
-  window.fetch = async (input, init = {}) => {
-    const url = typeof input === 'string' ? input : input?.url;
-    const method = String(
-      init.method || (typeof Request !== 'undefined' && input instanceof Request ? input.method : 'GET')
-    ).toUpperCase();
-
-    if (url && String(url).startsWith(API_BASE_URL) && MUTATING.includes(method)) {
-      const token = await ensureCsrfToken();
-      const headers = new Headers(
-        init.headers || (typeof Request !== 'undefined' && input instanceof Request ? input.headers : undefined)
-      );
-      if (token && !headers.has('X-CSRF-Token')) headers.set('X-CSRF-Token', token);
-      init = { ...init, headers, credentials: init.credentials || 'include' };
-    }
-
-    return originalFetch(input, init);
-  };
 };

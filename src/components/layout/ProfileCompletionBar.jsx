@@ -18,7 +18,6 @@ const ProfileCompletionBar = () => {
     !!(user.address?.municipality && user.address?.wardNumber),
     !!(user.householdDurables?.length > 0),
     !!user.mainIncomeSource,
-    !!(user.interests?.length > 0),
   ];
 
   const percentage = Math.round((fields.filter(Boolean).length / fields.length) * 100);

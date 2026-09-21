@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { surveyAPI, userAPI } from '../services/api';
 import { ArrowLeft, Star, Loader2, Package, Clock, Type, FileText, CheckSquare, Sliders } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { goToSurveyComplete } from '../utils/surveyComplete';
+import { completionFromSubmitResponse, goToSurveyComplete } from '../utils/surveyComplete';
+import SurveySubmitConfirm from '../components/survey/SurveySubmitConfirm';
 
 const Survey = () => {
   const { campaignId } = useParams();
@@ -12,6 +13,7 @@ const Survey = () => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [responses, setResponses] = useState({});
   const [error, setError] = useState(null);
 
@@ -103,7 +105,7 @@ const Survey = () => {
     });
   };
 
-  const handleSubmit = async (e) => {
+  const requestSubmit = (e) => {
     e.preventDefault();
     
     // Enhanced validation for all question types
@@ -156,14 +158,22 @@ const Survey = () => {
       return;
     }
 
+    setConfirmOpen(true);
+  };
+
+  const handleSubmit = async () => {
     setSubmitting(true);
     
     try {
       const previousStreak = user?.streakCount ?? 0;
       const creditsEarned = survey.creditsToAward || 100;
-      await surveyAPI.submitSurvey({ responses });
+      const res = await surveyAPI.submitSurvey({ responses });
+      setConfirmOpen(false);
       window.dispatchEvent(new Event('authChange'));
-      goToSurveyComplete(navigate, { creditsEarned, previousStreak });
+      goToSurveyComplete(
+        navigate,
+        completionFromSubmitResponse(res, { creditsEarned, previousStreak })
+      );
     } catch (error) {
       console.error('Error submitting survey:', error);
       const errorMessage = error.response?.data?.message || 'Failed to submit survey';
@@ -466,7 +476,7 @@ const Survey = () => {
             </div>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6">
+          <form onSubmit={requestSubmit} className="p-6">
             <div className="space-y-8">
               {survey.questions.map((question, index) => (
                 <div key={index} className="border-b border-gray-200 pb-8 last:border-b-0">
@@ -517,6 +527,13 @@ const Survey = () => {
           </form>
         </div>
       </div>
+
+      <SurveySubmitConfirm
+        open={confirmOpen}
+        submitting={submitting}
+        onCancel={() => !submitting && setConfirmOpen(false)}
+        onConfirm={handleSubmit}
+      />
     </div>
   );
 };

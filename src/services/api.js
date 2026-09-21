@@ -64,6 +64,7 @@ export const userAPI = {
   updateBasicProfile: (data, config = {}) => api.put('/users/me/basic-profile', data, config),
   updateDemographics: (data, config = {}) => api.put('/users/me/demographics', data, config),
   updateAdditionalProfile: (data, config = {}) => api.put('/users/me/additional-profile', data, config),
+  purchaseStreakGuard: (days, config = {}) => api.post('/users/me/streak-guard', { days }, config),
 };
 
 export const campaignAPI = {
@@ -81,6 +82,13 @@ export const surveyAPI = {
 
 export const adminAPI = {
   getUsers: (options = {}) => getRequest('/admin/users', options),
+  getUser: (userId, options = {}) => getRequest(`/admin/users/${userId}`, options),
+  getUserCredits: (userId, options = {}) => getRequest(`/admin/users/${userId}/credits`, options),
+  adjustUserCredits: (userId, data, config = {}) => api.post(`/admin/users/${userId}/credits`, data, config),
+  getStats: (options = {}) => getRequest('/admin/stats', options),
+  getCampaigns: (options = {}) => getRequest('/admin/campaigns', options),
+  getCampaign: (id, options = {}) => getRequest(`/admin/campaigns/${id}`, options),
+  updateCampaign: (id, data, config = {}) => api.put(`/admin/campaigns/${id}`, data, config),
   updateUserStatus: (userId, data, config = {}) => api.put(`/admin/users/${userId}/status`, data, config),
   getBusinesses: (options = {}) => getRequest('/admin/businesses', options),
   createBusiness: (data, config = {}) => api.post('/admin/businesses', data, config),
@@ -126,6 +134,7 @@ export const sepSurveyAPI = {
   getHistory: (options = {}) => getRequest('/sepsurveys/history', options),
   create: (data, config = {}) => api.post('/sepsurveys', data, config),
   update: (surveyId, data, config = {}) => api.put(`/sepsurveys/${surveyId}`, data, config),
+  updateStatus: (surveyId, status, config = {}) => api.put(`/sepsurveys/${surveyId}/status`, { status }, config),
   delete: (surveyId, config = {}) => api.delete(`/sepsurveys/${surveyId}`, config),
   exportTimingsCSV: (surveyId, config = {}) => api.get(`/sepsurveys/${surveyId}/timings/csv`, { responseType: 'blob', ...config }),
 };

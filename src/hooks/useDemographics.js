@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { demographicsStepSchema, parseStep } from '../utils/onboardingSchemas';
 
-const STORAGE_KEY = 'demographics_draft_v1';
+const STORAGE_KEY = 'demographics_draft_v2';
+const LEGACY_STORAGE_KEY = 'demographics_draft_v1';
 
 const initialFormData = {
-  // Part 1: Sampler Profile
+  // Part 1: About You
   firstLanguage: '',
   education: '',
   maritalStatus: '',
@@ -17,16 +19,12 @@ const initialFormData = {
   durableGoods: [],
   mainHouseholdEarner: '',
   earnerEducation: '',
-
-  // Part 4: Psychographics
-  selectedInterests: []
 };
 
 const initialCompletedSteps = {
   step1: false,
   step2: false,
-  step3: false,
-  step4: false
+  step3: false
 };
 
 // Load any saved draft from localStorage. Falls back to defaults on any
@@ -34,9 +32,16 @@ const initialCompletedSteps = {
 // the wizard.
 const loadDraft = () => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
+    if (parsed?.formData?.selectedInterests) {
+      delete parsed.formData.selectedInterests;
+    }
+    if (parsed?.completedSteps?.step4) {
+      delete parsed.completedSteps.step4;
+    }
+    if (parsed?.currentStep > 3) parsed.currentStep = 3;
     return parsed;
   } catch (err) {
     console.warn('Failed to parse saved demographics draft, ignoring it:', err);
@@ -60,6 +65,7 @@ const saveDraft = (formData, completedSteps, currentStep) => {
 export const clearDemographicsDraft = () => {
   try {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch (err) {
     console.warn('Failed to clear demographics draft:', err);
   }
@@ -68,7 +74,7 @@ export const clearDemographicsDraft = () => {
 const useDemographics = () => {
   const draft = loadDraft();
 
-  const [currentStep, setCurrentStep] = useState(draft?.currentStep || 1);
+  const [currentStep, setCurrentStep] = useState(Math.min(draft?.currentStep || 1, 3));
   const [formData, setFormData] = useState({
     ...initialFormData,
     ...(draft?.formData || {})
@@ -85,49 +91,14 @@ const useDemographics = () => {
     saveDraft(formData, completedSteps, currentStep);
   }, [formData, completedSteps, currentStep]);
 
-  // Validation rules for each step
   const validateStep = (step) => {
-    const newErrors = {};
+    const schema = demographicsStepSchema[step];
+    if (!schema) return true;
 
-    switch (step) {
-      case 1:
-        if (!formData.firstLanguage) newErrors.firstLanguage = 'First language is required';
-        if (!formData.education) newErrors.education = 'Education level is required';
-        if (!formData.maritalStatus) newErrors.maritalStatus = 'Marital status is required';
-        if (!formData.occupation) newErrors.occupation = 'Occupation is required';
-        break;
-
-      case 2:
-        if (!formData.municipality) newErrors.municipality = 'Municipality is required';
-        if (!formData.wardNumber) {
-          newErrors.wardNumber = 'Ward number is required';
-        } else {
-          const wardNum = parseInt(formData.wardNumber);
-          if (isNaN(wardNum) || wardNum < 1) {
-            newErrors.wardNumber = 'Ward number must be a positive number';
-          }
-        }
-        break;
-
-      case 3:
-        if (!formData.mainHouseholdEarner) {
-          newErrors.mainHouseholdEarner = 'Please specify the main household earner';
-        }
-        if (formData.mainHouseholdEarner !== 'Me' && !formData.earnerEducation) {
-          newErrors.earnerEducation = 'Please specify the education level of the main earner';
-        }
-        break;
-
-      case 4:
-        if (!formData.selectedInterests || formData.selectedInterests.length < 3) {
-          newErrors.selectedInterests = 'Please select at least 3 interests';
-        }
-        break;
-
-      default:
-        break;
-    }
-
+    const newErrors = parseStep(schema, {
+      ...formData,
+      durableGoods: formData.durableGoods || [],
+    });
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -148,7 +119,7 @@ const useDemographics = () => {
   };
 
   const goToStep = (step) => {
-    if (step >= 1 && step <= 4) {
+    if (step >= 1 && step <= 3) {
       setCurrentStep(step);
     }
   };
@@ -175,6 +146,13 @@ const useDemographics = () => {
   };
 
   const updateArrayField = (field, value, action = 'toggle') => {
+    if (errors[field]) {
+      setErrors(prev => ({
+        ...prev,
+        [field]: ''
+      }));
+    }
+
     setFormData(prev => {
       const currentArray = prev[field] || [];
       let newArray;
@@ -217,8 +195,8 @@ const useDemographics = () => {
     const completedCount = Object.values(completedSteps).filter(Boolean).length;
     return {
       completed: completedCount,
-      total: 4,
-      percentage: (completedCount / 4) * 100
+      total: 3,
+      percentage: (completedCount / 3) * 100
     };
   };
 
@@ -237,7 +215,7 @@ const useDemographics = () => {
   };
 
   const submitForm = async () => {
-    for (let step = 1; step <= 4; step++) {
+    for (let step = 1; step <= 3; step++) {
       if (!validateStep(step)) {
         setCurrentStep(step);
         return { success: false, error: 'Please complete all required fields' };
