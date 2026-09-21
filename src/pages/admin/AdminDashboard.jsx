@@ -1,11 +1,18 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { adminAPI, sepSurveyAPI } from "../../services/api";
 import {
-  Users, Package, Plus, ArrowLeft, Award, Clock, X, Building2, FileText,
-  HelpCircle, CalendarDays, Ticket, ScanLine,
+  Users, Plus, ArrowLeft, Award, Clock, X, Building2, FileText,
+  HelpCircle, CalendarDays, Ticket, ScanLine, Layers,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useAuth } from "../../context/AuthContext";
+import {
+  defaultAdminTab,
+  hasPermission,
+  roleLabel,
+  TAB_PERMISSIONS,
+} from "../../utils/adminRoles";
 
 import StatsGrid from "./components/StatsGrid.jsx";
 import SurveyExports from "./components/SurveyExports.jsx";
@@ -15,10 +22,12 @@ import SurveyManagement from "./components/SurveyManagement.jsx";
 import SurveyCalendar from "./components/SurveyCalendar.jsx";
 import VoucherManagement from "./components/VoucherManagement.jsx";
 import ScanLogView from "./components/ScanLogView.jsx";
+import ClusterManagement from "./components/ClusterManagement.jsx";
 
 const NAVY = "#1B2A4A";
 const TABS = [
   { id: "users", label: "Users", icon: Users },
+  { id: "clusters", label: "Clusters", icon: Layers },
   { id: "surveys", label: "Surveys", icon: FileText },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "vouchers", label: "Vouchers", icon: Ticket },
@@ -28,9 +37,25 @@ const TABS = [
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const role = user?.role;
+  const can = useCallback((permission) => hasPermission(role, permission), [role]);
   const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab = searchParams.get("tab") || "users";
+  const requestedTab = searchParams.get("tab") || defaultAdminTab(role);
+  const visibleTabs = useMemo(
+    () => TABS.filter((tab) => can(TAB_PERMISSIONS[tab.id])),
+    [can]
+  );
+  const activeTab = visibleTabs.some((t) => t.id === requestedTab)
+    ? requestedTab
+    : (visibleTabs[0]?.id || defaultAdminTab(role));
   const setActiveTab = (tab) => setSearchParams({ tab });
+
+  useEffect(() => {
+    if (requestedTab !== activeTab) {
+      setSearchParams({ tab: activeTab }, { replace: true });
+    }
+  }, [requestedTab, activeTab, setSearchParams]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -41,13 +66,21 @@ const AdminDashboard = () => {
   const [dashboardStats, setDashboardStats] = useState(null);
   const [surveys, setSurveys] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState(null);
-  const [userQuery, setUserQuery] = useState({ status: "", q: "" });
+  const [userQuery, setUserQuery] = useState({ activity: "", q: "" });
   const pageSize = 50;
 
   const [vouchers, setVouchers] = useState([]);
   const [voucherLoading, setVoucherLoading] = useState(false);
   const [voucherStatusFilter, setVoucherStatusFilter] = useState("active");
   const [voucherPagination, setVoucherPagination] = useState(null);
+  const [voucherDateFrom, setVoucherDateFrom] = useState("");
+  const [voucherDateTo, setVoucherDateTo] = useState("");
+  const [voucherStatusCounts, setVoucherStatusCounts] = useState({
+    active: 0,
+    used: 0,
+    expired: 0,
+  });
+  const [voucherRedeemedInRange, setVoucherRedeemedInRange] = useState(null);
 
   const [scanLogs, setScanLogs] = useState([]);
   const [scanLoading, setScanLoading] = useState(false);
@@ -65,19 +98,23 @@ const AdminDashboard = () => {
 
   const fetchSurveys = async () => {
     try {
-      const res = await sepSurveyAPI.getAvailable({ limit: 500, skipErrorToast: true });
+      const res = await sepSurveyAPI.getAvailable({
+        limit: 500,
+        manage: 1,
+        skipErrorToast: true,
+      });
       setSurveys(res.data.data || []);
     } catch (err) {
       console.error("Failed to fetch surveys", err);
     }
   };
 
-  const fetchUsers = useCallback(async (status = "", page = 1, q = "") => {
+  const fetchUsers = useCallback(async (activity = "", page = 1, q = "") => {
     try {
       setCurrentPage(page);
-      setUserQuery({ status, q });
+      setUserQuery({ activity, q });
       const response = await adminAPI.getUsers({
-        ...(status && { status }),
+        ...(activity && { activity }),
         ...(q.trim() && { q: q.trim() }),
         page,
         limit: pageSize,
@@ -92,22 +129,61 @@ const AdminDashboard = () => {
         setTotalPages(1);
       }
     } catch (err) {
-      console.error("Error fetching users:", err);
-      setError("Failed to load users data");
+      toast.error("Failed to load users");
     }
   }, []);
 
-  const fetchVouchers = async (status = voucherStatusFilter, page = 1) => {
+  const fetchVoucherStats = async (from = voucherDateFrom, to = voucherDateTo) => {
+    try {
+      const res = await adminAPI.getVoucherStats({
+        ...(from && { from }),
+        ...(to && { to }),
+        skipErrorToast: true,
+      });
+      const data = res.data.data || {};
+      // When a range is applied, button badges show in-range counts for all three statuses
+      if (from || to) {
+        setVoucherStatusCounts(data.inRangeByStatus || { active: 0, used: 0, expired: 0 });
+        setVoucherRedeemedInRange(data.redeemedInRange ?? 0);
+      } else {
+        setVoucherStatusCounts(data.byStatus || { active: 0, used: 0, expired: 0 });
+        setVoucherRedeemedInRange(null);
+      }
+    } catch (err) {
+      console.error("Failed to load voucher stats", err);
+    }
+  };
+
+  const fetchVouchers = async (
+    status = voucherStatusFilter,
+    page = 1,
+    from = voucherDateFrom,
+    to = voucherDateTo
+  ) => {
     setVoucherLoading(true);
     try {
-      const res = await adminAPI.getVouchers({ status, page, limit: 20, skipErrorToast: true });
+      const res = await adminAPI.getVouchers({
+        status,
+        page,
+        limit: 20,
+        ...(from && { from }),
+        ...(to && { to }),
+        skipErrorToast: true,
+      });
       setVouchers(res.data.data || []);
       setVoucherPagination(res.data.pagination || null);
+      await fetchVoucherStats(from, to);
     } catch (err) {
       toast.error("Failed to load vouchers");
     } finally {
       setVoucherLoading(false);
     }
+  };
+
+  const handleVoucherDateRangeChange = ({ from, to }) => {
+    setVoucherDateFrom(from || "");
+    setVoucherDateTo(to || "");
+    fetchVouchers(voucherStatusFilter, 1, from || "", to || "");
   };
 
   const fetchScans = async (outcome = scanOutcome, page = 1) => {
@@ -131,7 +207,10 @@ const AdminDashboard = () => {
   useEffect(() => {
     const boot = async () => {
       try {
-        await Promise.all([fetchUsers("", 1), fetchSurveys(), fetchStats()]);
+        const tasks = [fetchStats()];
+        if (can("users")) tasks.push(fetchUsers("", 1));
+        if (can("surveys")) tasks.push(fetchSurveys());
+        await Promise.all(tasks);
       } catch (err) {
         setError("Failed to load admin dashboard");
       } finally {
@@ -139,13 +218,9 @@ const AdminDashboard = () => {
       }
     };
     boot();
-  }, [fetchUsers]);
+  }, [fetchUsers, can]);
 
   useEffect(() => {
-    if (activeTab === "campaigns") {
-      setActiveTab("users");
-      return;
-    }
     if (activeTab === "vouchers") fetchVouchers(voucherStatusFilter, 1);
     if (activeTab === "scans") fetchScans(scanOutcome, 1);
   }, [activeTab]);
@@ -171,49 +246,18 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleUpdateStatus = async (userId, newStatus) => {
-    try {
-      await adminAPI.updateUserStatus(userId, { status: newStatus });
-      toast.success(`User status updated to ${newStatus}`);
-      fetchUsers(userQuery.status, currentPage, userQuery.q);
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to update user status");
-    }
-  };
-
-  const handleBulkUpdateStatus = async (userIds, newStatus) => {
-    const loadingToast = toast.loading(`Updating ${userIds.length} user(s)...`);
-    try {
-      await Promise.all(userIds.map((userId) => adminAPI.updateUserStatus(userId, { status: newStatus })));
-      toast.success(`Successfully updated ${userIds.length} user(s) to ${newStatus}`, { id: loadingToast });
-      fetchUsers(userQuery.status, currentPage, userQuery.q);
-    } catch (error) {
-      toast.error("Some updates failed. Please try again.", { id: loadingToast });
-    }
-  };
-
-  const handlePageChange = (newPage, status = userQuery.status, q = userQuery.q) => {
-    fetchUsers(status, newPage, q);
+  const handlePageChange = (newPage, activity = userQuery.activity, q = userQuery.q) => {
+    fetchUsers(activity, newPage, q);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "joined": return "bg-blue-500";
-      case "dispatched": return "bg-amber-500";
-      case "delivered": return "bg-emerald-500";
-      default: return "bg-gray-400";
-    }
-  };
-
   const stats = [
-    { label: "Total Users", value: dashboardStats?.totalUsers ?? totalUsers, icon: Users },
-    { label: "In a campaign", value: dashboardStats?.usersInCampaign ?? 0, icon: Package },
-    { label: "Live surveys", value: dashboardStats?.liveSurveys ?? 0, icon: FileText, to: "/admin?tab=surveys" },
-    { label: "Avg. Credits", value: dashboardStats?.avgCredits ?? 0, icon: Award },
-    { label: "Pending businesses", value: dashboardStats?.pendingBusinesses ?? 0, icon: Building2, to: "/admin/businesses" },
-    { label: "Redeemed (7d)", value: dashboardStats?.vouchersRedeemedWeek ?? 0, icon: Ticket, to: "/admin?tab=vouchers" },
-  ];
+    can("users") && { label: "Total Users", value: dashboardStats?.totalUsers ?? totalUsers, icon: Users },
+    can("surveys") && { label: "Live surveys", value: dashboardStats?.liveSurveys ?? 0, icon: FileText, to: "/admin?tab=surveys" },
+    can("users") && { label: "Avg. Credits", value: dashboardStats?.avgCredits ?? 0, icon: Award },
+    can("businesses") && { label: "Pending businesses", value: dashboardStats?.pendingBusinesses ?? 0, icon: Building2, to: "/admin/businesses" },
+    can("vouchers") && { label: "Redeemed (7d)", value: dashboardStats?.vouchersRedeemedWeek ?? 0, icon: Ticket, to: "/admin?tab=vouchers" },
+  ].filter(Boolean);
 
   if (loading) {
     return (
@@ -254,20 +298,26 @@ const AdminDashboard = () => {
               </button>
               <div className="min-w-0">
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Dashboard</h1>
-                <p className="text-sm text-gray-500">Admin Control Panel</p>
+                <p className="text-sm text-gray-500">{roleLabel(role)} control panel</p>
               </div>
             </div>
 
             <div className="flex items-center flex-wrap gap-2 sm:gap-3">
-              <button onClick={() => navigate("/admin/create-sep-survey")} className="flex items-center gap-2 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90" style={{ backgroundColor: NAVY }}>
-                <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Standalone </span>Survey
-              </button>
-              <button onClick={() => navigate("/admin/businesses")} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
-                <Building2 className="h-4 w-4" /> Businesses
-              </button>
-              <button onClick={() => navigate("/admin/faqs")} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
-                <HelpCircle className="h-4 w-4" /> FAQs
-              </button>
+              {can("surveys") && (
+                <button onClick={() => navigate("/admin/create-sep-survey")} className="flex items-center gap-2 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90" style={{ backgroundColor: NAVY }}>
+                  <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Standalone </span>Survey
+                </button>
+              )}
+              {can("businesses") && (
+                <button onClick={() => navigate("/admin/businesses")} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
+                  <Building2 className="h-4 w-4" /> Businesses
+                </button>
+              )}
+              {can("faqs") && (
+                <button onClick={() => navigate("/admin/faqs")} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
+                  <HelpCircle className="h-4 w-4" /> FAQs
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -277,7 +327,7 @@ const AdminDashboard = () => {
         <StatsGrid stats={stats} NAVY={NAVY} />
 
         <div className="flex gap-2 mb-8 overflow-x-auto pb-1 -mx-4 px-4 sm:mx-0 sm:px-0">
-          {TABS.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
@@ -299,13 +349,11 @@ const AdminDashboard = () => {
             totalUsers={totalUsers}
             pageSize={pageSize}
             handlePageChange={handlePageChange}
-            handleUpdateStatus={handleUpdateStatus}
-            handleBulkUpdateStatus={handleBulkUpdateStatus}
-            getStatusColor={getStatusColor}
             NAVY={NAVY}
             onSelectUser={setSelectedUserId}
           />
         )}
+        {activeTab === "clusters" && <ClusterManagement NAVY={NAVY} />}
         {activeTab === "surveys" && (
           <SurveyManagement surveys={surveys} refetchSurveys={fetchSurveys} NAVY={NAVY} />
         )}
@@ -323,6 +371,11 @@ const AdminDashboard = () => {
             }}
             pagination={voucherPagination}
             onPageChange={(page) => fetchVouchers(voucherStatusFilter, page)}
+            dateFrom={voucherDateFrom}
+            dateTo={voucherDateTo}
+            onDateRangeChange={handleVoucherDateRangeChange}
+            statusCounts={voucherStatusCounts}
+            redeemedInRange={voucherRedeemedInRange}
             NAVY={NAVY}
           />
         )}
@@ -351,7 +404,7 @@ const AdminDashboard = () => {
           onClose={() => setSelectedUserId(null)}
           NAVY={NAVY}
           onCreditsChanged={() => {
-            fetchUsers(userQuery.status, currentPage, userQuery.q);
+            fetchUsers(userQuery.activity, currentPage, userQuery.q);
             fetchStats();
           }}
         />

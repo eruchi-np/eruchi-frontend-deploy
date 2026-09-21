@@ -44,7 +44,6 @@ const Terms = lazy(() => import('./pages/Terms'));
 const PrivacyPolicy = lazy(() => import('./pages/LegalNotice'));
 const CompleteAdditionalProfile = lazy(() => import('./pages/CompleteAdditionalProfile'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
-const CreateCampaign = lazy(() => import('./pages/admin/CreateCampaign'));
 const CreateSepSurvey = lazy(() => import('./pages/admin/CreateSepSurvey.jsx'));
 const AdminBusinessManagement = lazy(() => import('./pages/admin/AdminBusinessManagement'));
 const AdminFaqManagement = lazy(() => import('./pages/admin/AdminFaqManagement.jsx'));
@@ -288,27 +287,11 @@ function App() {
                 </AdminRoute>
               }
             />
-            <Route
-              path="/admin/create-campaign"
-              element={
-                <AdminRoute>
-                  <CreateCampaign />
-                </AdminRoute>
-              }
-            />
-            <Route
-              path="/admin/edit-campaign/:campaignId"
-              element={
-                <AdminRoute>
-                  <CreateCampaign />
-                </AdminRoute>
-              }
-            />
 
             <Route
               path="/admin/create-sep-survey"
               element={
-                <AdminRoute>
+                <AdminRoute permission="surveys">
                   <CreateSepSurvey />
                 </AdminRoute>
               }
@@ -317,7 +300,7 @@ function App() {
             <Route
               path="/admin/edit-sep-survey/:surveyId"
               element={
-                <AdminRoute>
+                <AdminRoute permission="surveys">
                   <CreateSepSurvey />
                 </AdminRoute>
               }
@@ -326,7 +309,7 @@ function App() {
             <Route
               path="/admin/businesses"
               element={
-                <AdminRoute>
+                <AdminRoute permission="businesses">
                   <AdminBusinessManagement />
                 </AdminRoute>
               }
@@ -334,7 +317,7 @@ function App() {
             <Route
               path="/admin/faqs"
               element={
-                <AdminRoute>
+                <AdminRoute permission="faqs">
                   <AdminFaqManagement />
                 </AdminRoute>
               }

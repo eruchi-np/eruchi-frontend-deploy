@@ -4,6 +4,7 @@ import { Menu, X } from "lucide-react";
 import ProfileCompletionBar from "../layout/ProfileCompletionBar";
 import { useAuth } from "../../context/AuthContext";
 import { trackEvent } from "../../utils/visitorEvents";
+import { adminHomePath, isStaffAdmin } from "../../utils/adminRoles";
 import "./homepage.css";
 
 export default function HomeNav({ variant = "page" }) {
@@ -15,7 +16,7 @@ export default function HomeNav({ variant = "page" }) {
   const waitingOnSession =
     loading && typeof window !== "undefined" && Boolean(localStorage.getItem("access_token"));
   const isLoggedIn = Boolean(user) || waitingOnSession;
-  const isAdmin = user?.role === "admin";
+  const isAdmin = isStaffAdmin(user?.role);
   const isOverlay = variant === "overlay";
   const isBusiness = variant === "business";
   const lightNav = isOverlay && !scrolled && !menuOpen;
@@ -139,7 +140,7 @@ export default function HomeNav({ variant = "page" }) {
                   Survey
                 </button>
                 {isAdmin && (
-                  <Link to="/admin" style={{ color: linkColor }}>
+                  <Link to={adminHomePath(user?.role)} style={{ color: linkColor }}>
                     Admin
                   </Link>
                 )}
@@ -227,7 +228,7 @@ export default function HomeNav({ variant = "page" }) {
                 Survey
               </button>
               {isAdmin && (
-                <Link to="/admin" onClick={() => setMenuOpen(false)}>
+                <Link to={adminHomePath(user?.role)} onClick={() => setMenuOpen(false)}>
                   Admin
                 </Link>
               )}

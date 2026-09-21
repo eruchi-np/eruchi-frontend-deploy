@@ -5,12 +5,37 @@ import {
   ChevronDown,
   Check,
   Users,
-  Package,
   Mail,
   Award,
-  MoreVertical,
-  X,
+  Clock,
 } from "lucide-react";
+
+const ACTIVITY_OPTIONS = [
+  { value: "", label: "All users", sub: "No activity filter", icon: Users },
+  { value: "today", label: "Online today", sub: "Active since midnight (Nepal)", icon: Clock },
+  { value: "7d", label: "Last 7 days", sub: "Seen within a week", icon: Clock },
+  { value: "inactive_7d", label: "Inactive 7+ days", sub: "Quieter than a week", icon: Clock },
+  { value: "inactive_30d", label: "Inactive 30+ days", sub: "Long idle", icon: Clock },
+];
+
+const NEPAL_TZ = "Asia/Kathmandu";
+
+/** Format lastActiveAt in Nepal time; never invent activity from createdAt. */
+const formatLastOnline = (user) => {
+  if (!user.lastActiveAt) return "Never";
+  const date = new Date(user.lastActiveAt);
+  if (Number.isNaN(date.getTime())) return "Never";
+
+  return date.toLocaleString("en-GB", {
+    timeZone: NEPAL_TZ,
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+};
 
 const UserManagement = ({
   users,
@@ -20,136 +45,43 @@ const UserManagement = ({
   totalUsers,
   pageSize,
   handlePageChange,
-  handleUpdateStatus,
-  handleBulkUpdateStatus,
-  getStatusColor,
   NAVY,
   onSelectUser,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [activityFilter, setActivityFilter] = useState("");
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState(null);
-  const [selectedUsers, setSelectedUsers] = useState([]);
-  const [bulkActionOpen, setBulkActionOpen] = useState(false);
 
   useEffect(() => {
     const t = setTimeout(() => {
-      fetchUsers(statusFilter, 1, searchTerm);
+      fetchUsers(activityFilter, 1, searchTerm);
     }, 300);
     return () => clearTimeout(t);
   }, [searchTerm]);
 
   useEffect(() => {
-    const handleClickOutside = () => {
-      setOpenDropdown(null);
-      setFilterDropdownOpen(false);
-      setBulkActionOpen(false);
-    };
-    if (openDropdown || filterDropdownOpen || bulkActionOpen) {
+    const handleClickOutside = () => setFilterDropdownOpen(false);
+    if (filterDropdownOpen) {
       document.addEventListener("click", handleClickOutside);
       return () => document.removeEventListener("click", handleClickOutside);
     }
-  }, [openDropdown, filterDropdownOpen, bulkActionOpen]);
+  }, [filterDropdownOpen]);
 
-  const handleStatusFilter = (status) => {
-    setStatusFilter(status);
+  const handleActivityFilter = (activity) => {
+    setActivityFilter(activity);
     setFilterDropdownOpen(false);
-    setSelectedUsers([]);
-    fetchUsers(status, 1, searchTerm);
-  };
-
-  const eligibleUsers = users.filter((user) => user.activeCampaign?.status);
-
-  const handleSelectUser = (userId) => {
-    setSelectedUsers((prev) =>
-      prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
-    );
-  };
-
-  const handleSelectAll = () => {
-    if (selectedUsers.length === eligibleUsers.length) {
-      setSelectedUsers([]);
-    } else {
-      setSelectedUsers(eligibleUsers.map((user) => user._id));
-    }
-  };
-
-  const triggerBulkAction = async (status) => {
-    await handleBulkUpdateStatus(selectedUsers, status);
-    setSelectedUsers([]);
-    setBulkActionOpen(false);
-  };
-
-  const toggleDropdown = (id) => {
-    setOpenDropdown((prev) => (prev === id ? null : id));
+    fetchUsers(activity, 1, searchTerm);
   };
 
   const goToPage = (page) => {
-    handlePageChange(page, statusFilter, searchTerm);
+    handlePageChange(page, activityFilter, searchTerm);
   };
+
+  const selectedLabel =
+    ACTIVITY_OPTIONS.find((opt) => opt.value === activityFilter)?.label || "All users";
 
   return (
     <>
-      {selectedUsers.length > 0 && (
-        <div className="text-white rounded-2xl p-4 mb-6 shadow-lg animate-in fade-in slide-in-from-top-4 duration-200" style={{ backgroundColor: NAVY }}>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                <Check className="h-5 w-5" />
-              </div>
-              <span className="font-semibold">{selectedUsers.length} user(s) selected</span>
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <button
-                  onClick={(e) => { e.stopPropagation(); setBulkActionOpen(!bulkActionOpen); }}
-                  className="flex items-center gap-2 bg-white text-gray-900 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors"
-                >
-                  Bulk Actions
-                  <ChevronDown className={`h-4 w-4 transition-transform ${bulkActionOpen ? "rotate-180" : ""}`} />
-                </button>
-
-                {bulkActionOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden">
-                    <div className="p-2">
-                      <button
-                        onClick={() => triggerBulkAction("dispatched")}
-                        className="w-full text-left px-3 py-2.5 hover:bg-orange-50 rounded-lg transition-colors flex items-center gap-3"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
-                          <Package className="h-4 w-4 text-orange-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">Mark Dispatched</p>
-                          <p className="text-xs text-gray-500">Update selected</p>
-                        </div>
-                      </button>
-                      <button
-                        onClick={() => triggerBulkAction("delivered")}
-                        className="w-full text-left px-3 py-2.5 hover:bg-emerald-50 rounded-lg transition-colors flex items-center gap-3"
-                      >
-                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                          <Check className="h-4 w-4 text-emerald-600" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-semibold text-gray-900">Mark Delivered</p>
-                          <p className="text-xs text-gray-500">Update selected</p>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <button onClick={() => setSelectedUsers([])} className="p-2 hover:bg-white/20 rounded-lg transition-colors">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
         <div className="border-b border-gray-200 p-4 sm:p-6">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -176,37 +108,27 @@ const UserManagement = ({
                   className="flex items-center gap-2 pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 font-medium focus:outline-none w-full sm:w-auto hover:bg-gray-100 transition-colors"
                 >
                   <Filter className="absolute left-3 h-5 w-5 text-gray-400" />
-                  <span className="flex-1 text-left">
-                    {statusFilter === "" && "All Statuses"}
-                    {statusFilter === "joined" && "Joined"}
-                    {statusFilter === "dispatched" && "Dispatched"}
-                    {statusFilter === "delivered" && "Delivered"}
-                  </span>
+                  <span className="flex-1 text-left">{selectedLabel}</span>
                   <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${filterDropdownOpen ? "rotate-180" : ""}`} />
                 </button>
 
                 {filterDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden">
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden">
                     <div className="p-2">
-                      {[
-                        { value: "", label: "All Statuses", sub: "Show all users", icon: Users },
-                        { value: "joined", label: "Joined", sub: "Campaign started", icon: Package },
-                        { value: "dispatched", label: "Dispatched", sub: "Package shipped", icon: Package },
-                        { value: "delivered", label: "Delivered", sub: "Completed", icon: Check },
-                      ].map((opt) => (
+                      {ACTIVITY_OPTIONS.map((opt) => (
                         <button
-                          key={opt.value}
-                          onClick={() => handleStatusFilter(opt.value)}
-                          className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors flex items-center gap-3 ${statusFilter === opt.value ? "bg-gray-100 text-gray-900" : "hover:bg-gray-50 text-gray-700"}`}
+                          key={opt.value || "all"}
+                          onClick={() => handleActivityFilter(opt.value)}
+                          className={`w-full text-left px-3 py-2.5 rounded-lg transition-colors flex items-center gap-3 ${activityFilter === opt.value ? "bg-gray-100 text-gray-900" : "hover:bg-gray-50 text-gray-700"}`}
                         >
-                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: statusFilter === opt.value ? `${NAVY}20` : "#f3f4f6" }}>
-                            <opt.icon className="h-4 w-4" style={{ color: statusFilter === opt.value ? NAVY : "#6b7280" }} />
+                          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: activityFilter === opt.value ? `${NAVY}20` : "#f3f4f6" }}>
+                            <opt.icon className="h-4 w-4" style={{ color: activityFilter === opt.value ? NAVY : "#6b7280" }} />
                           </div>
                           <div className="flex-1">
                             <p className="text-sm font-semibold">{opt.label}</p>
                             <p className="text-xs text-gray-500">{opt.sub}</p>
                           </div>
-                          {statusFilter === opt.value && <Check className="h-4 w-4" style={{ color: NAVY }} />}
+                          {activityFilter === opt.value && <Check className="h-4 w-4" style={{ color: NAVY }} />}
                         </button>
                       ))}
                     </div>
@@ -216,17 +138,6 @@ const UserManagement = ({
             </div>
           </div>
         </div>
-
-        {eligibleUsers.length > 0 && (
-          <div className="bg-gray-50 border-b border-gray-200 px-6 py-3">
-            <button onClick={handleSelectAll} className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 transition-colors">
-              <div className="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors" style={selectedUsers.length === eligibleUsers.length ? { backgroundColor: NAVY, borderColor: NAVY } : { borderColor: "#d1d5db", backgroundColor: "white" }}>
-                {selectedUsers.length === eligibleUsers.length && <Check className="h-3 w-3 text-white" />}
-              </div>
-              Select All ({eligibleUsers.length} users)
-            </button>
-          </div>
-        )}
 
         <div className="divide-y divide-gray-100">
           {users.length === 0 ? (
@@ -242,13 +153,6 @@ const UserManagement = ({
               <div key={user._id} className="p-4 sm:p-6 hover:bg-gray-50/70 transition-colors">
                 <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                   <div className="flex items-center gap-4 flex-1 min-w-0">
-                    {user.activeCampaign?.status && (
-                      <button onClick={() => handleSelectUser(user._id)} className="flex-shrink-0">
-                        <div className="w-5 h-5 rounded border-2 flex items-center justify-center transition-colors" style={selectedUsers.includes(user._id) ? { backgroundColor: NAVY, borderColor: NAVY } : { borderColor: "#d1d5db", backgroundColor: "white" }}>
-                          {selectedUsers.includes(user._id) && <Check className="h-3 w-3 text-white" />}
-                        </div>
-                      </button>
-                    )}
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-white font-bold text-lg" style={{ backgroundColor: NAVY }}>
                       {user.firstName?.charAt(0)?.toUpperCase() || "U"}
                     </div>
@@ -268,21 +172,9 @@ const UserManagement = ({
                   </div>
 
                   <div className="flex items-center gap-3 sm:gap-4 lg:gap-6 flex-wrap">
-                    <div className="flex items-center gap-3">
-                      {user.activeCampaign?.status ? (
-                        <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${getStatusColor(user.activeCampaign.status)}`}></div>
-                          <span className="text-sm font-medium text-gray-700 capitalize">
-                            {user.activeCampaign.status}
-                            {user.activeCampaign.campaign?.title ? ` · ${user.activeCampaign.campaign.title}` : ""}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-gray-300"></div>
-                          <span className="text-sm font-medium text-gray-500">No Campaign</span>
-                        </div>
-                      )}
+                    <div className="flex items-center gap-2 text-sm text-gray-600" title={user.lastActiveAt ? new Date(user.lastActiveAt).toISOString() : undefined}>
+                      <Clock className="h-4 w-4 text-gray-400" />
+                      <span className="font-medium">{formatLastOnline(user)}</span>
                     </div>
 
                     <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-lg">
@@ -297,38 +189,6 @@ const UserManagement = ({
                     >
                       Details
                     </button>
-
-                    {user.activeCampaign?.status && (
-                      <div className="relative">
-                        <button onClick={(e) => { e.stopPropagation(); toggleDropdown(user._id); }} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-                          <MoreVertical className="h-5 w-5 text-gray-600" />
-                        </button>
-                        {openDropdown === user._id && (
-                          <div className="absolute right-0 bottom-full mb-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 z-50 overflow-hidden">
-                            <div className="p-2">
-                              {user.activeCampaign.status !== "dispatched" && (
-                                <button onClick={() => { handleUpdateStatus(user._id, "dispatched"); setOpenDropdown(null); }} className="w-full text-left px-3 py-2.5 hover:bg-orange-50 rounded-lg transition-colors flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center"><Package className="h-4 w-4 text-orange-600" /></div>
-                                  <div>
-                                    <p className="text-sm font-semibold text-gray-900">Mark Dispatched</p>
-                                    <p className="text-xs text-gray-500">Package shipped</p>
-                                  </div>
-                                </button>
-                              )}
-                              {user.activeCampaign.status !== "delivered" && (
-                                <button onClick={() => { handleUpdateStatus(user._id, "delivered"); setOpenDropdown(null); }} className="w-full text-left px-3 py-2.5 hover:bg-emerald-50 rounded-lg transition-colors flex items-center gap-3">
-                                  <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center"><Check className="h-4 w-4 text-emerald-600" /></div>
-                                  <div>
-                                    <p className="text-sm font-semibold text-gray-900">Mark Delivered</p>
-                                    <p className="text-xs text-gray-500">Completed</p>
-                                  </div>
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>

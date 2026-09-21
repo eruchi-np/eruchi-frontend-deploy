@@ -20,6 +20,7 @@ import skyBg from "../assets/home/sky.jpg";
 import "../components/homepage/homepage.css";
 import "../components/profile/profile.css";
 import "../components/onboarding/onboarding.css";
+import { adminHomePath, isStaffAdmin } from "../utils/adminRoles";
 
 const WEEK_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const VOUCHER_COLORS = ["#16365c", "#e91e63", "#f5a623", "#16365c"];
@@ -368,8 +369,8 @@ export default function Profile() {
               <button type="button" className="profile-btn profile-btn-logout" onClick={handleLogout}>
                 Logout
               </button>
-              {user.role === "admin" && (
-                <button type="button" className="profile-btn profile-btn-outline" onClick={() => navigate("/admin")}>
+              {isStaffAdmin(user.role) && (
+                <button type="button" className="profile-btn profile-btn-outline" onClick={() => navigate(adminHomePath(user.role))}>
                   <ShieldCheck size={14} className="mr-2" />
                   Admin
                 </button>

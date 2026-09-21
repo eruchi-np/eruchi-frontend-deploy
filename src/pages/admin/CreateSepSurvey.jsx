@@ -1,13 +1,15 @@
 // src/pages/admin/CreateSepSurvey.jsx
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { sepSurveyAPI } from '../../services/api'; // ← Make sure this is exported in api.js
+import { sepSurveyAPI, clusterAPI } from '../../services/api';
 import { ArrowLeft, Plus, Trash2, Save, Type, FileText, CheckSquare,Loader2, Sliders, AlertCircle, Eye, Settings as SettingsIcon, Clock, Calendar, Award, Users, Target } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const CreateSepSurvey = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [clusters, setClusters] = useState([]);
+  const [clustersLoading, setClustersLoading] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -18,6 +20,8 @@ const CreateSepSurvey = () => {
     estimatedMinutes: '',
     visibility: 'public',
     validityDays: 7,
+    alsoPublishToOthers: false,
+    clusterIds: [],
     questions: [
       {
         questionText: '',
@@ -36,6 +40,23 @@ const CreateSepSurvey = () => {
   const isEditMode = Boolean(surveyId);
   const [initialLoading, setInitialLoading] = useState(isEditMode);
   const [editLocked, setEditLocked] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadClusters = async () => {
+      setClustersLoading(true);
+      try {
+        const res = await clusterAPI.list({ skipErrorToast: true, limit: 100 });
+        if (!cancelled) setClusters(res.data?.data || []);
+      } catch {
+        if (!cancelled) setClusters([]);
+      } finally {
+        if (!cancelled) setClustersLoading(false);
+      }
+    };
+    loadClusters();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (!isEditMode) return;
@@ -68,6 +89,8 @@ const CreateSepSurvey = () => {
           estimatedMinutes: survey.estimatedMinutes ?? '',
           visibility: survey.visibility || 'public',
           validityDays: survey.validityDays ?? 7,
+          alsoPublishToOthers: Boolean(survey.alsoPublishToOthers),
+          clusterIds: [],
           questions: survey.questions?.length ? survey.questions : [
             { questionText: '', questionType: 'text_short', options: [], maxSelections: 1, minValue: 0, maxValue: 5 }
           ]
@@ -109,13 +132,30 @@ const CreateSepSurvey = () => {
       value: 'targeted',
       label: 'Targeted',
       icon: Target,
-      description: 'Hidden from the public list — only shows to users specifically assigned it (e.g. merchant feedback triggered after a voucher redemption)'
+      description: 'Sent to selected clusters (and/or merchant feedback). Hidden from others unless you enable dual publish.'
     }
   ];
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  const toggleCluster = (clusterId) => {
+    setFormData((prev) => {
+      const id = String(clusterId);
+      const has = prev.clusterIds.includes(id);
+      return {
+        ...prev,
+        clusterIds: has
+          ? prev.clusterIds.filter((c) => c !== id)
+          : [...prev.clusterIds, id]
+      };
+    });
+  };
+
+  const needsPublicWindow =
+    formData.visibility === 'public' ||
+    (formData.visibility === 'targeted' && formData.alsoPublishToOthers);
 
   const handleQuestionChange = (index, field, value) => {
     const updated = [...formData.questions];
@@ -191,10 +231,14 @@ const CreateSepSurvey = () => {
 
     if (!trimmedTitle) return toast.error('Survey title is required');
     if (!trimmedDesc) return toast.error('Description is required');
-    if (!formData.publishedAt) return toast.error('Published date is required');
-    if (!formData.availableDays || Number(formData.availableDays) < 1) {
-      return toast.error('Available days must be at least 1');
+
+    if (needsPublicWindow) {
+      if (!formData.publishedAt) return toast.error('Published date is required');
+      if (!formData.availableDays || Number(formData.availableDays) < 1) {
+        return toast.error('Available days must be at least 1');
+      }
     }
+
     if (formData.estimatedMinutes !== '' && Number(formData.estimatedMinutes) < 1) {
       return toast.error('Estimated time must be at least 1 minute');
     }
@@ -215,23 +259,30 @@ const CreateSepSurvey = () => {
     setLoading(true);
 
     try {
-      const availableDays = Number(formData.availableDays);
-      const derivedEndDate = new Date(formData.publishedAt);
+      const availableDays = Number(formData.availableDays) || 7;
+      const publishedAt = formData.publishedAt
+        ? new Date(formData.publishedAt)
+        : new Date();
+      const derivedEndDate = new Date(publishedAt);
       derivedEndDate.setDate(derivedEndDate.getDate() + availableDays);
-      // setDate preserves hours/minutes from formData.publishedAt automatically,
-      // so derivedEndDate already lands on the same time-of-day as startDate.
 
       const payload = {
         title: trimmedTitle,
         description: trimmedDesc,
         status: formData.status,
         credits: Number(formData.credits),
-        startDate: new Date(formData.publishedAt).toISOString(),
+        startDate: publishedAt.toISOString(),
         availableDays,
-        endDate: derivedEndDate.toISOString(),
+        endDate: needsPublicWindow ? derivedEndDate.toISOString() : null,
         estimatedMinutes: formData.estimatedMinutes !== '' ? Number(formData.estimatedMinutes) : null,
         visibility: formData.visibility,
+        alsoPublishToOthers:
+          formData.visibility === 'targeted' ? Boolean(formData.alsoPublishToOthers) : false,
         validityDays: Number(formData.validityDays),
+        clusterIds:
+          formData.visibility === 'targeted' && formData.status === 'published'
+            ? formData.clusterIds
+            : [],
         questions: formData.questions.map(q => {
           const base = {
             questionText: q.questionText.trim(),
@@ -250,13 +301,30 @@ const CreateSepSurvey = () => {
         })
       };
 
+      let sends = [];
       if (isEditMode) {
-        await sepSurveyAPI.update(surveyId, payload);
+        const res = await sepSurveyAPI.update(surveyId, payload);
+        sends = res.data?.sends || [];
         toast.success('Survey updated successfully!');
       } else {
-        await sepSurveyAPI.create(payload);
+        const res = await sepSurveyAPI.create(payload);
+        sends = res.data?.sends || [];
         toast.success('Standalone survey created successfully!');
       }
+
+      const failedSends = sends.filter((s) => !s.ok);
+      const okSends = sends.filter((s) => s.ok);
+      if (okSends.length) {
+        toast.success(`Queued send to ${okSends.length} cluster${okSends.length === 1 ? '' : 's'}`);
+      }
+      if (failedSends.length) {
+        toast.error(
+          `Could not send to ${failedSends.length} cluster${failedSends.length === 1 ? '' : 's'}: ${
+            failedSends.map((s) => s.message).join('; ')
+          }`
+        );
+      }
+
       navigate('/admin');
     } catch (err) {
       console.error('Create sep survey error:', err);
@@ -391,30 +459,96 @@ const CreateSepSurvey = () => {
                 {formData.visibility === 'targeted' && (
                   <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 flex items-start gap-1.5">
                     <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-                    This survey won't appear to anyone until it's attached to a voucher offer's feedback
-                    triggers and a user redeems a matching voucher.
+                    Targeted surveys stay hidden from the public list unless you enable &quot;Also publish to other users&quot;.
+                    Select clusters below to send now, or send later from Cluster Management / voucher feedback triggers.
                   </p>
                 )}
               </div>
 
               {formData.visibility === 'targeted' && (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Validity After Being Sent (days) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={formData.validityDays}
-                    onChange={e => handleInputChange('validityDays', Number(e.target.value))}
-                    className="w-full max-w-[200px] px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1.5">
-                    Timer starts when the survey email is actually sent to a user (e.g. after they claim
-                    an offer), not when this survey is created or attached to a voucher.
-                  </p>
-                </div>
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      Validity After Being Sent (days) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.validityDays}
+                      onChange={e => handleInputChange('validityDays', Number(e.target.value))}
+                      className="w-full max-w-[200px] px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1.5">
+                      For cluster / merchant-assigned users, the timer starts when the survey email is sent.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      Send to clusters
+                    </label>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Select one or more clusters. If status is Published, membership is snapshotted and emails are queued on save.
+                    </p>
+                    {clustersLoading ? (
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Loading clusters…
+                      </div>
+                    ) : clusters.length === 0 ? (
+                      <p className="text-sm text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
+                        No clusters yet. Create one under Clusters, or leave this empty and send later.
+                      </p>
+                    ) : (
+                      <div className="max-h-56 overflow-y-auto border border-gray-200 rounded-xl divide-y divide-gray-100">
+                        {clusters.map((c) => {
+                          const id = String(c._id);
+                          const checked = formData.clusterIds.includes(id);
+                          return (
+                            <label
+                              key={id}
+                              className={`flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-gray-50 ${
+                                checked ? 'bg-indigo-50/60' : 'bg-white'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleCluster(id)}
+                                className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                              />
+                              <span className="flex-1 min-w-0">
+                                <span className="block text-sm font-medium text-gray-900 truncate">{c.name}</span>
+                                <span className="block text-xs text-gray-500">
+                                  {c.memberCount ?? 0} member{(c.memberCount ?? 0) === 1 ? '' : 's'}
+                                </span>
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 p-4">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.alsoPublishToOthers}
+                        onChange={(e) => handleInputChange('alsoPublishToOthers', e.target.checked)}
+                        className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span>
+                        <span className="block text-sm font-semibold text-gray-900">
+                          Also publish to other users
+                        </span>
+                        <span className="block text-xs text-gray-500 mt-0.5">
+                          Non-cluster users can take this survey after a separate publish date (same survey, different schedule).
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                </>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -448,36 +582,46 @@ const CreateSepSurvey = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Published Date <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={formData.publishedAt}
-                    onChange={e => handleInputChange('publishedAt', e.target.value)}
-                    min={getMinPublishedDate()}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    required
-                  />
-                </div>
+              {needsPublicWindow && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      {formData.visibility === 'targeted'
+                        ? 'Publish to other users on'
+                        : 'Published Date'}{' '}
+                      <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={formData.publishedAt}
+                      onChange={e => handleInputChange('publishedAt', e.target.value)}
+                      min={getMinPublishedDate()}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      required
+                    />
+                  </div>
 
-                <div>
-                  <label className="block text-sm font-semibold text-gray-900 mb-2">
-                    Available for (in days) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={formData.availableDays}
-                    onChange={e => handleInputChange('availableDays', Number(e.target.value))}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                    placeholder="e.g., 7, 14, 30"
-                    required
-                  />
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-2">
+                      Available for (in days) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      value={formData.availableDays}
+                      onChange={e => handleInputChange('availableDays', Number(e.target.value))}
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      placeholder="e.g., 7, 14, 30"
+                      required
+                    />
+                    {formData.visibility === 'targeted' && (
+                      <p className="text-xs text-gray-500 mt-1.5">
+                        Only applies to non-targeted users. Cluster members still use validity days from send time.
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center gap-1.5">

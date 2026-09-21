@@ -71,7 +71,6 @@ export const userAPI = {
 export const campaignAPI = {
   getCampaigns: (config = {}) => api.get('/campaigns', config),
   joinCampaign: (id, config = {}) => api.post(`/campaigns/${id}/join`, {}, config),
-  createCampaign: (data, config = {}) => api.post('/campaigns', data, config),
 };
 
 export const surveyAPI = {
@@ -87,9 +86,6 @@ export const adminAPI = {
   getUserCredits: (userId, options = {}) => getRequest(`/admin/users/${userId}/credits`, options),
   adjustUserCredits: (userId, data, config = {}) => api.post(`/admin/users/${userId}/credits`, data, config),
   getStats: (options = {}) => getRequest('/admin/stats', options),
-  getCampaigns: (options = {}) => getRequest('/admin/campaigns', options),
-  getCampaign: (id, options = {}) => getRequest(`/admin/campaigns/${id}`, options),
-  updateCampaign: (id, data, config = {}) => api.put(`/admin/campaigns/${id}`, data, config),
   updateUserStatus: (userId, data, config = {}) => api.put(`/admin/users/${userId}/status`, data, config),
   getBusinesses: (options = {}) => getRequest('/admin/businesses', options),
   createBusiness: (data, config = {}) => api.post('/admin/businesses', data, config),
@@ -108,6 +104,7 @@ export const adminAPI = {
   createVoucherOffer: (data, config = {}) => api.post('/admin/voucher-offers', data, config),
   updateVoucherOffer: (id, data, config = {}) => api.put(`/admin/voucher-offers/${id}`, data, config),
   getVouchers: (options = {}) => getRequest('/admin/vouchers', options),
+  getVoucherStats: (options = {}) => getRequest('/admin/vouchers/stats', options),
   getScanLog: (options = {}) => getRequest('/admin/scan-log', options),
   deleteVoucherOffer: (id, config = {}) => api.delete(`/admin/voucher-offers/${id}`, config),
   getVoucherWithToken: (id, config = {}) => api.get(`/admin/vouchers/${id}`, config),
@@ -125,6 +122,32 @@ export const adminAPI = {
 
 export const faqAPI = {
   getAll: (config = {}) => api.get('/faqs', config),
+};
+
+export const clusterAPI = {
+  list: (options = {}) => getRequest('/clusters', options),
+  create: (data, config = {}) => api.post('/clusters', data, config),
+  get: (id, options = {}) => getRequest(`/clusters/${id}`, options),
+  update: (id, data, config = {}) => api.patch(`/clusters/${id}`, data, config),
+  remove: (id, config = {}) => api.delete(`/clusters/${id}`, config),
+  listMembers: (id, options = {}) => getRequest(`/clusters/${id}/members`, options),
+  addMembers: (id, userIds, config = {}) => api.post(`/clusters/${id}/members`, { userIds }, config),
+  removeMembers: (id, userIds, config = {}) =>
+    api.delete(`/clusters/${id}/members`, { data: { userIds }, ...config }),
+  importMembersCsv: (id, file, config = {}) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post(`/clusters/${id}/members/csv`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      ...config,
+    });
+  },
+  listSends: (id, options = {}) => getRequest(`/clusters/${id}/sends`, options),
+  createSend: (id, surveyId, config = {}) => api.post(`/clusters/${id}/sends`, { surveyId }, config),
+  getSend: (sendId, options = {}) => getRequest(`/clusters/sends/${sendId}`, options),
+  listSendResponses: (sendId, options = {}) => getRequest(`/clusters/sends/${sendId}/responses`, options),
+  exportSendResponsesCsv: (sendId, config = {}) =>
+    api.get(`/clusters/sends/${sendId}/responses/csv`, { responseType: 'blob', ...config }),
 };
 
 export const sepSurveyAPI = {

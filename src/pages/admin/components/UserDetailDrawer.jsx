@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { Award, Flame, Mail, Phone, Shield, Ticket, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { adminAPI } from "../../../services/api";
+import { useAuth } from "../../../context/AuthContext";
+import { hasPermission } from "../../../utils/adminRoles";
 
 const REASON_LABELS = {
   campaign_completion: "Campaign",
@@ -19,10 +21,20 @@ const REASON_LABELS = {
 
 const formatWhen = (value) => {
   if (!value) return "—";
-  return new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+  return new Date(value).toLocaleString("en-GB", {
+    timeZone: "Asia/Kathmandu",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
 };
 
 export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChanged }) {
+  const { user: authUser } = useAuth();
+  const canAdjustCredits = hasPermission(authUser?.role, "credits_adjust");
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
   const [amount, setAmount] = useState("");
@@ -143,6 +155,7 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
               <p>
                 Surveys completed: {detail.surveysCompleted ?? 0} · Campaigns completed: {detail.campaignsCompleted ?? 0}
               </p>
+              <p>Last online: {formatWhen(user.lastActiveAt)}</p>
               <p>Last survey filled: {formatWhen(user.lastSurveyCompletedAt)}</p>
               <p>
                 Campaign:{" "}
@@ -152,6 +165,7 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
               </p>
             </div>
 
+            {canAdjustCredits && (
             <form onSubmit={handleAdjust} className="rounded-xl border border-gray-200 p-4 space-y-3">
               <p className="text-sm font-semibold text-gray-900">Adjust credits</p>
               <input
@@ -177,6 +191,7 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
                 {saving ? "Saving…" : "Apply"}
               </button>
             </form>
+            )}
 
             <div>
               <h3 className="text-sm font-semibold text-gray-900 mb-3">Credit history</h3>

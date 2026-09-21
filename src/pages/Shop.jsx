@@ -181,6 +181,11 @@ export default function Shop() {
     navigate(isLoggedIn ? "/standalone-surveys" : "/signup");
   };
 
+  const goRewards = () => {
+    trackEvent("cta_click", "/rewards");
+    scrollShopToCatalog(pageRef.current, { behavior: "smooth" });
+  };
+
   const filteredCatalog = useMemo(() => {
     const q = searchDraft.toLowerCase().replace(/\s/g, "");
     let vouchers = voucherOffers.filter((offer) => {

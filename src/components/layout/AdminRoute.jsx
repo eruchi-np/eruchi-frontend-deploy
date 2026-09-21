@@ -2,8 +2,9 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { adminHomePath, hasPermission, isStaffAdmin } from '../../utils/adminRoles';
 
-const AdminRoute = ({ children }) => {
+const AdminRoute = ({ children, permission }) => {
   const { user, loading } = useAuth();
   const location = useLocation();
 
@@ -19,8 +20,12 @@ const AdminRoute = ({ children }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (user.role !== 'admin') {
+  if (!isStaffAdmin(user.role)) {
     return <Navigate to="/profile" replace />;
+  }
+
+  if (permission && !hasPermission(user.role, permission)) {
+    return <Navigate to={adminHomePath(user.role)} replace />;
   }
 
   return children;

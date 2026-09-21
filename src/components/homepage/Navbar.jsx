@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { Menu, X, Loader2 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import { adminHomePath, isStaffAdmin } from '../../utils/adminRoles'
 
 const Navbar = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
@@ -129,8 +130,8 @@ const Navbar = () => {
           <Link to="/for-business">
             <span className="uppercase cursor-pointer font-semibold hover:text-blue-600 transition-colors">Merchant</span>
           </Link>
-          {authUser?.role === 'admin' && (
-            <Link to="/admin">
+          {isStaffAdmin(authUser?.role) && (
+            <Link to={adminHomePath(authUser?.role)}>
               <span className="uppercase cursor-pointer font-semibold hover:text-blue-600 transition-colors">Admin</span>
             </Link>
           )}
@@ -211,9 +212,9 @@ const Navbar = () => {
             >
               MERCHANT
             </Link>
-            {authUser?.role === 'admin' && (
+            {isStaffAdmin(authUser?.role) && (
               <Link
-                to="/admin"
+                to={adminHomePath(authUser?.role)}
                 onClick={toggleDrawer}
                 className="text-lg font-semibold text-gray-800 hover:text-blue-600 transition-colors py-2 border-b border-gray-100"
               >

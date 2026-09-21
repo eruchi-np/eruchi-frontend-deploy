@@ -6,6 +6,7 @@ import {
   Eye, EyeOff, HelpCircle, X, ExternalLink,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { hasPermission } from '../../utils/adminRoles';
 
 const NAVY = '#1B2A4A';
 
@@ -61,7 +62,7 @@ export default function AdminFaqManagement() {
       try {
         const userResponse = await userAPI.getProfile({ skipErrorToast: true });
         const userData = userResponse.data.data.user;
-        if (userData.role !== 'admin') {
+        if (!hasPermission(userData.role, 'faqs')) {
           navigate('/profile');
           return;
         }
