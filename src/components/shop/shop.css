@@ -55,10 +55,6 @@
   height: min(280px, 64vw);
 }
 
-.shop-ring-arc {
-  transition: stroke-dasharray 0.08s linear;
-}
-
 .shop-ring svg {
   width: 100%;
   height: 100%;
@@ -366,6 +362,14 @@
     transform: translateY(10px);
     transition-delay: 0s;
   }
+
+  .shop-card {
+    --arch-h: 130px;
+  }
+
+  .shop-card-view-merchant {
+    display: block;
+  }
 }
 
 .shop-card-arch {
@@ -402,6 +406,13 @@
   background: #fff;
   flex-shrink: 0;
   color: var(--card, #003049);
+  box-shadow: 0 0 0 0 transparent;
+  filter: drop-shadow(0 0 0 transparent);
+  transition:
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform, box-shadow, filter;
 }
 
 .shop-card-initial {
@@ -423,6 +434,38 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  color: var(--navy);
+  transition: color 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.shop-card-view-merchant {
+  display: none;
+  margin-top: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #3399ff;
+  line-height: 1.2;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .shop-card-arch:not(:disabled):hover .shop-card-logo,
+  .shop-card-arch:not(:disabled):hover .shop-card-initial,
+  .shop-card-arch:not(:disabled):focus-visible .shop-card-logo,
+  .shop-card-arch:not(:disabled):focus-visible .shop-card-initial {
+    transform: scale(1.08);
+    box-shadow:
+      0 0 0 3px rgba(51, 153, 255, 0.55),
+      0 0 16px rgba(46, 214, 253, 0.7),
+      0 0 28px rgba(51, 153, 255, 0.4);
+    filter: drop-shadow(0 0 8px rgba(46, 214, 253, 0.55));
+  }
+
+  .shop-card-arch:not(:disabled):hover .shop-card-brand,
+  .shop-card-arch:not(:disabled):focus-visible .shop-card-brand {
+    color: #3399ff;
+  }
 }
 
 .shop-card-credits {
@@ -993,11 +1036,15 @@
   }
 
   .shop-card {
-    --arch-h: 114px;
+    --arch-h: 130px;
   }
 
   .shop-card-panel {
     padding: 14px 20px 16px;
+  }
+
+  .shop-card-view-merchant {
+    display: block;
   }
 
   .shop-toolbar,
@@ -1438,6 +1485,8 @@
   .shop-card-arch,
   .shop-card-logo,
   .shop-card-initial,
+  .shop-card-brand,
+  .shop-card-view-merchant,
   .shop-card-redeem,
   .shop-pager button,
   .reward-claim,

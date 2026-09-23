@@ -39,6 +39,7 @@ const ClusterManagement = ({ NAVY }) => {
 
   const [targetedSurveys, setTargetedSurveys] = useState([]);
   const [sendSurveyId, setSendSurveyId] = useState("");
+  const [sendAt, setSendAt] = useState(() => new Date().toISOString().slice(0, 16));
   const [sending, setSending] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -246,14 +247,36 @@ const ClusterManagement = ({ NAVY }) => {
     if (!selectedCluster || !sendSurveyId) {
       return toast.error("Pick a targeted published survey");
     }
-    if (!window.confirm("Send this survey to everyone currently in the cluster? (snapshot)")) {
+    if (!sendAt) {
+      return toast.error("Pick a send date/time");
+    }
+    const scheduledFor = new Date(sendAt);
+    if (Number.isNaN(scheduledFor.getTime())) {
+      return toast.error("Invalid send date/time");
+    }
+    const whenLabel = scheduledFor.toLocaleString();
+    if (
+      !window.confirm(
+        `Send this survey to everyone in the cluster at ${whenLabel}? Membership is snapshotted at that time.`
+      )
+    ) {
       return;
     }
     setSending(true);
     try {
-      const res = await clusterAPI.createSend(selectedCluster._id, sendSurveyId);
-      toast.success("Send queued — assignments are being created");
+      const res = await clusterAPI.createSend(
+        selectedCluster._id,
+        sendSurveyId,
+        scheduledFor.toISOString()
+      );
+      const dueNow = scheduledFor.getTime() <= Date.now();
+      toast.success(
+        dueNow
+          ? "Send queued — assignments are being created"
+          : `Send scheduled for ${whenLabel}`
+      );
       setSendSurveyId("");
+      setSendAt(new Date().toISOString().slice(0, 16));
       await loadSends(selectedCluster._id);
       openSend(res.data.data);
     } catch (err) {
@@ -370,6 +393,9 @@ const ClusterManagement = ({ NAVY }) => {
           </h2>
           <p className="text-sm text-gray-500 mb-4">
             Status: <span className="font-medium text-gray-800">{selectedSend.status}</span>
+            {" · "}
+            Send time:{" "}
+            {new Date(selectedSend.scheduledFor || selectedSend.createdAt).toLocaleString()}
             {" · "}
             Snapshot size: {selectedSend.memberCount}
           </p>
@@ -514,13 +540,13 @@ const ClusterManagement = ({ NAVY }) => {
             <Send className="h-4 w-4" /> Send targeted survey
           </h3>
           <p className="text-sm text-gray-500">
-            Only published surveys with visibility &quot;targeted&quot; can be sent. Membership is snapshotted at send time.
+            Only published surveys with visibility &quot;targeted&quot; can be sent. Membership is snapshotted at the send time you choose.
           </p>
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-col gap-3">
             <select
               value={sendSurveyId}
               onChange={(e) => setSendSurveyId(e.target.value)}
-              className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 text-sm"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm"
             >
               <option value="">Select survey…</option>
               {targetedSurveys.map((s) => (
@@ -529,11 +555,21 @@ const ClusterManagement = ({ NAVY }) => {
                 </option>
               ))}
             </select>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Send on</label>
+              <input
+                type="datetime-local"
+                value={sendAt}
+                onChange={(e) => setSendAt(e.target.value)}
+                min={new Date().toISOString().slice(0, 16)}
+                className="w-full sm:max-w-md border border-gray-200 rounded-xl px-4 py-2.5 text-sm"
+              />
+            </div>
             <button
               type="button"
               onClick={handleSendSurvey}
-              disabled={sending || !sendSurveyId}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-50"
+              disabled={sending || !sendSurveyId || !sendAt}
+              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-white disabled:opacity-50 sm:self-start"
               style={{ backgroundColor: NAVY }}
             >
               {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
@@ -562,7 +598,13 @@ const ClusterManagement = ({ NAVY }) => {
                         {s.surveyId?.title || "Survey"}
                       </div>
                       <div className="text-xs text-gray-500 mt-0.5">
-                        {new Date(s.createdAt).toLocaleString()} · {s.memberCount} members · {s.status}
+                        {new Date(s.scheduledFor || s.createdAt).toLocaleString()}
+                        {s.scheduledFor &&
+                        new Date(s.scheduledFor).getTime() > Date.now() &&
+                        s.status === "queued"
+                          ? " (scheduled)"
+                          : ""}{" "}
+                        · {s.memberCount} members · {s.status}
                       </div>
                     </div>
                     <span className="text-sm text-gray-400">View →</span>

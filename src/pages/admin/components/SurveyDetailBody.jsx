@@ -58,6 +58,11 @@ export default function SurveyDetailBody({ survey, NAVY, refetchSurveys, onDelet
           <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
             {survey.visibility === "targeted" ? "Targeted" : "Public"}
           </span>
+          {survey.kind === "daily" && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+              Daily
+            </span>
+          )}
           {survey.visibility === "targeted" && survey.alsoPublishToOthers && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
               Also public

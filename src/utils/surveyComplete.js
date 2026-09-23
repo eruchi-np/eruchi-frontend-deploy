@@ -26,17 +26,19 @@ export function completionFromSubmitResponse(res, fallback = {}) {
         ? toNumber(data.credits ?? fallback.credits)
         : undefined,
     streakBonus: toNumber(data.streakBonus ?? fallback.streakBonus, 0),
+    kind: data.kind || fallback.kind || "normal",
   };
 }
 
 export function goToSurveyComplete(
   navigate,
-  { creditsEarned, previousStreak, streakCount, credits, streakBonus }
+  { creditsEarned, previousStreak, streakCount, credits, streakBonus, kind }
 ) {
   const payload = {
     creditsEarned: toNumber(creditsEarned, 0),
     previousStreak: toNumber(previousStreak, 0),
     streakBonus: toNumber(streakBonus, 0),
+    kind: kind === "daily" ? "daily" : "normal",
     completedAt: Date.now(),
   };
 

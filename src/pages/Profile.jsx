@@ -381,7 +381,7 @@ export default function Profile() {
               <StatRing
                 value={streak}
                 max={streakGoal}
-                color="#7bd13a"
+                color="#2ed6fd"
                 label="Day Streak"
                 unit={streak === 1 ? "Day in a row" : "Days in a row"}
                 delay={480}
@@ -423,7 +423,7 @@ export default function Profile() {
                 <p>Every reward you&apos;ve picked up, all in one place.</p>
               </div>
             </div>
-            <button type="button" className="home-pill home-pill-lime profile-view-all" onClick={() => navigate("/vouchers")}>
+            <button type="button" className="home-pill home-pill-blue profile-view-all" onClick={() => navigate("/vouchers")}>
               View All
             </button>
           </div>
@@ -488,7 +488,7 @@ export default function Profile() {
                 <p>Every survey you have been a part of, all in one place.</p>
               </div>
             </div>
-            <button type="button" className="home-pill home-pill-lime profile-view-all" onClick={() => navigate("/survey-history")}>
+            <button type="button" className="home-pill home-pill-blue profile-view-all" onClick={() => navigate("/survey-history")}>
               View All
             </button>
           </div>
