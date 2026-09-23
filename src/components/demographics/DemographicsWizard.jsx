@@ -10,8 +10,8 @@ import { demographicsStepSchema, parseStep } from "../../utils/onboardingSchemas
 import "../onboarding/onboarding.css";
 
 const DemographicsWizard = ({ onComplete }) => {
-  const { formData, updateFormData, errors: hookErrors, currentStep, goToStep } =
-    useDemographics();
+  const { formData, updateFormData, errors: hookErrors } = useDemographics();
+  const [currentStep, setCurrentStep] = useState(1);
   const [localErrors, setLocalErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
 
@@ -43,11 +43,7 @@ const DemographicsWizard = ({ onComplete }) => {
     setSubmitError("");
 
     const payload = {
-      // null = "Other" (allowed by backend enum); don't coerce to ""
-      firstLanguage:
-        formData.firstLanguage === null
-          ? null
-          : String(formData.firstLanguage || "").trim(),
+      firstLanguage: (formData.firstLanguage || "").trim(),
       educationLevel: (formData.education || "").trim(),
       maritalStatus: (formData.maritalStatus || "").trim(),
       occupation: (formData.occupation || "").trim(),
@@ -132,8 +128,8 @@ const DemographicsWizard = ({ onComplete }) => {
         <p className="text-sm text-red-600 font-medium text-center mb-4">{submitError}</p>
       )}
       <Stepper
-        initialStep={currentStep}
-        onStepChange={goToStep}
+        initialStep={1}
+        onStepChange={(step) => setCurrentStep(step)}
         onBeforeNext={checkStepValidation}
         onFinalStepCompleted={handleComplete}
         renderStepIndicator={renderCustomIndicator}

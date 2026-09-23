@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { adminAPI, sepSurveyAPI } from "../../services/api";
 import {
   Users, Plus, ArrowLeft, Award, Clock, X, Building2, FileText,
-  HelpCircle, CalendarDays, Ticket, ScanLine, Layers, Shield, BarChart3,
+  HelpCircle, CalendarDays, Ticket, ScanLine, Layers,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
@@ -23,16 +23,12 @@ import SurveyCalendar from "./components/SurveyCalendar.jsx";
 import VoucherManagement from "./components/VoucherManagement.jsx";
 import ScanLogView from "./components/ScanLogView.jsx";
 import ClusterManagement from "./components/ClusterManagement.jsx";
-import StaffManagement from "./components/StaffManagement.jsx";
-import MetricInsights from "./components/MetricInsights.jsx";
 
 const NAVY = "#1B2A4A";
 const TABS = [
   { id: "users", label: "Users", icon: Users },
-  { id: "staff", label: "Staff", icon: Shield },
   { id: "clusters", label: "Clusters", icon: Layers },
   { id: "surveys", label: "Surveys", icon: FileText },
-  { id: "metrics", label: "CEP / NPS", icon: BarChart3 },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "vouchers", label: "Vouchers", icon: Ticket },
   { id: "scans", label: "Scan log", icon: ScanLine },
@@ -53,29 +49,11 @@ const AdminDashboard = () => {
   const activeTab = visibleTabs.some((t) => t.id === requestedTab)
     ? requestedTab
     : (visibleTabs[0]?.id || defaultAdminTab(role));
-  const setActiveTab = (tab) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams();
-      next.set("tab", tab);
-      if (tab === "vouchers") {
-        const status = prev.get("status");
-        const from = prev.get("from");
-        const to = prev.get("to");
-        if (status) next.set("status", status);
-        if (from) next.set("from", from);
-        if (to) next.set("to", to);
-      }
-      return next;
-    });
-  };
+  const setActiveTab = (tab) => setSearchParams({ tab });
 
   useEffect(() => {
     if (requestedTab !== activeTab) {
-      setSearchParams((prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("tab", activeTab);
-        return next;
-      }, { replace: true });
+      setSearchParams({ tab: activeTab }, { replace: true });
     }
   }, [requestedTab, activeTab, setSearchParams]);
 
@@ -88,19 +66,15 @@ const AdminDashboard = () => {
   const [dashboardStats, setDashboardStats] = useState(null);
   const [surveys, setSurveys] = useState([]);
   const [selectedUserId, setSelectedUserId] = useState(null);
-  const [userQuery, setUserQuery] = useState({});
+  const [userQuery, setUserQuery] = useState({ activity: "", q: "" });
   const pageSize = 50;
 
-  const voucherStatusParam = searchParams.get("status");
-  const initialVoucherStatus = ["active", "used", "expired"].includes(voucherStatusParam)
-    ? voucherStatusParam
-    : "active";
   const [vouchers, setVouchers] = useState([]);
   const [voucherLoading, setVoucherLoading] = useState(false);
-  const [voucherStatusFilter, setVoucherStatusFilter] = useState(initialVoucherStatus);
+  const [voucherStatusFilter, setVoucherStatusFilter] = useState("active");
   const [voucherPagination, setVoucherPagination] = useState(null);
-  const [voucherDateFrom, setVoucherDateFrom] = useState(searchParams.get("from") || "");
-  const [voucherDateTo, setVoucherDateTo] = useState(searchParams.get("to") || "");
+  const [voucherDateFrom, setVoucherDateFrom] = useState("");
+  const [voucherDateTo, setVoucherDateTo] = useState("");
   const [voucherStatusCounts, setVoucherStatusCounts] = useState({
     active: 0,
     used: 0,
@@ -136,35 +110,13 @@ const AdminDashboard = () => {
     }
   };
 
-  const buildUserListParams = (filters = {}) => {
-    const params = {};
-    const setIf = (key, value) => {
-      if (value === undefined || value === null || value === "") return;
-      params[key] = value;
-    };
-    setIf("activity", filters.activity);
-    if (filters.q?.trim()) params.q = filters.q.trim();
-    setIf("isVerified", filters.isVerified);
-    setIf("isProfileComplete", filters.isProfileComplete);
-    setIf("isAdditionalProfileComplete", filters.isAdditionalProfileComplete);
-    setIf("unsubscribedFromEmails", filters.unsubscribedFromEmails);
-    setIf("creditsMin", filters.creditsMin);
-    setIf("creditsMax", filters.creditsMax);
-    setIf("createdAtFrom", filters.createdAtFrom);
-    setIf("createdAtTo", filters.createdAtTo);
-    setIf("dateOfBirthFrom", filters.dateOfBirthFrom);
-    setIf("dateOfBirthTo", filters.dateOfBirthTo);
-    setIf("lastSurveyCompletedAtFrom", filters.lastSurveyCompletedAtFrom);
-    setIf("lastSurveyCompletedAtTo", filters.lastSurveyCompletedAtTo);
-    return params;
-  };
-
-  const fetchUsers = useCallback(async (filters = {}, page = 1) => {
+  const fetchUsers = useCallback(async (activity = "", page = 1, q = "") => {
     try {
       setCurrentPage(page);
-      setUserQuery(filters);
+      setUserQuery({ activity, q });
       const response = await adminAPI.getUsers({
-        ...buildUserListParams(filters),
+        ...(activity && { activity }),
+        ...(q.trim() && { q: q.trim() }),
         page,
         limit: pageSize,
         skipErrorToast: true,
@@ -179,27 +131,6 @@ const AdminDashboard = () => {
       }
     } catch (err) {
       toast.error("Failed to load users");
-    }
-  }, []);
-
-  const exportUserEmails = useCallback(async (filters = {}, emailType) => {
-    try {
-      const res = await adminAPI.exportUserEmailsCsv({
-        ...buildUserListParams(filters),
-        emailType,
-        skipErrorToast: true,
-      });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: "text/csv" }));
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `user-emails-${emailType}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("Eligible emails exported");
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to export emails");
     }
   }, []);
 
@@ -251,31 +182,9 @@ const AdminDashboard = () => {
   };
 
   const handleVoucherDateRangeChange = ({ from, to }) => {
-    const nextFrom = from || "";
-    const nextTo = to || "";
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set("tab", "vouchers");
-      next.set("status", voucherStatusFilter);
-      if (nextFrom) next.set("from", nextFrom);
-      else next.delete("from");
-      if (nextTo) next.set("to", nextTo);
-      else next.delete("to");
-      return next;
-    });
-  };
-
-  const handleVoucherStatusFilter = (status) => {
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set("tab", "vouchers");
-      next.set("status", status);
-      if (voucherDateFrom) next.set("from", voucherDateFrom);
-      else next.delete("from");
-      if (voucherDateTo) next.set("to", voucherDateTo);
-      else next.delete("to");
-      return next;
-    });
+    setVoucherDateFrom(from || "");
+    setVoucherDateTo(to || "");
+    fetchVouchers(voucherStatusFilter, 1, from || "", to || "");
   };
 
   const fetchScans = async (outcome = scanOutcome, page = 1) => {
@@ -301,7 +210,7 @@ const AdminDashboard = () => {
       try {
         const tasks = [];
         if (can("stats")) tasks.push(fetchStats());
-        if (can("users")) tasks.push(fetchUsers({}, 1));
+        if (can("users")) tasks.push(fetchUsers("", 1));
         if (can("surveys")) tasks.push(fetchSurveys());
         await Promise.all(tasks);
       } catch (err) {
@@ -313,21 +222,8 @@ const AdminDashboard = () => {
     boot();
   }, [fetchUsers, can]);
 
-  const voucherFromParam = searchParams.get("from") || "";
-  const voucherToParam = searchParams.get("to") || "";
-
   useEffect(() => {
-    if (activeTab !== "vouchers") return;
-    const status = ["active", "used", "expired"].includes(voucherStatusParam)
-      ? voucherStatusParam
-      : "active";
-    setVoucherStatusFilter(status);
-    setVoucherDateFrom(voucherFromParam);
-    setVoucherDateTo(voucherToParam);
-    fetchVouchers(status, 1, voucherFromParam, voucherToParam);
-  }, [activeTab, voucherStatusParam, voucherFromParam, voucherToParam]);
-
-  useEffect(() => {
+    if (activeTab === "vouchers") fetchVouchers(voucherStatusFilter, 1);
     if (activeTab === "scans") fetchScans(scanOutcome, 1);
   }, [activeTab]);
 
@@ -352,37 +248,17 @@ const AdminDashboard = () => {
     }
   };
 
-  const handlePageChange = (newPage, filters = userQuery) => {
-    fetchUsers(filters, newPage);
+  const handlePageChange = (newPage, activity = userQuery.activity, q = userQuery.q) => {
+    fetchUsers(activity, newPage, q);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const nepalYmd = (date = new Date()) =>
-    new Intl.DateTimeFormat("en-CA", {
-      timeZone: "Asia/Kathmandu",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).format(date);
-  const redeemedFrom = nepalYmd(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
-  const redeemedTo = nepalYmd();
-
   const stats = [
-    can("stats") && { label: "Total Users", value: dashboardStats?.totalUsers ?? totalUsers, icon: Users },
+    can("users") && { label: "Total Users", value: dashboardStats?.totalUsers ?? totalUsers, icon: Users },
     can("surveys") && { label: "Live surveys", value: dashboardStats?.liveSurveys ?? 0, icon: FileText, to: "/admin?tab=surveys" },
     can("users") && { label: "Avg. Credits", value: dashboardStats?.avgCredits ?? 0, icon: Award },
-    can("businesses") && {
-      label: "Pending businesses",
-      value: dashboardStats?.pendingBusinesses ?? 0,
-      icon: Building2,
-      to: "/admin/businesses?verified=pending",
-    },
-    can("vouchers") && {
-      label: "Redeemed (7d)",
-      value: dashboardStats?.vouchersRedeemedWeek ?? 0,
-      icon: Ticket,
-      to: `/admin?tab=vouchers&status=used&from=${redeemedFrom}&to=${redeemedTo}`,
-    },
+    can("businesses") && { label: "Pending businesses", value: dashboardStats?.pendingBusinesses ?? 0, icon: Building2, to: "/admin/businesses" },
+    can("vouchers") && { label: "Redeemed (7d)", value: dashboardStats?.vouchersRedeemedWeek ?? 0, icon: Ticket, to: "/admin?tab=vouchers" },
   ].filter(Boolean);
 
   if (loading) {
@@ -470,7 +346,6 @@ const AdminDashboard = () => {
           <UserManagement
             users={users}
             fetchUsers={fetchUsers}
-            exportUserEmails={exportUserEmails}
             currentPage={currentPage}
             totalPages={totalPages}
             totalUsers={totalUsers}
@@ -480,14 +355,10 @@ const AdminDashboard = () => {
             onSelectUser={setSelectedUserId}
           />
         )}
-        {activeTab === "staff" && (
-          <StaffManagement NAVY={NAVY} currentUserId={user?.id || user?._id} />
-        )}
         {activeTab === "clusters" && <ClusterManagement NAVY={NAVY} />}
         {activeTab === "surveys" && (
           <SurveyManagement surveys={surveys} refetchSurveys={fetchSurveys} NAVY={NAVY} />
         )}
-        {activeTab === "metrics" && <MetricInsights NAVY={NAVY} />}
         {activeTab === "calendar" && (
           <SurveyCalendar surveys={surveys} refetchSurveys={fetchSurveys} NAVY={NAVY} />
         )}
@@ -496,7 +367,10 @@ const AdminDashboard = () => {
             vouchers={vouchers}
             voucherLoading={voucherLoading}
             voucherStatusFilter={voucherStatusFilter}
-            handleVoucherStatusFilter={handleVoucherStatusFilter}
+            handleVoucherStatusFilter={(status) => {
+              setVoucherStatusFilter(status);
+              fetchVouchers(status, 1);
+            }}
             pagination={voucherPagination}
             onPageChange={(page) => fetchVouchers(voucherStatusFilter, page)}
             dateFrom={voucherDateFrom}

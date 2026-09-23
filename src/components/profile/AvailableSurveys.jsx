@@ -57,11 +57,6 @@ const SurveyRow = ({ survey }) => {
               Mandatory
             </span>
           )}
-          {survey.kind === "daily" && (
-            <span className="bg-amber-50 text-amber-800 text-[10px] font-semibold px-2 py-0.5 rounded-full">
-              Daily
-            </span>
-          )}
         </div>
         <div className="text-xs text-[#6B7A8A]">
           {survey.description}

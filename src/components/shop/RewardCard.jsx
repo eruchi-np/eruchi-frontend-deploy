@@ -93,9 +93,6 @@ export default function RewardCard({ offer, index = 0, onRedeem, onViewStore }) 
             <span className="shop-card-initial">{brandName.charAt(0).toUpperCase()}</span>
           )}
           <span className="shop-card-brand">{brandName}</span>
-          {businessId ? (
-            <span className="shop-card-view-merchant">View Merchant</span>
-          ) : null}
         </button>
 
         <div className="shop-card-body">

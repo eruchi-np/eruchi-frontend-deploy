@@ -149,16 +149,10 @@ export default function SurveyComplete() {
         </AnimatedContent>
 
         <div className="mt-10 flex justify-center sm:justify-start">
-          {completion.kind === "daily" ? (
-            <p className="text-sm text-gray-500 font-light">
-              Daily surveys award credits only — they don’t count toward your streak.
-            </p>
-          ) : (
-            <StreakCelebration
-              from={completion.previousStreak ?? 0}
-              to={completion.streakCount ?? streak}
-            />
-          )}
+          <StreakCelebration
+            from={completion.previousStreak ?? 0}
+            to={completion.streakCount ?? streak}
+          />
         </div>
 
         <div className="mt-14 border-t border-gray-100 pt-10">

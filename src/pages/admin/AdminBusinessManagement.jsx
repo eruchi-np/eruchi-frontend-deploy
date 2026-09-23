@@ -1,31 +1,16 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { adminAPI, sepSurveyAPI } from '../../services/api';
 import {
   ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2, Calendar,
   ShieldAlert, Eye, EyeOff, RefreshCw, Building2, KeyRound, Upload,
-  MessageSquarePlus, X, Pencil, Star, Users, Ticket,
+  MessageSquarePlus, X, Pencil, Star,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Pagination from '../../components/ui/Pagination';
-import StatsGrid from './components/StatsGrid.jsx';
 
 const NAVY = "#1B2A4A";
 const MAX_POSTERS = 5;
-
-const nepalYmd = (date = new Date()) =>
-  new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Kathmandu',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(date);
-
-const last7NepalDaysRange = () => {
-  const to = nepalYmd();
-  const fromDate = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
-  return { from: nepalYmd(fromDate), to };
-};
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -98,18 +83,14 @@ const EMPTY_BUSINESS_FORM = {
 
 export default function AdminBusinessManagement() {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const verifiedParam = searchParams.get('verified');
-  const verifiedFilter = verifiedParam === 'pending' ? 'pending' : 'all';
 
   // Business list
   const [businesses, setBusinesses]               = useState([]);
   const [loading, setLoading]                     = useState(true);
   const [currentPage, setCurrentPage]             = useState(1);
   const [totalPages, setTotalPages]               = useState(1);
-  const [listTotal, setListTotal]                 = useState(0);
+  const [totalBusinesses, setTotalBusinesses]     = useState(0);
   const BUSINESS_PAGE_SIZE = 20;
-  const [dashboardStats, setDashboardStats]       = useState(null);
   const [expandedBusinesses, setExpandedBusinesses] = useState({});
   const [businessOffers, setBusinessOffers]       = useState({});
   const [offersLoading, setOffersLoading]         = useState({});
@@ -143,20 +124,7 @@ export default function AdminBusinessManagement() {
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
-  useEffect(() => { fetchStats(); }, []);
-  useEffect(() => {
-    fetchBusinesses(currentPage);
-  }, [currentPage, verifiedFilter]);
-
-  const setVerifiedFilter = (next) => {
-    setCurrentPage(1);
-    setSearchParams((prev) => {
-      const params = new URLSearchParams(prev);
-      if (next === 'pending') params.set('verified', 'pending');
-      else params.delete('verified');
-      return params;
-    });
-  };
+  useEffect(() => { fetchBusinesses(currentPage); }, [currentPage]);
 
   const addPublicSurveyRow = () => {
     setVoucherForm((prev) => ({
@@ -184,28 +152,14 @@ export default function AdminBusinessManagement() {
 
   // ── Data fetching ──────────────────────────────────────────────────────────
 
-  const fetchStats = async () => {
-    try {
-      const res = await adminAPI.getStats({ skipErrorToast: true });
-      setDashboardStats(res.data.data);
-    } catch (err) {
-      console.error('Failed to fetch admin stats', err);
-    }
-  };
-
   const fetchBusinesses = async (page = currentPage) => {
     try {
       setLoading(true);
-      const res = await adminAPI.getBusinesses({
-        page,
-        limit: BUSINESS_PAGE_SIZE,
-        ...(verifiedFilter === 'pending' ? { isVerified: 'false' } : {}),
-        skipErrorToast: true,
-      });
+      const res = await adminAPI.getBusinesses({ page, limit: BUSINESS_PAGE_SIZE, skipErrorToast: true });
       setBusinesses(res.data.data || []);
       setCurrentPage(res.data.pagination?.currentPage || page);
       setTotalPages(res.data.pagination?.totalPages || 1);
-      setListTotal(res.data.pagination?.total || 0);
+      setTotalBusinesses(res.data.pagination?.total || 0);
     } catch (err) {
       console.error(err);
       toast.error('Failed to load businesses');
@@ -485,7 +439,6 @@ export default function AdminBusinessManagement() {
         const res = await adminAPI.updateBusiness(editingBusiness._id, profilePayload());
         toast.success('Business updated');
         mergeBusiness(res.data.data);
-        fetchStats();
         closeBusinessModal();
       } else {
         const payload = {
@@ -498,11 +451,9 @@ export default function AdminBusinessManagement() {
         const newBusiness = res.data.data;
         if (newBusiness) {
           setBusinesses((prev) => [newBusiness, ...prev]);
-          setListTotal((n) => n + 1);
         } else {
           fetchBusinesses();
         }
-        fetchStats();
         closeBusinessModal();
       }
     } catch (err) {
@@ -613,29 +564,6 @@ export default function AdminBusinessManagement() {
 
   const inputCls = 'w-full px-3 py-2 border border-gray-200 rounded-xl text-sm outline-none focus:border-gray-900 transition-colors';
 
-  const redeemedRange = useMemo(() => last7NepalDaysRange(), []);
-  const stats = [
-    { label: 'Total Users', value: dashboardStats?.totalUsers ?? 0, icon: Users },
-    {
-      label: 'Total Businesses',
-      value: dashboardStats?.totalBusinesses ?? listTotal,
-      icon: Building2,
-      to: '/admin/businesses',
-    },
-    {
-      label: 'Pending businesses',
-      value: dashboardStats?.pendingBusinesses ?? 0,
-      icon: ShieldAlert,
-      to: '/admin/businesses?verified=pending',
-    },
-    {
-      label: 'Redeemed (7d)',
-      value: dashboardStats?.vouchersRedeemedWeek ?? 0,
-      icon: Ticket,
-      to: `/admin?tab=vouchers&status=used&from=${redeemedRange.from}&to=${redeemedRange.to}`,
-    },
-  ];
-
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -661,37 +589,6 @@ export default function AdminBusinessManagement() {
             <Building2 className="h-4 w-4" />
             Add Business
           </button>
-        </div>
-
-        <StatsGrid stats={stats} NAVY={NAVY} />
-
-        <div className="flex flex-wrap gap-2 mb-4" id="business-list">
-          {[
-            { id: 'all', label: 'All businesses' },
-            { id: 'pending', label: 'Pending' },
-          ].map((opt) => (
-            <button
-              key={opt.id}
-              type="button"
-              onClick={() => setVerifiedFilter(opt.id)}
-              className="px-4 py-2 rounded-xl text-sm font-medium transition-colors"
-              style={
-                verifiedFilter === opt.id
-                  ? { backgroundColor: NAVY, color: 'white' }
-                  : { backgroundColor: '#fff', color: '#374151', border: '1px solid #e5e7eb' }
-              }
-            >
-              {opt.label}
-              {opt.id === 'pending' && dashboardStats?.pendingBusinesses != null && (
-                <span className="ml-2 opacity-80">{dashboardStats.pendingBusinesses}</span>
-              )}
-            </button>
-          ))}
-          {verifiedFilter === 'pending' && (
-            <p className="w-full text-sm text-gray-500 mt-1">
-              Showing {listTotal} unverified {listTotal === 1 ? 'business' : 'businesses'}
-            </p>
-          )}
         </div>
 
         {/* ── Business list ── */}
@@ -914,7 +811,7 @@ export default function AdminBusinessManagement() {
         <Pagination
           page={currentPage}
           totalPages={totalPages}
-          total={listTotal}
+          total={totalBusinesses}
           pageSize={BUSINESS_PAGE_SIZE}
           onChange={setCurrentPage}
           label="businesses"

@@ -99,7 +99,6 @@ const StandaloneSurvey = () => {
         completionFromSubmitResponse(res, {
           creditsEarned: survey.credits || 0,
           previousStreak,
-          kind: survey.kind || "normal",
         })
       );
     } catch (err) {
@@ -140,9 +139,6 @@ const StandaloneSurvey = () => {
             <div className="flex items-center gap-2">
               <Award className="h-4 w-4" /> {survey.credits} Credits
             </div>
-            {survey.kind === "daily" ? (
-              <div className="text-amber-700">Daily survey · credits only, no streak</div>
-            ) : null}
           </div>
         </div>
 

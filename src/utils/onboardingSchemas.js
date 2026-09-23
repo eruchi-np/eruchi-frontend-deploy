@@ -7,17 +7,8 @@ const required = (message) =>
     z.string({ invalid_type_error: message }).trim().min(1, message)
   );
 
-// null is a valid firstLanguage value ("Other" in the UI / backend enum).
-const requiredLanguage = z.preprocess(
-  (value) => (value === undefined || value === "" ? undefined : value),
-  z.union([
-    z.null(),
-    z.string({ invalid_type_error: "Please select your first language" }).trim().min(1, "Please select your first language"),
-  ], { errorMap: () => ({ message: "Please select your first language" }) })
-);
-
 export const aboutYouSchema = z.object({
-  firstLanguage: requiredLanguage,
+  firstLanguage: required("Please select your first language"),
   education: required("Please select your education level"),
   maritalStatus: required("Please select your marital status"),
   occupation: required("Please select your occupation"),

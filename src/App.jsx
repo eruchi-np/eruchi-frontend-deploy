@@ -54,7 +54,6 @@ const BusinessVoucherForm = lazy(() => import('./pages/business/BusinessVoucherF
 const MerchantPublicProfile = lazy(() => import('./pages/MerchantPublicProfile'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const ResetPasswordToken = lazy(() => import('./pages/ResetPasswordToken'));
-const Unsubscribe = lazy(() => import('./pages/Unsubscribe'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 import { AnimationProvider } from './components/animations/AnimationContext';
@@ -147,7 +146,6 @@ function App() {
             <Route path="/login/success" element={<LoginSuccess />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/reset-password/:token" element={<ResetPasswordToken />} />
-            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/" element={<Homepage />} />
             <Route path="/for-business" element={<ForBusiness />} />
            <Route path="/faqs" element={<FAQs />} />

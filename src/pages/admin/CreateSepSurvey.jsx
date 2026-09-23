@@ -15,14 +15,12 @@ const CreateSepSurvey = () => {
     description: '',
     status: 'published',
     credits: 50,
-    kind: 'normal',
     publishedAt: new Date().toISOString().slice(0, 16),
     availableDays: 7,
     estimatedMinutes: '',
     visibility: 'public',
     validityDays: 7,
     alsoPublishToOthers: false,
-    clusterSendAt: new Date().toISOString().slice(0, 16),
     clusterIds: [],
     questions: [
       {
@@ -32,8 +30,7 @@ const CreateSepSurvey = () => {
         maxSelections: 1,
         minValue: 0,
         maxValue: 5,
-        isRequired: true,
-        metricTag: 'none'
+        isRequired: true
       }
     ]
   });
@@ -87,20 +84,15 @@ const CreateSepSurvey = () => {
           description: survey.description || '',
           status: survey.status || 'published',
           credits: survey.credits ?? 50,
-          kind: survey.kind === 'daily' ? 'daily' : 'normal',
           publishedAt: startDate.toISOString().slice(0, 16),
           availableDays,
           estimatedMinutes: survey.estimatedMinutes ?? '',
           visibility: survey.visibility || 'public',
           validityDays: survey.validityDays ?? 7,
           alsoPublishToOthers: Boolean(survey.alsoPublishToOthers),
-          clusterSendAt: new Date().toISOString().slice(0, 16),
           clusterIds: [],
-          questions: survey.questions?.length ? survey.questions.map((q) => ({
-            ...q,
-            metricTag: q.metricTag === 'cep' || q.metricTag === 'nps' ? q.metricTag : 'none'
-          })) : [
-            { questionText: '', questionType: 'text_short', options: [], maxSelections: 1, minValue: 0, maxValue: 5, isRequired: true, metricTag: 'none' }
+          questions: survey.questions?.length ? survey.questions : [
+            { questionText: '', questionType: 'text_short', options: [], maxSelections: 1, minValue: 0, maxValue: 5 }
           ]
         });
       } catch (err) {
@@ -123,12 +115,6 @@ const CreateSepSurvey = () => {
     { value: 'slider', label: 'Slider', icon: Sliders, description: 'Range selection' }
   ];
 
-  const metricTagOptions = [
-    { value: 'none', label: 'None', description: 'Normal question' },
-    { value: 'cep', label: 'CEP', description: 'Category entry point' },
-    { value: 'nps', label: 'NPS', description: 'Net promoter score' }
-  ];
-
   const statusOptions = [
     { value: 'draft', label: 'Draft', color: 'bg-gray-100 text-gray-700 border-gray-200' },
     { value: 'published', label: 'Published', color: 'bg-green-100 text-green-700 border-green-200' },
@@ -147,19 +133,6 @@ const CreateSepSurvey = () => {
       label: 'Targeted',
       icon: Target,
       description: 'Sent to selected clusters (and/or merchant feedback). Hidden from others unless you enable dual publish.'
-    }
-  ];
-
-  const kindOptions = [
-    {
-      value: 'normal',
-      label: 'Normal survey',
-      description: 'Full survey — awards credits and counts toward streak'
-    },
-    {
-      value: 'daily',
-      label: 'Daily survey',
-      description: 'Shorter bonus survey — awards credits only, no streak'
     }
   ];
 
@@ -237,9 +210,7 @@ const CreateSepSurvey = () => {
           options: [],
           maxSelections: 1,
           minValue: 0,
-          maxValue: 5,
-          isRequired: true,
-          metricTag: 'none'
+          maxValue: 5
         }
       ]
     }));
@@ -276,15 +247,6 @@ const CreateSepSurvey = () => {
       return toast.error('Validity days must be at least 1');
     }
 
-    if (
-      formData.visibility === 'targeted' &&
-      formData.status === 'published' &&
-      formData.clusterIds.length > 0 &&
-      !formData.clusterSendAt
-    ) {
-      return toast.error('Cluster send date/time is required');
-    }
-
     const emptyQuestions = formData.questions.filter(q => !q.questionText.trim());
     if (emptyQuestions.length) return toast.error('All questions must have text');
 
@@ -309,7 +271,6 @@ const CreateSepSurvey = () => {
         description: trimmedDesc,
         status: formData.status,
         credits: Number(formData.credits),
-        kind: formData.kind === 'daily' ? 'daily' : 'normal',
         startDate: publishedAt.toISOString(),
         endDate: needsPublicWindow ? derivedEndDate.toISOString() : null,
         visibility: formData.visibility,
@@ -320,18 +281,11 @@ const CreateSepSurvey = () => {
           formData.visibility === 'targeted' && formData.status === 'published'
             ? formData.clusterIds
             : [],
-        clusterSendAt:
-          formData.visibility === 'targeted' &&
-          formData.status === 'published' &&
-          formData.clusterIds.length > 0
-            ? new Date(formData.clusterSendAt).toISOString()
-            : undefined,
         questions: formData.questions.map(q => {
           const base = {
             questionText: q.questionText.trim(),
             questionType: q.questionType,
-            isRequired: q.isRequired !== false,
-            metricTag: q.metricTag === 'cep' || q.metricTag === 'nps' ? q.metricTag : 'none'
+            isRequired: q.isRequired !== false
           };
           if (['single_checkbox', 'multiple_checkbox'].includes(q.questionType)) {
             base.options = q.options.map(o => o.trim()).filter(Boolean);
@@ -362,15 +316,7 @@ const CreateSepSurvey = () => {
       const failedSends = sends.filter((s) => !s.ok);
       const okSends = sends.filter((s) => s.ok);
       if (okSends.length) {
-        const firstWhen = okSends.find((s) => s.scheduledFor)?.scheduledFor;
-        const scheduledDate = firstWhen ? new Date(firstWhen) : null;
-        const future =
-          scheduledDate && !Number.isNaN(scheduledDate.getTime()) && scheduledDate.getTime() > Date.now();
-        toast.success(
-          future
-            ? `Scheduled send to ${okSends.length} cluster${okSends.length === 1 ? '' : 's'} for ${scheduledDate.toLocaleString()}`
-            : `Queued send to ${okSends.length} cluster${okSends.length === 1 ? '' : 's'}`
-        );
+        toast.success(`Queued send to ${okSends.length} cluster${okSends.length === 1 ? '' : 's'}`);
       }
       if (failedSends.length) {
         toast.error(
@@ -488,35 +434,6 @@ const CreateSepSurvey = () => {
                 />
               </div>
 
-              {/* Survey kind */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-2">
-                  Survey type
-                </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {kindOptions.map((opt) => {
-                    const selected = formData.kind === opt.value;
-                    return (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => handleInputChange('kind', opt.value)}
-                        className={`text-left p-4 rounded-xl border-2 transition-all ${
-                          selected
-                            ? 'border-indigo-500 bg-indigo-50'
-                            : 'border-gray-200 bg-gray-50 hover:border-gray-300'
-                        }`}
-                      >
-                        <p className={`font-semibold text-sm ${selected ? 'text-indigo-900' : 'text-gray-900'}`}>
-                          {opt.label}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">{opt.description}</p>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
               {/* Visibility selector */}
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
@@ -581,7 +498,7 @@ const CreateSepSurvey = () => {
                       Send to clusters
                     </label>
                     <p className="text-xs text-gray-500 mb-3">
-                      Select one or more clusters. If status is Published, membership is snapshotted and emails are queued at the send time below.
+                      Select one or more clusters. If status is Published, membership is snapshotted and emails are queued on save.
                     </p>
                     {clustersLoading ? (
                       <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -618,24 +535,6 @@ const CreateSepSurvey = () => {
                             </label>
                           );
                         })}
-                      </div>
-                    )}
-                    {formData.clusterIds.length > 0 && (
-                      <div className="mt-4">
-                        <label className="block text-sm font-semibold text-gray-900 mb-2">
-                          Send to clusters on <span className="text-red-500">*</span>
-                        </label>
-                        <input
-                          type="datetime-local"
-                          value={formData.clusterSendAt}
-                          onChange={(e) => handleInputChange('clusterSendAt', e.target.value)}
-                          min={getMinPublishedDate()}
-                          className="w-full max-w-md px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                          required
-                        />
-                        <p className="text-xs text-gray-500 mt-1.5">
-                          Membership is snapshotted and emails go out at this time (same as now if you leave it as the current time).
-                        </p>
                       </div>
                     )}
                   </div>
@@ -790,17 +689,6 @@ const CreateSepSurvey = () => {
                               <span className="text-sm font-medium">{typeData.label}</span>
                             </div>
                           )}
-                          {(q.metricTag === 'cep' || q.metricTag === 'nps') && (
-                            <span
-                              className={`px-3 py-1 rounded-lg text-xs font-bold border ${
-                                q.metricTag === 'nps'
-                                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
-                                  : 'bg-amber-50 border-amber-200 text-amber-700'
-                              }`}
-                            >
-                              {q.metricTag.toUpperCase()}
-                            </span>
-                          )}
                         </div>
 
                         <button
@@ -861,50 +749,6 @@ const CreateSepSurvey = () => {
                                 <p className={`text-sm font-medium ${isActive ? 'text-green-700' : 'text-gray-900'}`}>
                                   {t.label}
                                 </p>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Metric tag: None / CEP / NPS */}
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-900 mb-3">
-                          Metric tag
-                        </label>
-                        <p className="text-xs text-gray-500 mb-3">
-                          Tag CEP or NPS questions for analytics collections. Leave as None for normal questions.
-                        </p>
-                        <div className="grid grid-cols-3 gap-3">
-                          {metricTagOptions.map((opt) => {
-                            const isActive = (q.metricTag || 'none') === opt.value;
-                            return (
-                              <button
-                                key={opt.value}
-                                type="button"
-                                onClick={() => handleQuestionChange(idx, 'metricTag', opt.value)}
-                                className={`p-3 rounded-xl border-2 transition-all text-center ${
-                                  isActive
-                                    ? opt.value === 'nps'
-                                      ? 'border-indigo-500 bg-indigo-50'
-                                      : opt.value === 'cep'
-                                        ? 'border-amber-500 bg-amber-50'
-                                        : 'border-green-500 bg-green-50'
-                                    : 'border-gray-200 hover:border-gray-300 bg-white'
-                                }`}
-                              >
-                                <p className={`text-sm font-semibold ${
-                                  isActive
-                                    ? opt.value === 'nps'
-                                      ? 'text-indigo-700'
-                                      : opt.value === 'cep'
-                                        ? 'text-amber-700'
-                                        : 'text-green-700'
-                                    : 'text-gray-900'
-                                }`}>
-                                  {opt.label}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-1">{opt.description}</p>
                               </button>
                             );
                           })}

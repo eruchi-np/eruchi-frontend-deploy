@@ -104,23 +104,13 @@ const AddressInfo = ({ formData, updateFormData, errors = {} }) => {
               <input
                 type="text"
                 placeholder="Search for your municipality..."
-                // While searching: only show what the user typed (never auto-fill first option).
-                // When closed: show the chosen municipality, or blank.
-                value={showMunicipalityDropdown ? searchTerm : (formData.municipality || '')}
+                value={searchTerm || formData.municipality || ''}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
                   if (!showMunicipalityDropdown) setShowMunicipalityDropdown(true);
                 }}
-                onFocus={() => {
-                  setSearchTerm('');
-                  setShowMunicipalityDropdown(true);
-                }}
-                onBlur={() => {
-                  // Delay so a click on a list item still registers
-                  setTimeout(() => setShowMunicipalityDropdown(false), 150);
-                }}
+                onFocus={() => setShowMunicipalityDropdown(true)}
                 className="w-full pl-10 pr-3 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200"
-                autoComplete="off"
               />
             </div>
 
@@ -158,10 +148,7 @@ const AddressInfo = ({ formData, updateFormData, errors = {} }) => {
                           <div
                             key={createMunicipalityKey(municipality, index, type)} // Use unique key with index
                             className="px-4 py-3 cursor-pointer hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-b-0"
-                            onMouseDown={(e) => {
-                              e.preventDefault(); // keep focus so blur doesn't close before select
-                              handleMunicipalitySelect(municipality);
-                            }}
+                            onClick={() => handleMunicipalitySelect(municipality)}
                           >
                             <div className="flex items-center justify-between">
                               <div>

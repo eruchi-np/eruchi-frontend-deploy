@@ -31,7 +31,6 @@ const formSchema = z
     termsAccepted: z.literal(true, {
       errorMap: () => ({ message: "You must accept the terms, conditions, and privacy policy" }),
     }),
-    promotionalEmails: z.boolean().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -62,9 +61,6 @@ const Signup = () => {
     resolver: zodResolver(formSchema),
     mode: "onBlur",
     reValidateMode: "onBlur",
-    defaultValues: {
-      promotionalEmails: false,
-    },
   });
 
   const termsAcceptedValue = watch("termsAccepted");
@@ -84,7 +80,6 @@ const Signup = () => {
         firstName: data.firstName,
         lastName: data.lastName,
         nationality: data.nationality || null,
-        promotionalEmails: data.promotionalEmails === true,
       };
 
       const response = await axios.post(`${API_BASE_URL}/auth/register`, payload);
@@ -205,12 +200,6 @@ const Signup = () => {
               </label>
             </div>
             {errors.termsAccepted && <p className="onboard-error">{errors.termsAccepted.message}</p>}
-            <div className="onboard-terms-row">
-              <input type="checkbox" id="promotionalEmails" {...register("promotionalEmails")} />
-              <label htmlFor="promotionalEmails">
-                I would like to receive promotional emails from eRuchi
-              </label>
-            </div>
           </div>
 
           <div className="onboard-links">

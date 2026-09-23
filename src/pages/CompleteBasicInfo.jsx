@@ -41,11 +41,10 @@ const schema = z.object({
 });
 
 const CompleteBasicInfo = () => {
-  const { user, refreshUser, loading: authLoading, logout } = useAuth();
+  const { user, refreshUser, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [loggingOut, setLoggingOut] = useState(false);
 
   const {
     register,
@@ -136,16 +135,6 @@ const CompleteBasicInfo = () => {
     }
   };
 
-  const handleLogout = async () => {
-    setLoggingOut(true);
-    try {
-      await logout();
-      navigate("/login", { replace: true });
-    } finally {
-      setLoggingOut(false);
-    }
-  };
-
   if (authLoading) {
     return (
       <OnboardingShell footer={false}>
@@ -230,17 +219,6 @@ const CompleteBasicInfo = () => {
             </button>
           </div>
         </form>
-        <div className="onboard-links" style={{ marginTop: 24 }}>
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={loggingOut || submitting}
-            className="bg-transparent border-0 p-0 cursor-pointer underline-offset-2 hover:underline disabled:opacity-50"
-            style={{ color: "inherit", font: "inherit" }}
-          >
-            {loggingOut ? "Logging out…" : "Log out"}
-          </button>
-        </div>
       </div>
     </OnboardingShell>
   );

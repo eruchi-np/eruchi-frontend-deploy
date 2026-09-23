@@ -4,7 +4,7 @@ import { Award, Flame, Mail, Phone, Shield, Ticket, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { adminAPI } from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
-import { canAdjustCredits as userCanAdjustCredits } from "../../../utils/adminRoles";
+import { hasPermission } from "../../../utils/adminRoles";
 
 const REASON_LABELS = {
   campaign_completion: "Campaign",
@@ -34,7 +34,7 @@ const formatWhen = (value) => {
 
 export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChanged }) {
   const { user: authUser } = useAuth();
-  const canAdjustCredits = userCanAdjustCredits(authUser);
+  const canAdjustCredits = hasPermission(authUser?.role, "credits_adjust");
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
   const [amount, setAmount] = useState("");

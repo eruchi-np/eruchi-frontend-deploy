@@ -22,12 +22,10 @@
 }
 
 .home-hero-pin {
-  --home-sheet-peek: 80px;
   position: sticky;
   top: 0;
-  /* Leave a strip of the rounded white sheet visible to invite scroll */
-  height: calc(100vh - var(--home-sheet-peek));
-  height: calc(100dvh - var(--home-sheet-peek));
+  height: 100vh;
+  height: 100dvh;
   z-index: 0;
 }
 
@@ -202,24 +200,6 @@
   box-shadow: 0 10px 24px rgba(200, 245, 58, 0.28);
 }
 
-.home-pill-turquoise {
-  background: #2efdd4;
-  color: var(--navy);
-}
-
-.home-pill-turquoise:hover {
-  box-shadow: 0 10px 24px rgba(46, 253, 212, 0.28);
-}
-
-.home-pill-blue {
-  background: #3399ff;
-  color: #fff;
-}
-
-.home-pill-blue:hover {
-  box-shadow: 0 10px 24px rgba(51, 153, 255, 0.28);
-}
-
 .home-pill-white {
   background: #fff;
   color: var(--navy);
@@ -318,7 +298,7 @@
 .home-hero h1 em {
   font-style: italic;
   font-weight: 600;
-  color: #2efdd4;
+  color: var(--lime);
 }
 
 .home-hero-sub {
@@ -380,7 +360,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: #2efdd4;
+  background: var(--lime);
   transition: width 0.45s ease;
 }
 
@@ -1376,10 +1356,6 @@ button.streak-badge {
 }
 
 @media (max-width: 1024px) {
-  .home-hero-pin {
-    --home-sheet-peek: 56px;
-  }
-
   .home-nav-inner {
     grid-template-columns: 1fr auto;
   }

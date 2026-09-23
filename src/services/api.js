@@ -82,15 +82,6 @@ export const surveyAPI = {
 
 export const adminAPI = {
   getUsers: (options = {}) => getRequest('/admin/users', options),
-  exportUserEmailsCsv: (options = {}) => {
-    const { skipErrorToast, skipAuthRedirect, ...params } = options;
-    return api.get('/admin/users/emails/csv', {
-      params,
-      responseType: 'blob',
-      skipErrorToast,
-      skipAuthRedirect,
-    });
-  },
   getUser: (userId, options = {}) => getRequest(`/admin/users/${userId}`, options),
   getUserCredits: (userId, options = {}) => getRequest(`/admin/users/${userId}/credits`, options),
   adjustUserCredits: (userId, data, config = {}) => api.post(`/admin/users/${userId}/credits`, data, config),
@@ -127,11 +118,6 @@ export const adminAPI = {
   updateFaq: (id, data, config = {}) => api.put(`/admin/faqs/${id}`, data, config),
   deleteFaq: (id, config = {}) => api.delete(`/admin/faqs/${id}`, config),
   reorderFaq: (id, direction, config = {}) => api.put(`/admin/faqs/${id}/reorder`, { direction }, config),
-  getStaff: (options = {}) => getRequest('/admin/staff', options),
-  updateStaffRole: (userId, data, config = {}) => api.patch(`/admin/staff/${userId}/role`, data, config),
-  promoteStaff: (data, config = {}) => api.post('/admin/staff', data, config),
-  getNpsMetrics: (options = {}) => getRequest('/admin/metrics/nps', options),
-  getCepMetrics: (options = {}) => getRequest('/admin/metrics/cep', options),
 };
 
 export const faqAPI = {
@@ -157,15 +143,7 @@ export const clusterAPI = {
     });
   },
   listSends: (id, options = {}) => getRequest(`/clusters/${id}/sends`, options),
-  createSend: (id, surveyId, scheduledFor, config = {}) =>
-    api.post(
-      `/clusters/${id}/sends`,
-      {
-        surveyId,
-        ...(scheduledFor ? { scheduledFor } : {})
-      },
-      config
-    ),
+  createSend: (id, surveyId, config = {}) => api.post(`/clusters/${id}/sends`, { surveyId }, config),
   getSend: (sendId, options = {}) => getRequest(`/clusters/sends/${sendId}`, options),
   listSendResponses: (sendId, options = {}) => getRequest(`/clusters/sends/${sendId}/responses`, options),
   exportSendResponsesCsv: (sendId, config = {}) =>
@@ -191,11 +169,6 @@ export const voucherAPI = {
   redeem: (offerId, config = {}) => api.post('/vouchers/redeem', { offerId }, config),
   getMyVouchers: (options = {}) => getRequest('/vouchers', options),
   getVoucherById: (id, config = {}) => api.get(`/vouchers/${id}`, config),
-};
-
-/** Public homepage Discover feed (stable card DTO). */
-export const discoverAPI = {
-  getRewards: (options = {}) => getRequest('/discover', { skipErrorToast: true, ...options }),
 };
 
 export const businessAPI = {
