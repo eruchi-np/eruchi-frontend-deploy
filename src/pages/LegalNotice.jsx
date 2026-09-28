@@ -125,7 +125,7 @@ const PrivacyPolicy = () => {
               <p>Survey responses are aggregated across the Panelist pool. All insights delivered to business clients are based on aggregated, anonymised data. No business client receives access to individual survey responses or any data that could identify a specific Panelist. eRuchi's business model depends on maintaining the trust of our Panelist community — individual user data is never sold or directly disclosed to any client, advertiser, or third party.</p>
             </SubSection>
             <SubSection title="3.4 Marketing Communications">
-              <p>We may use your email or phone number to send marketing communications about the Platform, new features, merchant partners, and rewards opportunities. You are enrolled by default and may unsubscribe at any time via the link in any marketing email, or by contacting support@eruchi.com.np. Opting out does not affect transactional communications such as Voucher delivery emails.</p>
+              <p>We may use your email or phone number to send marketing communications about the Platform, new features, merchant partners, and rewards opportunities. Promotional emails are opt-in at signup (or later via your email preferences). You may change preferences or unsubscribe at any time via the link in any email, or by contacting support@eruchi.com.np. Opting out of promotional or reminder mail does not affect transactional communications such as account verification, password reset, or Voucher delivery emails that you still allow under in-app notifications.</p>
             </SubSection>
           </Section>
 

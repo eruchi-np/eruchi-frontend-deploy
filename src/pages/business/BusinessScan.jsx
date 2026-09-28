@@ -6,6 +6,15 @@ import { discountLabel, formatRs } from "../../utils/billMath";
 
 const RESULT_IDLE = null;
 
+const parseAmount = (raw) => {
+  const cleaned = raw.trim().replace(/,/g, "");
+  if (!cleaned) return null;
+  if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
+  const n = Number(cleaned);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+};
+
 export default function BusinessScan() {
   const navigate = useNavigate();
   const [scannerActive, setScannerActive] = useState(false);
@@ -14,29 +23,31 @@ export default function BusinessScan() {
   const [scanError, setScanError] = useState(null);
   const [mode, setMode] = useState("qr"); // "qr" | "code"
   const [codeInput, setCodeInput] = useState("");
-  const [billAmount, setBillAmount] = useState("");
+  const [billAmountBefore, setBillAmountBefore] = useState("");
+  const [billAmountAfter, setBillAmountAfter] = useState("");
   const [billAmountError, setBillAmountError] = useState("");
   const scannerRef = useRef(null);
   const html5QrcodeRef = useRef(null);
   const billInputRef = useRef(null);
 
-  const parsedBillAmount = (() => {
-    const raw = billAmount.trim().replace(/,/g, "");
-    if (!raw) return null;
-    if (!/^\d+(\.\d{1,2})?$/.test(raw)) return null;
-    const n = Number(raw);
-    if (!Number.isFinite(n) || n < 0) return null;
-    return n;
-  })();
+  const parsedBefore = parseAmount(billAmountBefore);
+  const parsedAfter = parseAmount(billAmountAfter);
 
-  const processResult = async (voucherId, redemptionToken, amount) => {
+  const clearBillFields = () => {
+    setBillAmountBefore("");
+    setBillAmountAfter("");
+    setBillAmountError("");
+  };
+
+  const processResult = async (voucherId, redemptionToken, before, after) => {
     setLoading(true);
     setResult(null);
     try {
       const res = await businessAPI.scan({
         voucherId,
         redemptionToken,
-        billAmountAfterDiscount: amount,
+        billAmountTotal: before,
+        billAmountAfterDiscount: after,
       });
       setResult({ type: "success", data: res.data });
     } catch (err) {
@@ -44,7 +55,7 @@ export default function BusinessScan() {
       const msg = err.response?.data?.message || "An error occurred";
       if (status === 403) {
         setResult({ type: "wrong_business", message: msg });
-      } else if (/bill amount/i.test(msg)) {
+      } else if (/bill amount|before-discount|after-discount/i.test(msg)) {
         setResult({ type: "invalid", message: msg });
       } else if (msg.startsWith("Voucher already used")) {
         setResult({ type: "already_used", message: msg });
@@ -64,8 +75,7 @@ export default function BusinessScan() {
     try {
       const res = await businessAPI.previewScan(voucherId, redemptionToken);
       setResult({ type: "pending", voucherId, redemptionToken, data: res.data.data });
-      setBillAmount("");
-      setBillAmountError("");
+      clearBillFields();
     } catch (err) {
       const status = err.response?.status;
       const msg = err.response?.data?.message || "An error occurred";
@@ -85,12 +95,20 @@ export default function BusinessScan() {
 
   const handleApprove = async () => {
     if (!result || result.type !== "pending") return;
-    if (parsedBillAmount === null) {
-      setBillAmountError("Enter an amount");
+    if (parsedBefore === null) {
+      setBillAmountError("Enter bill amount before discount");
+      return;
+    }
+    if (parsedAfter === null) {
+      setBillAmountError("Enter bill amount after discount");
+      return;
+    }
+    if (parsedBefore < parsedAfter) {
+      setBillAmountError("Before-discount amount cannot be less than after-discount amount");
       return;
     }
     setBillAmountError("");
-    await processResult(result.voucherId, result.redemptionToken, parsedBillAmount);
+    await processResult(result.voucherId, result.redemptionToken, parsedBefore, parsedAfter);
   };
 
   const startScanner = async () => {
@@ -149,8 +167,7 @@ export default function BusinessScan() {
   const handleReset = () => {
     setResult(RESULT_IDLE);
     setCodeInput("");
-    setBillAmount("");
-    setBillAmountError("");
+    clearBillFields();
   };
 
   const handleCodeSubmit = async (e) => {
@@ -168,8 +185,7 @@ export default function BusinessScan() {
         redemptionToken: res.data.data.redemptionToken,
         data: res.data.data,
       });
-      setBillAmount("");
-      setBillAmountError("");
+      clearBillFields();
     } catch (err) {
       const status = err.response?.status;
       const msg = err.response?.data?.message || "An error occurred";
@@ -186,6 +202,11 @@ export default function BusinessScan() {
       setLoading(false);
       setCodeInput("");
     }
+  };
+
+  const onAmountChange = (setter) => (e) => {
+    setter(e.target.value.replace(/[^\d.,]/g, ""));
+    setBillAmountError("");
   };
 
   return (
@@ -245,31 +266,48 @@ export default function BusinessScan() {
                 {result.data.description && (
                   <p className="text-sm text-gray-500 mt-2">{result.data.description}</p>
                 )}
-                <label className="block text-left mt-5 bg-white rounded-xl border border-blue-200 px-4 py-3">
-                  <span className="block text-sm font-semibold text-gray-800 mb-1">
-                    Amount <span className="text-red-500">*</span>
-                  </span>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
-                      Rs.
+                <div className="mt-5 space-y-3 text-left">
+                  <label className="block bg-white rounded-xl border border-blue-200 px-4 py-3">
+                    <span className="block text-sm font-semibold text-gray-800 mb-1">
+                      Bill amount before discount <span className="text-red-500">*</span>
                     </span>
-                    <input
-                      ref={billInputRef}
-                      type="text"
-                      inputMode="decimal"
-                      value={billAmount}
-                      onChange={(e) => {
-                        setBillAmount(e.target.value.replace(/[^\d.,]/g, ""));
-                        setBillAmountError("");
-                      }}
-                      placeholder="0.00"
-                      className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 text-sm font-medium text-left focus:outline-none focus:border-blue-500"
-                    />
-                  </div>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                        Rs.
+                      </span>
+                      <input
+                        ref={billInputRef}
+                        type="text"
+                        inputMode="decimal"
+                        value={billAmountBefore}
+                        onChange={onAmountChange(setBillAmountBefore)}
+                        placeholder="0.00"
+                        className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 text-sm font-medium text-left focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </label>
+                  <label className="block bg-white rounded-xl border border-blue-200 px-4 py-3">
+                    <span className="block text-sm font-semibold text-gray-800 mb-1">
+                      Bill amount after discount <span className="text-red-500">*</span>
+                    </span>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">
+                        Rs.
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={billAmountAfter}
+                        onChange={onAmountChange(setBillAmountAfter)}
+                        placeholder="0.00"
+                        className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-gray-300 bg-white text-gray-900 text-sm font-medium text-left focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </label>
                   {billAmountError && (
-                    <p className="mt-1.5 text-xs text-red-500">{billAmountError}</p>
+                    <p className="text-xs text-red-500">{billAmountError}</p>
                   )}
-                </label>
+                </div>
                 <div className="flex gap-3 mt-4 justify-center">
                   <button
                     onClick={handleApprove}
@@ -305,7 +343,7 @@ export default function BusinessScan() {
                     ? "Expired"
                     : result.type === "wrong_business"
                     ? "Not for your business"
-                    : /bill amount/i.test(result.message || "")
+                    : /bill amount|before-discount|after-discount/i.test(result.message || "")
                     ? "Bill amount required"
                     : "Invalid QR Code"}
                 </p>
@@ -420,9 +458,21 @@ export default function BusinessScan() {
 function BillMathBlock({ math }) {
   if (!math || math.afterDiscount == null) return null;
   return (
-    <div className="mt-4 text-left bg-white/80 border border-gray-100 rounded-xl px-4 py-3">
+    <div className="mt-4 text-left bg-white/80 border border-gray-100 rounded-xl px-4 py-3 space-y-1.5">
+      {math.total != null && (
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-600">Before discount</span>
+          <span className="font-medium text-gray-800">{formatRs(math.total)}</span>
+        </div>
+      )}
+      {math.discountAmount != null && math.discountAmount > 0 && (
+        <div className="flex justify-between text-sm">
+          <span className="text-gray-600">Discount</span>
+          <span className="font-medium text-gray-800">−{formatRs(math.discountAmount)}</span>
+        </div>
+      )}
       <div className="flex justify-between text-sm">
-        <span className="font-semibold text-gray-800">Amount</span>
+        <span className="font-semibold text-gray-800">After discount</span>
         <span className="font-bold text-green-700">{formatRs(math.afterDiscount)}</span>
       </div>
     </div>

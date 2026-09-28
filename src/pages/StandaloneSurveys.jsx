@@ -48,6 +48,9 @@ function SurveyRow({ survey, onView }) {
               {survey.feedbackBusinessName ? `Feedback · ${survey.feedbackBusinessName}` : "Feedback"}
             </span>
           ) : null}
+          {survey.kind === "daily" ? (
+            <span className="surveys-row-tag">Daily</span>
+          ) : null}
         </h3>
         <p>{survey.description}</p>
       </div>
@@ -64,6 +67,18 @@ function SurveyRow({ survey, onView }) {
         {expired ? "closed" : "view"}
       </button>
     </article>
+  );
+}
+
+function sortSurveys(items, sortOrder) {
+  if (sortOrder === "credits-desc") {
+    return [...items].sort((a, b) => (b.credits || 0) - (a.credits || 0));
+  }
+  if (sortOrder === "credits-asc") {
+    return [...items].sort((a, b) => (a.credits || 0) - (b.credits || 0));
+  }
+  return [...items].sort((a, b) =>
+    String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
   );
 }
 
@@ -187,7 +202,7 @@ export default function StandaloneSurveys() {
 
   const filteredCatalog = useMemo(() => {
     const q = searchDraft.toLowerCase().replace(/\s/g, "");
-    let items = surveys.filter(isSurveyOpen);
+    let items = surveys.filter(isSurveyOpen).filter((survey) => survey.kind !== "daily");
 
     if (q) {
       items = items.filter((survey) =>
@@ -200,17 +215,25 @@ export default function StandaloneSurveys() {
       );
     }
 
-    if (sortOrder === "credits-desc") {
-      items = [...items].sort((a, b) => (b.credits || 0) - (a.credits || 0));
-    } else if (sortOrder === "credits-asc") {
-      items = [...items].sort((a, b) => (a.credits || 0) - (b.credits || 0));
-    } else {
-      items = [...items].sort((a, b) =>
-        String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
+    return sortSurveys(items, sortOrder);
+  }, [searchDraft, sortOrder, surveys]);
+
+  const dailyCatalog = useMemo(() => {
+    const q = searchDraft.toLowerCase().replace(/\s/g, "");
+    let items = surveys.filter(isSurveyOpen).filter((survey) => survey.kind === "daily");
+
+    if (q) {
+      items = items.filter((survey) =>
+        `${survey.title || ""} ${survey.description || ""} ${survey.credits || ""} ${
+          survey.estimatedMinutes || ""
+        }`
+          .toLowerCase()
+          .replace(/\s/g, "")
+          .includes(q)
       );
     }
 
-    return items;
+    return sortSurveys(items, sortOrder);
   }, [searchDraft, sortOrder, surveys]);
 
   const listPage = searchDraft === search ? catalogPage : 1;
@@ -392,7 +415,9 @@ export default function StandaloneSurveys() {
                 <p>
                   {searchDraft.trim()
                     ? "Nothing matches your search. Try clearing it to see all surveys."
-                    : "New surveys tailored to your profile will appear here when they’re published."}
+                    : dailyCatalog.length > 0
+                      ? "No regular surveys right now — check daily surveys below for extra credits."
+                      : "New surveys tailored to your profile will appear here when they’re published."}
                 </p>
                 {searchDraft.trim() ? (
                   <button
@@ -413,6 +438,31 @@ export default function StandaloneSurveys() {
                 )}
               </div>
             )}
+
+            {!loading && !error && dailyCatalog.length > 0 ? (
+              <div className="mt-12 pt-10 border-t border-gray-200">
+                <div className="shop-head mb-6">
+                  <div>
+                    <div className="shop-title-row">
+                      <span className="shop-dots" aria-hidden="true">
+                        {Array.from({ length: 16 }, (_, i) => (
+                          <i key={i} style={{ "--i": i }} />
+                        ))}
+                      </span>
+                      <h2>Want to earn more credits?</h2>
+                    </div>
+                    <p className="shop-head-copy">
+                      Quick daily surveys — credits only, no streak.
+                    </p>
+                  </div>
+                </div>
+                <div className="surveys-list">
+                  {dailyCatalog.map((survey) => (
+                    <SurveyRow key={survey._id} survey={survey} onView={openSurvey} />
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>

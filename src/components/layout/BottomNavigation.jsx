@@ -2,6 +2,7 @@ import React from 'react';
 import { Home, HelpCircle, User, ClipboardList, ShoppingBag, QrCode, LayoutDashboard, Store } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { isProfileOnboardingLocked } from '../../utils/onboardingGate';
 
 const BusinessBottomNavigation = () => {
   const location = useLocation();
@@ -50,6 +51,10 @@ const BottomNavigation = () => {
 
   if (location.pathname.startsWith('/business')) {
     return <BusinessBottomNavigation />;
+  }
+
+  if (isProfileOnboardingLocked(user)) {
+    return null;
   }
 
   const navItems = [

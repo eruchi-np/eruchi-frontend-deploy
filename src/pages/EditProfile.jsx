@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { ArrowLeft, Loader2, CheckCircle, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { userAPI } from "../services/api";
+import SearchableSelect from "../components/demographics/ui/SearchableSelect";
+import { occupationOptions } from "../utils/occupation-data";
 
 const TABS = ["Basic Info", "Demographics"];
 
@@ -18,7 +20,7 @@ const EDUCATION_LEVELS = [
   "PhD",
 ];
 
-const MARITAL_STATUSES = ["Single", "Married", "Divorced", "Widowed", "Separated"];
+const MARITAL_STATUSES = ["Unmarried", "Married", "Divorced", "Widowed", "Separated"];
 
 const INCOME_SOURCES = [
   "Me",
@@ -29,21 +31,44 @@ const INCOME_SOURCES = [
   "Other guardian or relative",
 ];
 
-const OCCUPATIONS = [
-  "Student",
-  "Government Employee",
-  "Private Employee",
-  "Self-employed",
-  "Business Owner",
-  "Farmer",
-  "Homemaker",
-  "Unemployed",
-  "Other",
+const OTHER_LANGUAGE = "__other__";
+
+const LANGUAGES = [
+  { value: "nepali", label: "Nepali" },
+  { value: "english", label: "English" },
+  { value: "hindi", label: "Hindi" },
+  { value: "maithili", label: "Maithili" },
+  { value: "bhojpuri", label: "Bhojpuri" },
+  { value: "newari", label: "Newari" },
+  { value: "tamang", label: "Tamang" },
+  { value: OTHER_LANGUAGE, label: "Other" },
 ];
 
-const LANGUAGES = ["Nepali", "Maithili", "Bhojpuri", "Tharu", "Tamang", "English", "Other"];
+const NATIONALITIES = ["Nepali", "Other"];
 
-const NATIONALITIES = ["Nepali", "Indian", "Chinese", "Other"];
+const emptyToNull = (value) => (value === "" || value === undefined ? null : value);
+
+const normalizeLanguage = (raw) => {
+  if (raw === undefined || raw === "") return "";
+  // Backend stores "Other" as null.
+  if (raw === null || String(raw).toLowerCase() === "other") return OTHER_LANGUAGE;
+  const known = LANGUAGES.find((language) => language.value === raw);
+  if (known) return known.value;
+  const byLabel = LANGUAGES.find(
+    (language) => language.label.toLowerCase() === String(raw).toLowerCase()
+  );
+  return byLabel ? byLabel.value : "";
+};
+
+const normalizeChoice = (raw, allowed, aliases = {}) => {
+  if (raw == null || raw === "") return "";
+  const aliasKey = Object.keys(aliases).find(
+    (key) => key.toLowerCase() === String(raw).toLowerCase()
+  );
+  if (aliasKey) return aliases[aliasKey];
+  const match = allowed.find((item) => item.toLowerCase() === String(raw).toLowerCase());
+  return match || "";
+};
 
 const HOUSEHOLD_DURABLES = [
   "Electricity Connection",
@@ -142,11 +167,16 @@ const EditProfile = () => {
           gender: u.gender || "",
         });
         setDemo({
-          nationality: u.nationality || "",
-          firstLanguage: u.firstLanguage || "",
-          educationLevel: u.educationLevel || "",
-          maritalStatus: u.maritalStatus || "",
-          occupation: u.occupation || "",
+          nationality: normalizeChoice(u.nationality, NATIONALITIES),
+          firstLanguage: normalizeLanguage(u.firstLanguage),
+          educationLevel: normalizeChoice(u.educationLevel, EDUCATION_LEVELS),
+          maritalStatus: normalizeChoice(u.maritalStatus, MARITAL_STATUSES, {
+            Single: "Unmarried",
+          }),
+          occupation: normalizeChoice(
+            u.occupation,
+            occupationOptions.map((option) => option.label)
+          ),
           mainIncomeSource: u.mainIncomeSource || "",
           mainIncomeSourceEducation: u.mainIncomeSourceEducation || "",
           householdDurables: u.householdDurables || [],
@@ -192,6 +222,15 @@ const EditProfile = () => {
     try {
       const payload = {
         ...demo,
+        nationality: emptyToNull(demo.nationality),
+        firstLanguage:
+          demo.firstLanguage === OTHER_LANGUAGE ? null : emptyToNull(demo.firstLanguage),
+        educationLevel: emptyToNull(demo.educationLevel),
+        maritalStatus: emptyToNull(demo.maritalStatus),
+        occupation: emptyToNull(demo.occupation),
+        mainIncomeSource: emptyToNull(demo.mainIncomeSource),
+        mainIncomeSourceEducation:
+          demo.mainIncomeSource === "Me" ? null : emptyToNull(demo.mainIncomeSourceEducation),
         address:
           demo.address.municipality && demo.address.wardNumber
             ? {
@@ -407,7 +446,9 @@ const EditProfile = () => {
                   >
                     <option value="">Select nationality</option>
                     {NATIONALITIES.map((n) => (
-                      <option key={n}>{n}</option>
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
                     ))}
                   </Select>
                 </div>
@@ -423,8 +464,10 @@ const EditProfile = () => {
                     }
                   >
                     <option value="">Select language</option>
-                    {LANGUAGES.map((l) => (
-                      <option key={l}>{l}</option>
+                    {LANGUAGES.map((language) => (
+                      <option key={language.value} value={language.value}>
+                        {language.label}
+                      </option>
                     ))}
                   </Select>
                 </div>
@@ -458,23 +501,23 @@ const EditProfile = () => {
                   >
                     <option value="">Select status</option>
                     {MARITAL_STATUSES.map((s) => (
-                      <option key={s}>{s}</option>
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
                     ))}
                   </Select>
                 </div>
                 <div>
                   <Label>Occupation</Label>
-                  <Select
+                  <SearchableSelect
+                    options={occupationOptions}
                     value={demo.occupation}
-                    onChange={(e) =>
-                      setDemo((p) => ({ ...p, occupation: e.target.value }))
+                    onChange={(occupation) =>
+                      setDemo((p) => ({ ...p, occupation }))
                     }
-                  >
-                    <option value="">Select occupation</option>
-                    {OCCUPATIONS.map((o) => (
-                      <option key={o}>{o}</option>
-                    ))}
-                  </Select>
+                    placeholder="Select occupation"
+                    label="Occupation"
+                  />
                 </div>
                 <div>
                   <Label>Main Income Source of your household</Label>

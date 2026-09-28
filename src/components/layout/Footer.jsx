@@ -153,7 +153,7 @@ const Footer = () => {
               © {year} E. Ruchi Private Limited. All Rights Reserved.{' '}
               eRuchi™ is a trademark of E. Ruchi Private Limited.
             </p>
-            <p className="text-[11px] text-gray-300">Made in Nepal 🇳🇵</p>
+            <p className="text-[11px] text-gray-300">Made in Nepal</p>
           </div>
         </div>
 

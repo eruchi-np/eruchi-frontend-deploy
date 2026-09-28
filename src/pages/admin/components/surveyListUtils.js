@@ -1,10 +1,5 @@
-export const EDIT_WINDOW_MINUTES = 15;
-
-export const isEditable = (createdAt) => {
-  if (!createdAt) return false;
-  const minutesSinceCreation = (Date.now() - new Date(createdAt).getTime()) / (1000 * 60);
-  return minutesSinceCreation <= EDIT_WINDOW_MINUTES;
-};
+/** Staff with the surveys permission can edit at any time. */
+export const isEditable = () => true;
 
 export const isScheduled = (startDate) => {
   if (!startDate) return false;

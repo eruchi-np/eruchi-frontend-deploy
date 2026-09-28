@@ -8,6 +8,7 @@ import HomeNav from './components/homepage/HomeNav';
 import BottomNavigation from './components/layout/BottomNavigation';
 import Footer from './components/layout/Footer';
 import ProtectedRoute from './components/layout/ProtectedRoute';
+import OnboardingGate from './components/layout/OnboardingGate';
 import AdminRoute from './components/layout/AdminRoute';
 import ProfileCompletionGuard from './components/layout/ProfileCompletionGuard';
 import BusinessProtectedRoute from './pages/business/BusinessProtectedRoutes';
@@ -17,6 +18,8 @@ import RouteFallback from './components/ui/RouteFallback';
 import { RouteErrorBoundary } from './components/layout/ErrorBoundary';
 import usePageMeta from './hooks/usePageMeta';
 import { getRouteMeta } from './utils/routeMeta';
+import { useAuth } from './context/AuthContext';
+import { isProfileOnboardingLocked } from './utils/onboardingGate';
 
 const Homepage = lazy(() => import('./pages/Homepage'));
 const ForBusiness = lazy(() => import('./pages/ForBusiness.jsx'));
@@ -54,6 +57,7 @@ const BusinessVoucherForm = lazy(() => import('./pages/business/BusinessVoucherF
 const MerchantPublicProfile = lazy(() => import('./pages/MerchantPublicProfile'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const ResetPasswordToken = lazy(() => import('./pages/ResetPasswordToken'));
+const Unsubscribe = lazy(() => import('./pages/Unsubscribe'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 
 import { AnimationProvider } from './components/animations/AnimationContext';
@@ -61,24 +65,28 @@ import PageTransition from './components/animations/PageTransition';
 
 function AppChrome({ children }) {
   const { pathname } = useLocation();
+  const { user } = useAuth();
   const isHome = pathname === '/';
   const isProfile = pathname === '/profile';
   const isShop = pathname === '/shop';
   const isSurveys = pathname === '/standalone-surveys';
   const isBusiness = pathname.startsWith('/business');
-  const isOnboarding =
+  const isProfileCompletion =
     pathname === '/complete-basic-info' ||
     pathname === '/complete-profile' ||
-    pathname === '/additional-profile' ||
+    pathname === '/additional-profile';
+  const isOnboarding =
+    isProfileCompletion ||
     pathname === '/login' ||
     pathname === '/signup' ||
     pathname === '/email-verification';
+  const hideNav = isProfileCompletion || isProfileOnboardingLocked(user);
   const overlayNav = isHome || isProfile || isShop || isSurveys || isOnboarding;
   const navVariant = overlayNav ? 'overlay' : 'page';
 
   return (
     <>
-      {!isBusiness && <HomeNav variant={navVariant} />}
+      {!isBusiness && !hideNav && <HomeNav variant={navVariant} />}
       <BusinessAccessGuard />
       <div className={`min-w-0 max-w-full ${overlayNav ? "overflow-x-clip" : "overflow-x-hidden"}`}>
         {children}
@@ -136,6 +144,7 @@ function App() {
         <RouteChangeHandler />
         <ScrollToTop />
         <AppChrome>
+        <OnboardingGate />
         <RouteErrorBoundary>
         <Suspense fallback={<RouteFallback />}>
         <Routes>
@@ -146,6 +155,7 @@ function App() {
             <Route path="/login/success" element={<LoginSuccess />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/reset-password/:token" element={<ResetPasswordToken />} />
+            <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/" element={<Homepage />} />
             <Route path="/for-business" element={<ForBusiness />} />
            <Route path="/faqs" element={<FAQs />} />

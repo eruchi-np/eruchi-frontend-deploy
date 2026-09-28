@@ -4,7 +4,7 @@ import { Award, Flame, Mail, Phone, Shield, Ticket, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { adminAPI } from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
-import { hasPermission } from "../../../utils/adminRoles";
+import { canAdjustCredits as userCanAdjustCredits } from "../../../utils/adminRoles";
 
 const REASON_LABELS = {
   campaign_completion: "Campaign",
@@ -34,18 +34,24 @@ const formatWhen = (value) => {
 
 export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChanged }) {
   const { user: authUser } = useAuth();
-  const canAdjustCredits = hasPermission(authUser?.role, "credits_adjust");
+  const canAdjustCredits = userCanAdjustCredits(authUser);
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState(null);
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const [restoreAmount, setRestoreAmount] = useState("");
+  const [grantGuard, setGrantGuard] = useState(false);
+  const [restoring, setRestoring] = useState(false);
 
   const load = async () => {
     setLoading(true);
     try {
       const res = await adminAPI.getUser(userId, { skipErrorToast: true });
       setDetail(res.data.data);
+      const saved = res.data.data?.user?.lastBrokenStreakCount || 0;
+      setRestoreAmount(saved > 0 ? String(saved) : "");
+      setGrantGuard(false);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to load user");
       onClose?.();
@@ -97,8 +103,38 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
     }
   };
 
+  const handleRestoreStreak = async (e) => {
+    e.preventDefault();
+    const saved = detail?.user?.lastBrokenStreakCount || 0;
+    const typed = restoreAmount.trim();
+    const payload = { grantStreakGuard: grantGuard };
+    if (typed) {
+      const n = Number(typed);
+      if (!Number.isFinite(n) || n < 1) {
+        toast.error("Enter a streak of at least 1 day");
+        return;
+      }
+      payload.streakCount = Math.floor(n);
+    } else if (saved < 1) {
+      toast.error("Enter the streak days to restore");
+      return;
+    }
+
+    setRestoring(true);
+    try {
+      const res = await adminAPI.restoreUserStreak(userId, payload, { skipErrorToast: true });
+      toast.success(res.data?.message || "Streak restored");
+      await load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to restore streak");
+    } finally {
+      setRestoring(false);
+    }
+  };
+
   const user = detail?.user;
   const campaign = user?.activeCampaign?.campaign;
+  const hasActiveStreak = (user?.streakCount || 0) > 0;
 
   return createPortal(
     <div className="fixed inset-0 z-[80] flex justify-end bg-black/40" onClick={onClose}>
@@ -152,6 +188,12 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
                 <Shield className="h-4 w-4 text-gray-400" />
                 Streak Guard: {user.streakGuardDays || 0} day{(user.streakGuardDays || 0) === 1 ? "" : "s"}
               </p>
+              {(user.lastBrokenStreakCount || 0) > 0 && (
+                <p className="flex items-center gap-2">
+                  <Flame className="h-4 w-4 text-gray-400" />
+                  Last broken streak: {user.lastBrokenStreakCount} day{user.lastBrokenStreakCount === 1 ? "" : "s"}
+                </p>
+              )}
               <p>
                 Surveys completed: {detail.surveysCompleted ?? 0} · Campaigns completed: {detail.campaignsCompleted ?? 0}
               </p>
@@ -190,6 +232,54 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
               >
                 {saving ? "Saving…" : "Apply"}
               </button>
+            </form>
+            )}
+
+            {canAdjustCredits && (
+            <form onSubmit={handleRestoreStreak} className="rounded-xl border border-gray-200 p-4 space-y-3">
+              <p className="text-sm font-semibold text-gray-900">Restore streak</p>
+              {hasActiveStreak ? (
+                <p className="text-sm text-gray-500">
+                  User already has an active streak ({user.streakCount} day{user.streakCount === 1 ? "" : "s"}).
+                </p>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-500">
+                    {(user.lastBrokenStreakCount || 0) > 0
+                      ? `Saved last streak: ${user.lastBrokenStreakCount}. Leave blank to use it, or type a different amount.`
+                      : "No saved last streak — enter the days to restore."}
+                  </p>
+                  <input
+                    type="number"
+                    min={1}
+                    value={restoreAmount}
+                    onChange={(e) => setRestoreAmount(e.target.value)}
+                    placeholder={
+                      (user.lastBrokenStreakCount || 0) > 0
+                        ? String(user.lastBrokenStreakCount)
+                        : "e.g. 12"
+                    }
+                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
+                  />
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={grantGuard}
+                      onChange={(e) => setGrantGuard(e.target.checked)}
+                      className="rounded border-gray-300"
+                    />
+                    Also give 1-day Streak Guard
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={restoring}
+                    className="w-full py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+                    style={{ backgroundColor: NAVY }}
+                  >
+                    {restoring ? "Restoring…" : "Restore streak"}
+                  </button>
+                </>
+              )}
             </form>
             )}
 

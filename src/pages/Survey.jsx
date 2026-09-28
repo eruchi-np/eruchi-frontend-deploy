@@ -1,10 +1,14 @@
 import React,  { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { surveyAPI, userAPI } from '../services/api';
-import { ArrowLeft, Star, Loader2, Package, Clock, Type, FileText, CheckSquare, Sliders } from 'lucide-react';
+import { ArrowLeft, Star, Loader2, Package, Clock, Type, FileText, CheckSquare, Sliders, Table2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { completionFromSubmitResponse, goToSurveyComplete } from '../utils/surveyComplete';
 import SurveySubmitConfirm from '../components/survey/SurveySubmitConfirm';
+import MatrixQuestion, {
+  emptyMatrixValue,
+  isMatrixComplete,
+} from '../components/survey/MatrixQuestion';
 
 const Survey = () => {
   const { campaignId } = useParams();
@@ -58,6 +62,9 @@ const Survey = () => {
               break;
             case 'multiple_checkbox':
               initialResponses[question.questionText] = [];
+              break;
+            case 'matrix_radio':
+              initialResponses[question.questionText] = emptyMatrixValue(question.rows || []);
               break;
             case 'slider':
               initialResponses[question.questionText] = question.minValue || 0;
@@ -133,6 +140,11 @@ const Survey = () => {
             validationErrors.push(`Please select at least one option for: "${questionText}"`);
           } else if (question.maxSelections && value.length > question.maxSelections) {
             validationErrors.push(`Please select no more than ${question.maxSelections} options for: "${questionText}"`);
+          }
+          break;
+        case 'matrix_radio':
+          if (!isMatrixComplete(value, question.rows || [])) {
+            validationErrors.push(`Please answer every row for: "${questionText}"`);
           }
           break;
         case 'text_short':
@@ -238,6 +250,7 @@ const Survey = () => {
       text_long: <FileText className="h-4 w-4" />,
       single_checkbox: <CheckSquare className="h-4 w-4" />,
       multiple_checkbox: <CheckSquare className="h-4 w-4" />,
+      matrix_radio: <Table2 className="h-4 w-4" />,
       slider: <Sliders className="h-4 w-4" />,
       rating: <Star className="h-4 w-4" />,
       yes_no: <CheckSquare className="h-4 w-4" />
@@ -366,6 +379,18 @@ const Survey = () => {
               <span>High</span>
             </div>
           </div>
+        );
+
+      case 'matrix_radio':
+        return (
+          <MatrixQuestion
+            rows={question.rows || []}
+            columns={question.options || []}
+            value={responses[question.questionText] || {}}
+            onChange={(next) => handleResponseChange(question.questionText, next)}
+            namePrefix={`q-${index}`}
+            headerRepeatEvery={3}
+          />
         );
 
       case 'text_short':

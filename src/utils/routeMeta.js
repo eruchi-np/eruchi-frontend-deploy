@@ -56,7 +56,7 @@ const PRIVATE_TITLES = [
   { test: (path) => path === '/standalone-surveys', title: 'Surveys' },
   { test: (path) => path.startsWith('/standalone-survey/'), title: 'Survey' },
   { test: (path) => path === '/survey-complete', title: 'Survey complete' },
-  { test: (path) => path === '/survey-history', title: 'Survey history' },
+  { test: (path) => path === '/survey-history', title: 'Activity' },
   { test: (path) => path === '/campaigns', title: 'Campaigns' },
   { test: (path) => path.startsWith('/survey/'), title: 'Campaign survey' },
   { test: (path) => path === '/campaign-history', title: 'Campaign history' },

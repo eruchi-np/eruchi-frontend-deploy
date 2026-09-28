@@ -41,10 +41,11 @@ const schema = z.object({
 });
 
 const CompleteBasicInfo = () => {
-  const { user, refreshUser, loading: authLoading } = useAuth();
+  const { user, refreshUser, loading: authLoading, logout } = useAuth();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const {
     register,
@@ -135,6 +136,16 @@ const CompleteBasicInfo = () => {
     }
   };
 
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await logout();
+      navigate("/login", { replace: true });
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
   if (authLoading) {
     return (
       <OnboardingShell footer={false}>
@@ -146,7 +157,7 @@ const CompleteBasicInfo = () => {
   }
 
   return (
-    <OnboardingShell>
+    <OnboardingShell onLogout={handleLogout} loggingOut={loggingOut || submitting}>
       <div className="onboard-card">
         <div className="onboard-kicker">
           <CreditRewardBadge amount={BASIC_DETAILS_CREDITS} />

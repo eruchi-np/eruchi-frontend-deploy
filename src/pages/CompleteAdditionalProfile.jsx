@@ -1,19 +1,32 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import AdditionalProfileSurvey from "../components/demographics/AdditionalProfileSurvey";
 import OnboardingShell from "../components/onboarding/OnboardingShell";
 import CreditRewardBadge from "../components/onboarding/CreditRewardBadge";
 import { PROFILE_COMPLETION_2_CREDITS, PROFILE_COMPLETION_2_QUESTION_COUNT } from "../utils/onboardingCredits";
+import { useAuth } from "../context/AuthContext";
 
 const CompleteAdditionalProfile = () => {
   const navigate = useNavigate();
+  const { logout } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const handleComplete = () => {
     navigate("/");
   };
 
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try {
+      await logout();
+      navigate("/login", { replace: true });
+    } finally {
+      setLoggingOut(false);
+    }
+  };
+
   return (
-    <OnboardingShell>
+    <OnboardingShell onLogout={handleLogout} loggingOut={loggingOut}>
       <div className="onboard-card">
         <div className="onboard-kicker">
           <CreditRewardBadge amount={PROFILE_COMPLETION_2_CREDITS} />

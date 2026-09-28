@@ -4,14 +4,13 @@ import { useNavigate } from "react-router-dom";
 import { Award, BarChart3, Clock, EyeOff, Pencil, Ticket, Trash2, User, Upload, X } from "lucide-react";
 import { sepSurveyAPI } from "../../../services/api";
 import toast from "react-hot-toast";
-import { formatCreatedAt, isEditable, isScheduled } from "./surveyListUtils";
+import { formatCreatedAt, isScheduled } from "./surveyListUtils";
 
 export default function SurveyDetailBody({ survey, NAVY, refetchSurveys, onDeleted }) {
   const navigate = useNavigate();
   const [deletingId, setDeletingId] = useState(null);
   const [statusSaving, setStatusSaving] = useState(false);
   const [status, setStatus] = useState(survey.status);
-  const editable = isEditable(survey.createdAt);
 
   useEffect(() => {
     setStatus(survey.status);
@@ -58,6 +57,11 @@ export default function SurveyDetailBody({ survey, NAVY, refetchSurveys, onDelet
           <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 border border-gray-200">
             {survey.visibility === "targeted" ? "Targeted" : "Public"}
           </span>
+          {survey.kind === "daily" && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+              Daily
+            </span>
+          )}
           {survey.visibility === "targeted" && survey.alsoPublishToOthers && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
               Also public
@@ -106,10 +110,9 @@ export default function SurveyDetailBody({ survey, NAVY, refetchSurveys, onDelet
         )}
         <button
           onClick={() => navigate(`/admin/edit-sep-survey/${survey._id}`)}
-          disabled={!editable}
-          title={editable ? "Edit" : "Edit window (15 min) has passed"}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          style={editable ? { borderColor: NAVY, color: NAVY } : { borderColor: "#e5e7eb", color: "#9ca3af" }}
+          title="Edit survey, including matrix rows and scale labels"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors"
+          style={{ borderColor: NAVY, color: NAVY }}
         >
           <Pencil className="h-3.5 w-3.5" /> Edit
         </button>

@@ -64,7 +64,8 @@ const ScanLogView = ({
                   </p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     {log.attemptedAt ? new Date(log.attemptedAt).toLocaleString() : "—"}
-                    {log.billAmountTotal != null && ` · Bill Rs. ${log.billAmountTotal}`}
+                    {log.billAmountTotal != null && ` · Before Rs. ${log.billAmountTotal}`}
+                    {log.billAmountAfterDiscount != null && ` · After Rs. ${log.billAmountAfterDiscount}`}
                     {log.discountAmount != null && ` · Discount Rs. ${log.discountAmount}`}
                   </p>
                 </div>

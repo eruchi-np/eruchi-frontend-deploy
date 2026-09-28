@@ -2,8 +2,28 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { sepSurveyAPI, clusterAPI } from '../../services/api';
-import { ArrowLeft, Plus, Trash2, Save, Type, FileText, CheckSquare,Loader2, Sliders, AlertCircle, Eye, Settings as SettingsIcon, Clock, Calendar, Award, Users, Target } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Type, FileText, CheckSquare, Loader2, Sliders, AlertCircle, Eye, Settings as SettingsIcon, Clock, Calendar, Award, Users, Target, Table2, ChevronUp, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
+import MatrixQuestion from '../../components/survey/MatrixQuestion';
+
+export const SATISFACTION_SCALE = [
+  'Completely satisfied',
+  'Very satisfied',
+  'Moderately satisfied',
+  'Slightly satisfied',
+  'Not at all satisfied',
+  'Not applicable',
+];
+
+const DEFAULT_MATRIX_ROWS = ['Sales process', 'Onboarding', 'Product support'];
+
+const moveItem = (list, from, to) => {
+  if (to < 0 || to >= list.length) return list;
+  const next = [...list];
+  const [item] = next.splice(from, 1);
+  next.splice(to, 0, item);
+  return next;
+};
 
 const CreateSepSurvey = () => {
   const navigate = useNavigate();
@@ -15,22 +35,26 @@ const CreateSepSurvey = () => {
     description: '',
     status: 'published',
     credits: 50,
+    kind: 'normal',
     publishedAt: new Date().toISOString().slice(0, 16),
     availableDays: 7,
     estimatedMinutes: '',
     visibility: 'public',
     validityDays: 7,
     alsoPublishToOthers: false,
+    clusterSendAt: new Date().toISOString().slice(0, 16),
     clusterIds: [],
     questions: [
       {
         questionText: '',
         questionType: 'text_short',
         options: [],
+        rows: [],
         maxSelections: 1,
         minValue: 0,
         maxValue: 5,
-        isRequired: true
+        isRequired: true,
+        metricTag: 'none'
       }
     ]
   });
@@ -39,7 +63,6 @@ const CreateSepSurvey = () => {
   const surveyId = params.surveyId || params.id;
   const isEditMode = Boolean(surveyId);
   const [initialLoading, setInitialLoading] = useState(isEditMode);
-  const [editLocked, setEditLocked] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -66,13 +89,6 @@ const CreateSepSurvey = () => {
         const res = await sepSurveyAPI.getById(surveyId, { skipErrorToast: true });
         const survey = res.data.data;
 
-        const minutesSinceCreation = (Date.now() - new Date(survey.createdAt).getTime()) / (1000 * 60);
-        if (minutesSinceCreation > 15) {
-          setEditLocked(true);
-          toast.error('This survey can no longer be edited (edit window is 15 minutes after creation).');
-          return;
-        }
-
         const startDate = survey.startDate ? new Date(survey.startDate) : new Date();
         const endDate = survey.endDate ? new Date(survey.endDate) : null;
         const availableDays = endDate
@@ -84,15 +100,22 @@ const CreateSepSurvey = () => {
           description: survey.description || '',
           status: survey.status || 'published',
           credits: survey.credits ?? 50,
+          kind: survey.kind === 'daily' ? 'daily' : 'normal',
           publishedAt: startDate.toISOString().slice(0, 16),
           availableDays,
           estimatedMinutes: survey.estimatedMinutes ?? '',
           visibility: survey.visibility || 'public',
           validityDays: survey.validityDays ?? 7,
           alsoPublishToOthers: Boolean(survey.alsoPublishToOthers),
+          clusterSendAt: new Date().toISOString().slice(0, 16),
           clusterIds: [],
-          questions: survey.questions?.length ? survey.questions : [
-            { questionText: '', questionType: 'text_short', options: [], maxSelections: 1, minValue: 0, maxValue: 5 }
+          questions: survey.questions?.length ? survey.questions.map((q) => ({
+            ...q,
+            options: Array.isArray(q.options) ? q.options : [],
+            rows: Array.isArray(q.rows) ? q.rows : [],
+            metricTag: q.metricTag === 'cep' || q.metricTag === 'nps' ? q.metricTag : 'none'
+          })) : [
+            { questionText: '', questionType: 'text_short', options: [], rows: [], maxSelections: 1, minValue: 0, maxValue: 5, isRequired: true, metricTag: 'none' }
           ]
         });
       } catch (err) {
@@ -112,7 +135,14 @@ const CreateSepSurvey = () => {
     { value: 'text_long', label: 'Long Text', icon: FileText, description: 'Detailed paragraph' },
     { value: 'single_checkbox', label: 'Single Choice', icon: CheckSquare, description: 'Pick one option' },
     { value: 'multiple_checkbox', label: 'Multiple Choice', icon: CheckSquare, description: 'Pick multiple' },
-    { value: 'slider', label: 'Slider', icon: Sliders, description: 'Range selection' }
+    { value: 'slider', label: 'Slider', icon: Sliders, description: 'Range selection' },
+    { value: 'matrix_radio', label: 'Matrix', icon: Table2, description: 'One choice per row' }
+  ];
+
+  const metricTagOptions = [
+    { value: 'none', label: 'None', description: 'Normal question' },
+    { value: 'cep', label: 'CEP', description: 'Category entry point' },
+    { value: 'nps', label: 'NPS', description: 'Net promoter score' }
   ];
 
   const statusOptions = [
@@ -133,6 +163,19 @@ const CreateSepSurvey = () => {
       label: 'Targeted',
       icon: Target,
       description: 'Sent to selected clusters (and/or merchant feedback). Hidden from others unless you enable dual publish.'
+    }
+  ];
+
+  const kindOptions = [
+    {
+      value: 'normal',
+      label: 'Normal survey',
+      description: 'Full survey — awards credits and counts toward streak'
+    },
+    {
+      value: 'daily',
+      label: 'Daily survey',
+      description: 'Shorter bonus survey — awards credits only, no streak'
     }
   ];
 
@@ -164,12 +207,24 @@ const CreateSepSurvey = () => {
     if (field === 'questionType') {
       if (value === 'single_checkbox' || value === 'multiple_checkbox') {
         updated[index].options = updated[index].options.length ? updated[index].options : ['Option 1', 'Option 2'];
+        updated[index].rows = [];
         updated[index].maxSelections = value === 'single_checkbox' ? 1 : 2;
+      } else if (value === 'matrix_radio') {
+        updated[index].options = updated[index].options?.length
+          ? updated[index].options
+          : [...SATISFACTION_SCALE];
+        updated[index].rows = updated[index].rows?.length
+          ? updated[index].rows
+          : [...DEFAULT_MATRIX_ROWS];
+        updated[index].maxSelections = 1;
       } else if (value === 'slider') {
         updated[index].minValue = 0;
         updated[index].maxValue = 5;
+        updated[index].options = [];
+        updated[index].rows = [];
       } else {
         updated[index].options = [];
+        updated[index].rows = [];
         updated[index].maxSelections = 1;
         updated[index].minValue = 0;
         updated[index].maxValue = 5;
@@ -199,6 +254,46 @@ const CreateSepSurvey = () => {
     }
   };
 
+  const handleRowChange = (qIndex, rowIndex, value) => {
+    const updated = [...formData.questions];
+    if (!Array.isArray(updated[qIndex].rows)) updated[qIndex].rows = [];
+    updated[qIndex].rows[rowIndex] = value;
+    setFormData(prev => ({ ...prev, questions: updated }));
+  };
+
+  const addRow = (qIndex) => {
+    const updated = [...formData.questions];
+    if (!Array.isArray(updated[qIndex].rows)) updated[qIndex].rows = [];
+    updated[qIndex].rows.push(`Aspect ${updated[qIndex].rows.length + 1}`);
+    setFormData(prev => ({ ...prev, questions: updated }));
+  };
+
+  const removeRow = (qIndex, rowIndex) => {
+    const updated = [...formData.questions];
+    if ((updated[qIndex].rows || []).length > 1) {
+      updated[qIndex].rows.splice(rowIndex, 1);
+      setFormData(prev => ({ ...prev, questions: updated }));
+    }
+  };
+
+  const moveRow = (qIndex, from, to) => {
+    const updated = [...formData.questions];
+    updated[qIndex].rows = moveItem(updated[qIndex].rows || [], from, to);
+    setFormData(prev => ({ ...prev, questions: updated }));
+  };
+
+  const moveOption = (qIndex, from, to) => {
+    const updated = [...formData.questions];
+    updated[qIndex].options = moveItem(updated[qIndex].options || [], from, to);
+    setFormData(prev => ({ ...prev, questions: updated }));
+  };
+
+  const applySatisfactionScale = (qIndex) => {
+    const updated = [...formData.questions];
+    updated[qIndex].options = [...SATISFACTION_SCALE];
+    setFormData(prev => ({ ...prev, questions: updated }));
+  };
+
   const addQuestion = () => {
     setFormData(prev => ({
       ...prev,
@@ -208,9 +303,12 @@ const CreateSepSurvey = () => {
           questionText: '',
           questionType: 'text_short',
           options: [],
+          rows: [],
           maxSelections: 1,
           minValue: 0,
-          maxValue: 5
+          maxValue: 5,
+          isRequired: true,
+          metricTag: 'none'
         }
       ]
     }));
@@ -247,6 +345,15 @@ const CreateSepSurvey = () => {
       return toast.error('Validity days must be at least 1');
     }
 
+    if (
+      formData.visibility === 'targeted' &&
+      formData.status === 'published' &&
+      formData.clusterIds.length > 0 &&
+      !formData.clusterSendAt
+    ) {
+      return toast.error('Cluster send date/time is required');
+    }
+
     const emptyQuestions = formData.questions.filter(q => !q.questionText.trim());
     if (emptyQuestions.length) return toast.error('All questions must have text');
 
@@ -255,6 +362,15 @@ const CreateSepSurvey = () => {
       (!q.options || q.options.length === 0)
     );
     if (invalidCheckboxes.length) return toast.error('Checkbox questions need at least one option');
+
+    const invalidMatrices = formData.questions.filter(q =>
+      q.questionType === 'matrix_radio' &&
+      (!(q.rows || []).map(r => r.trim()).filter(Boolean).length ||
+        !(q.options || []).map(o => o.trim()).filter(Boolean).length)
+    );
+    if (invalidMatrices.length) {
+      return toast.error('Matrix questions need at least one row and one column option');
+    }
 
     setLoading(true);
 
@@ -271,6 +387,7 @@ const CreateSepSurvey = () => {
         description: trimmedDesc,
         status: formData.status,
         credits: Number(formData.credits),
+        kind: formData.kind === 'daily' ? 'daily' : 'normal',
         startDate: publishedAt.toISOString(),
         endDate: needsPublicWindow ? derivedEndDate.toISOString() : null,
         visibility: formData.visibility,
@@ -281,15 +398,27 @@ const CreateSepSurvey = () => {
           formData.visibility === 'targeted' && formData.status === 'published'
             ? formData.clusterIds
             : [],
+        clusterSendAt:
+          formData.visibility === 'targeted' &&
+          formData.status === 'published' &&
+          formData.clusterIds.length > 0
+            ? new Date(formData.clusterSendAt).toISOString()
+            : undefined,
         questions: formData.questions.map(q => {
           const base = {
             questionText: q.questionText.trim(),
             questionType: q.questionType,
-            isRequired: q.isRequired !== false
+            isRequired: q.isRequired !== false,
+            metricTag: q.metricTag === 'cep' || q.metricTag === 'nps' ? q.metricTag : 'none'
           };
           if (['single_checkbox', 'multiple_checkbox'].includes(q.questionType)) {
             base.options = q.options.map(o => o.trim()).filter(Boolean);
             base.maxSelections = q.maxSelections;
+          }
+          if (q.questionType === 'matrix_radio') {
+            base.options = (q.options || []).map(o => o.trim()).filter(Boolean);
+            base.rows = (q.rows || []).map(r => r.trim()).filter(Boolean);
+            base.maxSelections = 1;
           }
           if (q.questionType === 'slider') {
             base.minValue = Number(q.minValue);
@@ -316,7 +445,15 @@ const CreateSepSurvey = () => {
       const failedSends = sends.filter((s) => !s.ok);
       const okSends = sends.filter((s) => s.ok);
       if (okSends.length) {
-        toast.success(`Queued send to ${okSends.length} cluster${okSends.length === 1 ? '' : 's'}`);
+        const firstWhen = okSends.find((s) => s.scheduledFor)?.scheduledFor;
+        const scheduledDate = firstWhen ? new Date(firstWhen) : null;
+        const future =
+          scheduledDate && !Number.isNaN(scheduledDate.getTime()) && scheduledDate.getTime() > Date.now();
+        toast.success(
+          future
+            ? `Scheduled send to ${okSends.length} cluster${okSends.length === 1 ? '' : 's'} for ${scheduledDate.toLocaleString()}`
+            : `Queued send to ${okSends.length} cluster${okSends.length === 1 ? '' : 's'}`
+        );
       }
       if (failedSends.length) {
         toast.error(
@@ -356,26 +493,6 @@ const CreateSepSurvey = () => {
     );
   }
 
-  if (editLocked) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-        <div className="bg-white rounded-2xl border border-gray-200 p-10 max-w-md text-center">
-          <AlertCircle className="h-10 w-10 text-amber-500 mx-auto mb-4" />
-          <h2 className="text-lg font-bold text-gray-900 mb-2">Edit window closed</h2>
-          <p className="text-sm text-gray-600 mb-6">
-            This survey can only be edited within 15 minutes of creation. That window has passed.
-          </p>
-          <button
-            onClick={() => navigate('/admin')}
-            className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700"
-          >
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -390,7 +507,7 @@ const CreateSepSurvey = () => {
             </button>
             <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{isEditMode ? 'Edit Standalone Survey' : 'Create Standalone Survey'}</h1>
-              <p className="text-sm text-gray-500">{isEditMode ? 'Editable for 15 minutes after creation' : 'Independent survey (not tied to a campaign)'}</p>
+              <p className="text-sm text-gray-500">{isEditMode ? 'Admins and customer admins can edit questions, rows, and scale labels any time' : 'Independent survey (not tied to a campaign)'}</p>
             </div>
           </div>
         </div>
@@ -432,6 +549,35 @@ const CreateSepSurvey = () => {
                   placeholder="Explain the purpose of this survey..."
                   required
                 />
+              </div>
+
+              {/* Survey kind */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  Survey type
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {kindOptions.map((opt) => {
+                    const selected = formData.kind === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => handleInputChange('kind', opt.value)}
+                        className={`text-left p-4 rounded-xl border-2 transition-all ${
+                          selected
+                            ? 'border-indigo-500 bg-indigo-50'
+                            : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                        }`}
+                      >
+                        <p className={`font-semibold text-sm ${selected ? 'text-indigo-900' : 'text-gray-900'}`}>
+                          {opt.label}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">{opt.description}</p>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Visibility selector */}
@@ -498,7 +644,7 @@ const CreateSepSurvey = () => {
                       Send to clusters
                     </label>
                     <p className="text-xs text-gray-500 mb-3">
-                      Select one or more clusters. If status is Published, membership is snapshotted and emails are queued on save.
+                      Select one or more clusters. If status is Published, membership is snapshotted and emails are queued at the send time below.
                     </p>
                     {clustersLoading ? (
                       <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -535,6 +681,24 @@ const CreateSepSurvey = () => {
                             </label>
                           );
                         })}
+                      </div>
+                    )}
+                    {formData.clusterIds.length > 0 && (
+                      <div className="mt-4">
+                        <label className="block text-sm font-semibold text-gray-900 mb-2">
+                          Send to clusters on <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={formData.clusterSendAt}
+                          onChange={(e) => handleInputChange('clusterSendAt', e.target.value)}
+                          min={getMinPublishedDate()}
+                          className="w-full max-w-md px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          required
+                        />
+                        <p className="text-xs text-gray-500 mt-1.5">
+                          Membership is snapshotted and emails go out at this time (same as now if you leave it as the current time).
+                        </p>
                       </div>
                     )}
                   </div>
@@ -689,6 +853,17 @@ const CreateSepSurvey = () => {
                               <span className="text-sm font-medium">{typeData.label}</span>
                             </div>
                           )}
+                          {(q.metricTag === 'cep' || q.metricTag === 'nps') && (
+                            <span
+                              className={`px-3 py-1 rounded-lg text-xs font-bold border ${
+                                q.metricTag === 'nps'
+                                  ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                                  : 'bg-amber-50 border-amber-200 text-amber-700'
+                              }`}
+                            >
+                              {q.metricTag.toUpperCase()}
+                            </span>
+                          )}
                         </div>
 
                         <button
@@ -730,7 +905,7 @@ const CreateSepSurvey = () => {
                         <label className="block text-sm font-semibold text-gray-900 mb-3">
                           Question Type
                         </label>
-                        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                           {questionTypes.map(t => {
                             const Icon = t.icon;
                             const isActive = q.questionType === t.value;
@@ -749,6 +924,50 @@ const CreateSepSurvey = () => {
                                 <p className={`text-sm font-medium ${isActive ? 'text-green-700' : 'text-gray-900'}`}>
                                   {t.label}
                                 </p>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Metric tag: None / CEP / NPS */}
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-900 mb-3">
+                          Metric tag
+                        </label>
+                        <p className="text-xs text-gray-500 mb-3">
+                          Tag CEP or NPS questions for analytics collections. Leave as None for normal questions.
+                        </p>
+                        <div className="grid grid-cols-3 gap-3">
+                          {metricTagOptions.map((opt) => {
+                            const isActive = (q.metricTag || 'none') === opt.value;
+                            return (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => handleQuestionChange(idx, 'metricTag', opt.value)}
+                                className={`p-3 rounded-xl border-2 transition-all text-center ${
+                                  isActive
+                                    ? opt.value === 'nps'
+                                      ? 'border-indigo-500 bg-indigo-50'
+                                      : opt.value === 'cep'
+                                        ? 'border-amber-500 bg-amber-50'
+                                        : 'border-green-500 bg-green-50'
+                                    : 'border-gray-200 hover:border-gray-300 bg-white'
+                                }`}
+                              >
+                                <p className={`text-sm font-semibold ${
+                                  isActive
+                                    ? opt.value === 'nps'
+                                      ? 'text-indigo-700'
+                                      : opt.value === 'cep'
+                                        ? 'text-amber-700'
+                                        : 'text-green-700'
+                                    : 'text-gray-900'
+                                }`}>
+                                  {opt.label}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-1">{opt.description}</p>
                               </button>
                             );
                           })}
@@ -813,6 +1032,138 @@ const CreateSepSurvey = () => {
                         </div>
                       )}
 
+                      {/* Matrix rows + column options */}
+                      {q.questionType === 'matrix_radio' && (
+                        <div className="space-y-4">
+                          <p className="text-xs text-gray-500">
+                            Edit every row label and every scale column (Completely satisfied, Not applicable, and the rest). Respondents see this grid as-is.
+                          </p>
+                          <div className="p-5 bg-sky-50 rounded-xl border border-sky-100">
+                            <div className="flex justify-between items-center mb-4 gap-3">
+                              <label className="text-sm font-semibold text-gray-900">
+                                Row items (aspects)
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => addRow(idx)}
+                                className="text-sm font-medium text-sky-700 hover:text-sky-800"
+                              >
+                                + Add Row
+                              </button>
+                            </div>
+                            <div className="space-y-3">
+                              {(q.rows || []).map((row, rowIdx) => (
+                                <div key={rowIdx} className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-gray-500 w-8 shrink-0">{rowIdx + 1}.</span>
+                                  <input
+                                    type="text"
+                                    value={row}
+                                    onChange={e => handleRowChange(idx, rowIdx, e.target.value)}
+                                    className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500"
+                                    placeholder={`Row ${rowIdx + 1}`}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => moveRow(idx, rowIdx, rowIdx - 1)}
+                                    disabled={rowIdx === 0}
+                                    className="p-2 text-gray-500 hover:bg-white rounded-lg disabled:opacity-30"
+                                    aria-label="Move row up"
+                                  >
+                                    <ChevronUp className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => moveRow(idx, rowIdx, rowIdx + 1)}
+                                    disabled={rowIdx === (q.rows || []).length - 1}
+                                    className="p-2 text-gray-500 hover:bg-white rounded-lg disabled:opacity-30"
+                                    aria-label="Move row down"
+                                  >
+                                    <ChevronDown className="h-4 w-4" />
+                                  </button>
+                                  {(q.rows || []).length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeRow(idx, rowIdx)}
+                                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                                    >
+                                      <Trash2 className="h-5 w-5" />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="p-5 bg-green-50 rounded-xl border border-green-100">
+                            <div className="flex justify-between items-center mb-2 gap-3 flex-wrap">
+                              <label className="text-sm font-semibold text-gray-900">
+                                Scale columns (shared across rows)
+                              </label>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  onClick={() => applySatisfactionScale(idx)}
+                                  className="text-sm font-medium text-green-800 hover:text-green-900"
+                                >
+                                  Use satisfaction scale
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => addOption(idx)}
+                                  className="text-sm font-medium text-green-700 hover:text-green-800"
+                                >
+                                  + Add Column
+                                </button>
+                              </div>
+                            </div>
+                            <p className="text-xs text-gray-500 mb-4">
+                              These are the radio labels across the top — e.g. Completely satisfied through Not applicable. Change any of them.
+                            </p>
+                            <div className="space-y-3">
+                              {(q.options || []).map((opt, optIdx) => (
+                                <div key={optIdx} className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-gray-500 w-8 shrink-0">{optIdx + 1}.</span>
+                                  <input
+                                    type="text"
+                                    value={opt}
+                                    onChange={e => handleOptionChange(idx, optIdx, e.target.value)}
+                                    className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    placeholder={`Column ${optIdx + 1}`}
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => moveOption(idx, optIdx, optIdx - 1)}
+                                    disabled={optIdx === 0}
+                                    className="p-2 text-gray-500 hover:bg-white rounded-lg disabled:opacity-30"
+                                    aria-label="Move column left"
+                                  >
+                                    <ChevronUp className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => moveOption(idx, optIdx, optIdx + 1)}
+                                    disabled={optIdx === (q.options || []).length - 1}
+                                    className="p-2 text-gray-500 hover:bg-white rounded-lg disabled:opacity-30"
+                                    aria-label="Move column right"
+                                  >
+                                    <ChevronDown className="h-4 w-4" />
+                                  </button>
+                                  {(q.options || []).length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeOption(idx, optIdx)}
+                                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                                    >
+                                      <Trash2 className="h-5 w-5" />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Slider Settings */}
                       {q.questionType === 'slider' && (
                         <div className="p-5 bg-purple-50 rounded-xl border border-purple-100">
@@ -847,6 +1198,9 @@ const CreateSepSurvey = () => {
                         <div className="flex items-center gap-3 mb-4">
                           <Eye className="h-5 w-5 text-gray-600" />
                           <span className="text-sm font-semibold text-gray-900">Live Preview</span>
+                          {q.questionType === 'matrix_radio' && (
+                            <span className="text-xs text-gray-500">(skeleton — how respondents will see it)</span>
+                          )}
                         </div>
 
                         {q.questionType === 'text_short' && (
@@ -894,6 +1248,22 @@ const CreateSepSurvey = () => {
                               <span>{q.minValue}</span>
                               <span>{q.maxValue}</span>
                             </div>
+                          </div>
+                        )}
+
+                        {q.questionType === 'matrix_radio' && (
+                          <div className="bg-white border border-dashed border-gray-300 rounded-lg p-4 opacity-90">
+                            <p className="text-sm font-medium text-gray-800 mb-4">
+                              {q.questionText.trim() || 'How satisfied are you with each of the following?'}
+                            </p>
+                            <MatrixQuestion
+                              preview
+                              rows={q.rows || []}
+                              columns={q.options || []}
+                              value={{}}
+                              namePrefix={`preview-${idx}`}
+                              headerRepeatEvery={3}
+                            />
                           </div>
                         )}
                       </div>

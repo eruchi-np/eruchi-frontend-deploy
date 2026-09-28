@@ -11,6 +11,10 @@ import useSurveyTimer from "../hooks/userSurveyTimer";
 import { useAuth } from "../context/AuthContext";
 import { completionFromSubmitResponse, goToSurveyComplete } from "../utils/surveyComplete";
 import SurveySubmitConfirm from "../components/survey/SurveySubmitConfirm";
+import MatrixQuestion, {
+  emptyMatrixValue,
+  isMatrixComplete,
+} from "../components/survey/MatrixQuestion";
 
 const StandaloneSurvey = () => {
   const { surveyId } = useParams();
@@ -32,12 +36,15 @@ const StandaloneSurvey = () => {
 
         const initial = {};
         res.data.data.questions.forEach((q) => {
-          initial[q.questionText] =
-            q.questionType === "multiple_checkbox"
-              ? []
-              : q.questionType === "slider"
-                ? q.minValue || 0
-                : "";
+          if (q.questionType === "multiple_checkbox") {
+            initial[q.questionText] = [];
+          } else if (q.questionType === "slider") {
+            initial[q.questionText] = q.minValue || 0;
+          } else if (q.questionType === "matrix_radio") {
+            initial[q.questionText] = emptyMatrixValue(q.rows || []);
+          } else {
+            initial[q.questionText] = "";
+          }
         });
         setResponses(initial);
       } catch (err) {
@@ -74,6 +81,9 @@ const StandaloneSurvey = () => {
       const val = responses[q.questionText];
       if (q.questionType === "multiple_checkbox") return val?.length > 0;
       if (q.questionType === "slider") return true;
+      if (q.questionType === "matrix_radio") {
+        return isMatrixComplete(val, q.rows || []);
+      }
       return val && (typeof val !== "string" || val.trim());
     });
   };
@@ -99,6 +109,7 @@ const StandaloneSurvey = () => {
         completionFromSubmitResponse(res, {
           creditsEarned: survey.credits || 0,
           previousStreak,
+          kind: survey.kind || "normal",
         })
       );
     } catch (err) {
@@ -123,7 +134,7 @@ const StandaloneSurvey = () => {
 
   return (
     <div className="min-h-screen bg-white pb-24" style={{ fontFamily: "'Inter', sans-serif" }}>
-      <div className="max-w-3xl mx-auto px-4 py-8 sm:py-16">
+      <div className="max-w-5xl mx-auto px-4 py-8 sm:py-16">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center text-neutral-500 mb-8 hover:text-neutral-900 transition-colors"
@@ -139,6 +150,9 @@ const StandaloneSurvey = () => {
             <div className="flex items-center gap-2">
               <Award className="h-4 w-4" /> {survey.credits} Credits
             </div>
+            {survey.kind === "daily" ? (
+              <div className="text-amber-700">Daily survey · credits only, no streak</div>
+            ) : null}
           </div>
         </div>
 
@@ -225,6 +239,17 @@ const StandaloneSurvey = () => {
                     <span>{q.maxValue}</span>
                   </div>
                 </div>
+              )}
+
+              {q.questionType === "matrix_radio" && (
+                <MatrixQuestion
+                  rows={q.rows || []}
+                  columns={q.options || []}
+                  value={responses[q.questionText] || {}}
+                  onChange={(next) => handleChange(q.questionText, next)}
+                  namePrefix={`q-${i}`}
+                  headerRepeatEvery={3}
+                />
               )}
             </div>
           ))}

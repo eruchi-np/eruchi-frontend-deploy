@@ -8,6 +8,7 @@ import HomeDots from "../components/homepage/HomeDots";
 import HomeFooter from "../components/homepage/HomeFooter";
 import { initHomeCinema } from "../components/homepage/homeCinema";
 import { useAuth } from "../context/AuthContext";
+import { discoverAPI } from "../services/api";
 import { trackEvent } from "../utils/visitorEvents";
 import skyBg from "../assets/home/sky.jpg";
 import climbImg from "../assets/home/climb.jpg";
@@ -20,33 +21,70 @@ import rewardsLogo from "../assets/home/features/rewards.png";
 import trustedLogo from "../assets/home/features/trusted.png";
 import "../components/homepage/homepage.css";
 
-const REWARDS = [
+/** Empty-state / offline fallback — not live merchant data. */
+const FALLBACK_REWARDS = [
   {
     id: "ascend",
     featured: true,
     image: climbImg,
     title: "15% off Day pass",
     venue: "Ascend Climbing Gym",
-    earned: 21,
-    needed: 30,
+    creditsRequired: 30,
   },
   { id: "goods", image: productsImg, title: "Market picks", venue: "Local grocers" },
   { id: "wine", image: bottleImg, title: "Wine night", venue: "Partner venues" },
   { id: "dining", image: barImg, title: "Dining out", venue: "Cafes & bars" },
 ];
 
+function mapDiscoverCard(card) {
+  return {
+    id: card.id || card.offerId,
+    featured: Boolean(card.featured),
+    image: card.imageUrl,
+    title: card.title,
+    venue: card.venue,
+    creditsRequired: Number(card.creditsRequired) || 0,
+    businessId: card.businessId,
+    offerId: card.offerId,
+  };
+}
+
 export default function Homepage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [scrollPct, setScrollPct] = useState(0);
   const [thumbW, setThumbW] = useState(32);
-  const [activeReward, setActiveReward] = useState(REWARDS[0].id);
+  const [rewards, setRewards] = useState(FALLBACK_REWARDS);
+  const [activeReward, setActiveReward] = useState(FALLBACK_REWARDS[0].id);
   const scrollerRef = useRef(null);
   const pageRef = useRef(null);
 
   const isLoggedIn = Boolean(user);
   const streak = Number(user?.streakCount) || 0;
   const credits = Number(user?.credits) || 0;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadDiscover = async () => {
+      try {
+        const res = await discoverAPI.getRewards();
+        const rows = res?.data?.data;
+        if (cancelled || !Array.isArray(rows) || rows.length === 0) return;
+        const next = rows.map(mapDiscoverCard).filter((card) => card.image);
+        if (!next.length) return;
+        setRewards(next);
+        setActiveReward(next[0].id);
+      } catch {
+        // Keep fallback cards when Discover is unavailable.
+      }
+    };
+
+    loadDiscover();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     trackEvent("page_view", "/");
@@ -93,7 +131,7 @@ export default function Homepage() {
   useEffect(() => {
     const timer = setTimeout(syncCarousel, 560);
     return () => clearTimeout(timer);
-  }, [activeReward]);
+  }, [activeReward, rewards]);
 
   const goRewards = () => {
     trackEvent("cta_click", "/rewards");
@@ -214,10 +252,12 @@ export default function Homepage() {
           <div
             className="home-carousel"
             ref={scrollerRef}
-            onMouseLeave={() => setActiveReward(REWARDS[0].id)}
+            onMouseLeave={() => setActiveReward(rewards[0]?.id)}
           >
-            {REWARDS.map((card) => {
+            {rewards.map((card) => {
               const expanded = activeReward === card.id;
+              const needed = Number(card.creditsRequired) || 0;
+              const showRing = card.featured && needed > 0;
               return (
                 <article
                   key={card.id}
@@ -240,14 +280,14 @@ export default function Homepage() {
                     <strong>{card.title}</strong>
                     <span>{card.venue}</span>
                   </div>
-                  {card.earned != null && (
+                  {showRing && (
                     <div className="home-credit-ring">
-                      <CreditRing earned={card.earned} needed={card.needed} />
+                      <CreditRing earned={credits} needed={needed} />
                       <div className="home-credit-label">
                         <b>
-                          {card.earned} out of
+                          {credits} out of
                           <br />
-                          {card.needed}
+                          {needed}
                         </b>
                         <small>credits</small>
                       </div>
@@ -298,7 +338,7 @@ function Feature({ icon, title, body }) {
 function CreditRing({ earned, needed }) {
   const r = 34;
   const c = 2 * Math.PI * r;
-  const pct = Math.min(1, earned / needed);
+  const pct = needed > 0 ? Math.min(1, Math.max(0, earned) / needed) : 0;
   return (
     <svg viewBox="0 0 88 88" fill="none">
       <circle cx="44" cy="44" r={r} stroke="rgba(255,255,255,0.22)" strokeWidth="6" />
@@ -316,4 +356,3 @@ function CreditRing({ earned, needed }) {
     </svg>
   );
 }
-

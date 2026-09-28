@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AlertCircle, Check, Loader2, Shield, ShieldCheck } from "lucide-react";
-import { sepSurveyAPI, surveyAPI, userAPI, voucherAPI } from "../services/api";
+import { userAPI, voucherAPI } from "../services/api";
 import { getNextStreakBonus } from "../utils/streakBonus";
 import { useAuth } from "../context/AuthContext";
 import HomeFooter from "../components/homepage/HomeFooter";
@@ -9,6 +9,7 @@ import StreakGuardModal from "../components/profile/StreakGuardModal";
 import { initProfileCinema } from "../components/profile/profileCinema";
 import sectionIcon from "../assets/home/features/opinions.png";
 import skyBg from "../assets/home/sky.jpg";
+import mks1kBadge from "../assets/mks-1k-badge.jpg";
 import "../components/homepage/homepage.css";
 import "../components/profile/profile.css";
 import { adminHomePath, isStaffAdmin } from "../utils/adminRoles";
@@ -58,29 +59,43 @@ function nepalWeekDays(now = new Date()) {
   return Array.from({ length: 7 }, (_, i) => shiftCivilDate(sunday, i));
 }
 
+function Credits1kBadge() {
+  return (
+    <span className="profile-1k-badge" title="First to 1,000 credits">
+      <img src={mks1kBadge} alt="First to 1,000 credits" />
+    </span>
+  );
+}
+
 function creditGoal(credits) {
   const caps = [50, 100, 200, 300, 400, 500, 750, 1000, 1500, 2000, 5000];
   return caps.find((cap) => credits <= cap) || credits;
 }
 
-function mapSurvey(entry, type) {
-  if (type === "campaign") {
-    return {
-      id: entry._id,
-      title: entry.campaign?.title || "Campaign Survey",
-      description: entry.campaign?.description || "Campaign survey you completed.",
-      minutes: entry.survey?.estimatedMinutes || null,
-      credits: entry.survey?.creditsToAward || 100,
-      createdAt: entry.createdAt,
-    };
-  }
+function mapActivity(entry) {
+  const credits =
+    entry.creditsDelta == null
+      ? null
+      : entry.creditsDelta > 0
+        ? `+${entry.creditsDelta} credits`
+        : `−${Math.abs(entry.creditsDelta)} credits`;
+  const streakLabel =
+    entry.type === "survey_completed" && entry.streakAfter != null
+      ? `Streak ${entry.streakAfter}`
+      : entry.type === "streak_lost"
+        ? "Streak lost"
+        : entry.type === "streak_reward" && entry.streakAfter != null
+          ? `Streak ${entry.streakAfter}`
+          : null;
+
   return {
     id: entry._id,
-    title: entry.survey?.title || "Survey",
-    description: entry.survey?.description || "Standalone survey you completed.",
-    minutes: entry.survey?.estimatedMinutes || null,
-    credits: entry.survey?.credits || 50,
+    title: entry.title || "Activity",
+    description: entry.description || "",
+    metaLeft: streakLabel,
+    metaRight: credits,
     createdAt: entry.createdAt,
+    type: entry.type,
   };
 }
 
@@ -171,7 +186,7 @@ export default function Profile() {
   const pageRef = useRef(null);
   const [user, setUser] = useState(null);
   const [vouchers, setVouchers] = useState([]);
-  const [surveys, setSurveys] = useState([]);
+  const [activities, setActivities] = useState([]);
   const [weekDone, setWeekDone] = useState(() => WEEK_LABELS.map(() => false));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -182,11 +197,10 @@ export default function Profile() {
   useEffect(() => {
     (async () => {
       try {
-        const [profileRes, voucherRes, campRes, standRes] = await Promise.all([
+        const [profileRes, voucherRes, activityRes] = await Promise.all([
           userAPI.getProfile(),
           voucherAPI.getMyVouchers({ status: "active", skipErrorToast: true }),
-          surveyAPI.getSurveyHistory({ skipErrorToast: true }),
-          sepSurveyAPI.getHistory({ limit: 100, skipErrorToast: true }),
+          userAPI.getActivity({ limit: 50, skipErrorToast: true }),
         ]);
 
         const userData = profileRes?.data?.data?.user;
@@ -206,13 +220,14 @@ export default function Profile() {
         const nextVouchers = voucherRes?.data?.data || [];
         setVouchers(nextVouchers);
 
-        const nextSurveys = [
-          ...(campRes?.data?.data || []).map((row) => mapSurvey(row, "campaign")),
-          ...(standRes?.data?.data || []).map((row) => mapSurvey(row, "standalone")),
-        ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        setSurveys(nextSurveys);
+        const nextActivities = (activityRes?.data?.data || []).map(mapActivity);
+        setActivities(nextActivities);
 
-        const done = new Set(nextSurveys.map((row) => nepalParts(new Date(row.createdAt)).key));
+        const done = new Set(
+          nextActivities
+            .filter((row) => row.type === "survey_completed")
+            .map((row) => nepalParts(new Date(row.createdAt)).key)
+        );
         const streak = Number(userData.streakCount) || 0;
         if (userData.lastStreakDate && streak > 0) {
           const last = nepalParts(new Date(userData.lastStreakDate));
@@ -323,7 +338,7 @@ export default function Profile() {
   const credits = Number(user.credits) || 0;
   const nextBonus = getNextStreakBonus(streak);
   const streakGoal = nextBonus.rewardCounter + nextBonus.remaining;
-  const previewSurveys = surveys.slice(0, 4);
+  const previewActivities = activities.slice(0, 4);
 
   const handleGuardPurchased = (data) => {
     setUser((prev) => ({
@@ -345,6 +360,7 @@ export default function Profile() {
           <div>
             <div className="profile-hero-name">
               <h1>Hi, {firstName}.</h1>
+              {String(firstName).trim().toLowerCase() === "mks" ? <Credits1kBadge /> : null}
               <button
                 type="button"
                 className="profile-guard-btn"
@@ -381,7 +397,7 @@ export default function Profile() {
               <StatRing
                 value={streak}
                 max={streakGoal}
-                color="#7bd13a"
+                color="#2ed6fd"
                 label="Day Streak"
                 unit={streak === 1 ? "Day in a row" : "Days in a row"}
                 delay={480}
@@ -423,7 +439,7 @@ export default function Profile() {
                 <p>Every reward you&apos;ve picked up, all in one place.</p>
               </div>
             </div>
-            <button type="button" className="home-pill home-pill-lime profile-view-all" onClick={() => navigate("/vouchers")}>
+            <button type="button" className="home-pill home-pill-blue profile-view-all" onClick={() => navigate("/vouchers")}>
               View All
             </button>
           </div>
@@ -484,29 +500,29 @@ export default function Profile() {
             <div className="profile-section-title">
               <img src={sectionIcon} alt="" />
               <div>
-                <h2>Survey History</h2>
-                <p>Every survey you have been a part of, all in one place.</p>
+                <h2>Activity</h2>
+                <p>Surveys, vouchers, streaks, and more — all in one place.</p>
               </div>
             </div>
-            <button type="button" className="home-pill home-pill-lime profile-view-all" onClick={() => navigate("/survey-history")}>
+            <button type="button" className="home-pill home-pill-blue profile-view-all" onClick={() => navigate("/survey-history")}>
               View All
             </button>
           </div>
 
-          {previewSurveys.length === 0 ? (
-            <div className="profile-empty">No surveys completed yet. Take a survey to see it here.</div>
+          {previewActivities.length === 0 ? (
+            <div className="profile-empty">No activity yet. Take a survey or claim a voucher to see it here.</div>
           ) : (
             <div className="profile-surveys">
-              {previewSurveys.map((survey) => (
-                <div className="profile-survey" key={survey.id}>
+              {previewActivities.map((item) => (
+                <div className="profile-survey" key={item.id}>
                   <div className="profile-survey-icon" aria-hidden="true" />
                   <div className="profile-survey-copy">
-                    <h3>{survey.title}</h3>
-                    <p>{survey.description}</p>
+                    <h3>{item.title}</h3>
+                    <p>{item.description || " "}</p>
                   </div>
                   <div className="profile-survey-meta">
-                    <span>{survey.minutes ? `${survey.minutes} Min` : "—"}</span>
-                    <span>{survey.credits} credits</span>
+                    <span>{item.metaLeft || "—"}</span>
+                    <span>{item.metaRight || "—"}</span>
                   </div>
                   <button
                     type="button"

@@ -1,59 +1,77 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef } from "react";
 import { Check } from "lucide-react";
 import { gsap } from "gsap";
 import { getNextStreakBonus } from "../../utils/streakBonus";
+
+const RING_R = 96;
+const RING_C = 2 * Math.PI * RING_R;
+const RING_GAP = RING_C * 0.24;
+const RING_TRACK = RING_C - RING_GAP;
 
 function creditGoal(credits) {
   const caps = [50, 100, 200, 300, 400, 500, 750, 1000, 1500, 2000, 5000];
   return caps.find((cap) => credits <= cap) || Math.max(credits, 1);
 }
 
-function easeOutCubic(t) {
-  return 1 - (1 - t) ** 3;
+function prefersReducedMotion() {
+  return typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-function useCountUp(target, { duration = 1600, delay = 480 } = {}) {
-  const end = Math.max(0, Number(target) || 0);
-  const [amount, setAmount] = useState(0);
+/** GSAP-driven ring fill + number — no React re-renders per frame. */
+function useGsapRing({
+  valueEnd,
+  fillRatio,
+  duration = 1.6,
+  delay = 0.48,
+}) {
+  const arcRef = useRef(null);
+  const valueRef = useRef(null);
+  const end = Math.max(0, Number(valueEnd) || 0);
+  const fill = RING_TRACK * Math.min(1, Math.max(0, Number(fillRatio) || 0));
 
   useEffect(() => {
-    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setAmount(end);
+    const arc = arcRef.current;
+    const label = valueRef.current;
+    if (!arc || !label) return undefined;
+
+    const apply = (t) => {
+      const eased = Math.max(0, Math.min(1, t));
+      arc.setAttribute("stroke-dasharray", `${fill * eased} ${RING_C}`);
+      label.textContent = Math.round(end * eased).toLocaleString();
+    };
+
+    if (prefersReducedMotion()) {
+      apply(1);
       return undefined;
     }
 
-    setAmount(0);
-    let raf = 0;
-    let start = null;
-    const timeout = window.setTimeout(() => {
-      const tick = (now) => {
-        if (start == null) start = now;
-        const t = Math.min(1, (now - start) / duration);
-        setAmount(end * easeOutCubic(t));
-        if (t < 1) raf = window.requestAnimationFrame(tick);
-      };
-      raf = window.requestAnimationFrame(tick);
-    }, delay);
+    apply(0);
+    const state = { t: 0 };
+    const tween = gsap.to(state, {
+      t: 1,
+      duration,
+      delay,
+      ease: "power3.out",
+      overwrite: true,
+      onUpdate: () => apply(state.t),
+      onComplete: () => apply(1),
+    });
 
     return () => {
-      window.clearTimeout(timeout);
-      window.cancelAnimationFrame(raf);
+      tween.kill();
     };
-  }, [end, duration, delay]);
+  }, [end, fill, duration, delay]);
 
-  return amount;
+  return { arcRef, valueRef };
 }
 
 export default function CreditArc({ credits }) {
   const value = Math.max(0, Number(credits) || 0);
-  const amount = useCountUp(value);
   const max = creditGoal(value);
-  const r = 96;
-  const c = 2 * Math.PI * r;
-  const gap = c * 0.24;
-  const track = c - gap;
-  const pct = Math.min(1, amount / max);
-  const filled = track * pct;
+  const { arcRef, valueRef } = useGsapRing({
+    valueEnd: value,
+    fillRatio: value / max,
+  });
 
   return (
     <div className="shop-ring" aria-label={`${value} available credits`}>
@@ -61,28 +79,31 @@ export default function CreditArc({ credits }) {
         <circle
           cx="120"
           cy="120"
-          r={r}
+          r={RING_R}
           stroke="rgba(255,255,255,0.28)"
           strokeWidth="10"
           strokeLinecap="round"
-          strokeDasharray={`${track} ${gap}`}
+          strokeDasharray={`${RING_TRACK} ${RING_GAP}`}
           transform="rotate(133 120 120)"
         />
         <circle
+          ref={arcRef}
           className="shop-ring-arc"
           cx="120"
           cy="120"
-          r={r}
+          r={RING_R}
           stroke="#fff"
           strokeWidth="10"
           strokeLinecap="round"
-          strokeDasharray={`${filled} ${c}`}
+          strokeDasharray={`0 ${RING_C}`}
           transform="rotate(133 120 120)"
         />
       </svg>
       <div className="shop-ring-inner">
         <p className="shop-ring-label">Available Credits</p>
-        <p className="shop-ring-value">{Math.round(amount).toLocaleString()}</p>
+        <p className="shop-ring-value" ref={valueRef}>
+          0
+        </p>
         <p className="shop-ring-unit">Credits</p>
       </div>
     </div>
@@ -108,14 +129,13 @@ export function StreakArc({ streak = 0 }) {
   const current = next.rewardCounter;
   const target = current === 30 ? 7 : current + next.remaining;
   const remaining = next.remaining;
-  const amount = useCountUp(daysInARow);
   const pct = target > 0 ? Math.min(1, current / target) : 0;
-  const fillProgress = useCountUp(pct, { duration: 1400, delay: 520 });
-  const r = 96;
-  const c = 2 * Math.PI * r;
-  const gap = c * 0.24;
-  const track = c - gap;
-  const filled = track * Math.min(1, fillProgress);
+  const { arcRef, valueRef } = useGsapRing({
+    valueEnd: daysInARow,
+    fillRatio: pct,
+    duration: 1.4,
+    delay: 0.52,
+  });
   const steps = streakWindow(current, target);
   const unit = remaining === 1 ? "day" : "days";
   const meterRef = useRef(null);
@@ -123,9 +143,7 @@ export function StreakArc({ streak = 0 }) {
   useEffect(() => {
     const root = meterRef.current;
     if (!root) return undefined;
-    if (typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return undefined;
-    }
+    if (prefersReducedMotion()) return undefined;
 
     const dots = root.querySelectorAll(".surveys-streak-step");
     const extras = root.querySelectorAll(".surveys-streak-scale, .surveys-streak-copy");
@@ -165,28 +183,31 @@ export function StreakArc({ streak = 0 }) {
           <circle
             cx="120"
             cy="120"
-            r={r}
+            r={RING_R}
             stroke="rgba(255,255,255,0.28)"
             strokeWidth="10"
             strokeLinecap="round"
-            strokeDasharray={`${track} ${gap}`}
+            strokeDasharray={`${RING_TRACK} ${RING_GAP}`}
             transform="rotate(133 120 120)"
           />
           <circle
+            ref={arcRef}
             className="shop-ring-arc"
             cx="120"
             cy="120"
-            r={r}
+            r={RING_R}
             stroke="#fff"
             strokeWidth="10"
             strokeLinecap="round"
-            strokeDasharray={`${filled} ${c}`}
+            strokeDasharray={`0 ${RING_C}`}
             transform="rotate(133 120 120)"
           />
         </svg>
         <div className="shop-ring-inner">
           <p className="shop-ring-label">Daily Streak</p>
-          <p className="shop-ring-value">{Math.round(amount).toLocaleString()}</p>
+          <p className="shop-ring-value" ref={valueRef}>
+            0
+          </p>
           <p className="shop-ring-unit">Days in a row</p>
         </div>
       </div>

@@ -9,6 +9,9 @@ export default function BusinessDashboard() {
   const [stats, setStats] = useState({
     totalScans: 0,
     successfulScans: 0,
+    totalSales: 0,
+    totalGrossRevenue: 0,
+    totalDiscounts: 0,
     recentScans: [],
   });
 
@@ -33,6 +36,9 @@ export default function BusinessDashboard() {
       setStats({
         totalScans: data.data.totalScans || 0,
         successfulScans: data.data.successfulScans || 0,
+        totalSales: data.data.totalSales || 0,
+        totalGrossRevenue: data.data.totalGrossRevenue || 0,
+        totalDiscounts: data.data.totalDiscounts || 0,
         recentScans: data.data.recentScans || [],
       });
     } catch (error) {
@@ -156,11 +162,31 @@ export default function BusinessDashboard() {
           <div className="border rounded-xl p-4">
             <p className="text-sm text-gray-500">Total Scans</p>
             <p className="text-2xl sm:text-3xl font-bold">{stats.totalScans}</p>
+            <p className="text-xs text-gray-400 mt-1">All scan attempts</p>
           </div>
 
           <div className="border rounded-xl p-4">
             <p className="text-sm text-gray-500">Successful Scans</p>
             <p className="text-2xl sm:text-3xl font-bold">{stats.successfulScans}</p>
+            <p className="text-xs text-gray-400 mt-1">Approved redemptions</p>
+          </div>
+
+          <div className="border rounded-xl p-4">
+            <p className="text-sm text-gray-500">Total Sales</p>
+            <p className="text-2xl sm:text-3xl font-bold">{formatRs(stats.totalSales)}</p>
+            <p className="text-xs text-gray-400 mt-1">Sum of all bill amounts before discount</p>
+          </div>
+
+          <div className="border rounded-xl p-4">
+            <p className="text-sm text-gray-500">Total Gross Revenue</p>
+            <p className="text-2xl sm:text-3xl font-bold">{formatRs(stats.totalGrossRevenue)}</p>
+            <p className="text-xs text-gray-400 mt-1">Sum of all bill amounts after discount</p>
+          </div>
+
+          <div className="border rounded-xl p-4 col-span-2">
+            <p className="text-sm text-gray-500">Total Discounts</p>
+            <p className="text-2xl sm:text-3xl font-bold">{formatRs(stats.totalDiscounts)}</p>
+            <p className="text-xs text-gray-400 mt-1">Total sales minus total gross revenue</p>
           </div>
         </div>
 
@@ -208,7 +234,9 @@ export default function BusinessDashboard() {
                         </p>
                         {scan.outcome === "success" && scan.billAmountAfterDiscount != null && (
                           <p className="text-sm text-gray-600 mt-0.5">
-                            {formatRs(scan.billAmountAfterDiscount)}
+                            {scan.billAmountTotal != null
+                              ? `${formatRs(scan.billAmountTotal)} → ${formatRs(scan.billAmountAfterDiscount)}`
+                              : formatRs(scan.billAmountAfterDiscount)}
                             {scan.offerSnapshot ? ` · ${discountLabel(scan.offerSnapshot)}` : ""}
                           </p>
                         )}
