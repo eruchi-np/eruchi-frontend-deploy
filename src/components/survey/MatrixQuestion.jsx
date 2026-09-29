@@ -53,7 +53,7 @@ export default function MatrixQuestion({
 
   const DesktopCell = ({ row, col }) => {
     const checked = value[row.id] === col.id;
-    const inputName = `${namePrefix}-${row.id}`;
+    const inputName = `${namePrefix}-${row.id}-desktop`;
 
     return (
       <td className="text-center px-1.5 py-3.5 align-middle">
@@ -140,7 +140,7 @@ export default function MatrixQuestion({
                   >
                     <input
                       type="radio"
-                      name={`${namePrefix}-${row.id}`}
+                      name={`${namePrefix}-${row.id}-mobile`}
                       checked={checked}
                       disabled={!interactive}
                       onChange={() => selectRadio(row.id, col.id)}

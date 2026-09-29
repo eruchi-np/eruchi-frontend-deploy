@@ -7,7 +7,8 @@ import CreditRewardBadge from "../components/onboarding/CreditRewardBadge";
 import { PROFILE_COMPLETION_1_CREDITS } from "../utils/onboardingCredits";
 import { useAuth } from "../context/AuthContext";
 
-const CompleteProfile = () => {
+const CompleteProfile = ({ mode = "registration" }) => {
+  const isRefresh = mode === "refresh";
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [profileCompleted, setProfileCompleted] = useState(false);
@@ -15,6 +16,10 @@ const CompleteProfile = () => {
 
   const handleProfileComplete = () => {
     window.dispatchEvent(new Event("profileComplete"));
+    if (isRefresh) {
+      navigate("/refresh-additional-profile", { replace: true });
+      return;
+    }
     setProfileCompleted(true);
   };
 
@@ -35,15 +40,18 @@ const CompleteProfile = () => {
   return (
     <OnboardingShell onLogout={handleLogout} loggingOut={loggingOut}>
       <div className="onboard-card">
-        <div className="onboard-kicker">
-          <CreditRewardBadge amount={PROFILE_COMPLETION_1_CREDITS} />
-        </div>
+        {!isRefresh && (
+          <div className="onboard-kicker">
+            <CreditRewardBadge amount={PROFILE_COMPLETION_1_CREDITS} />
+          </div>
+        )}
         <h1 className="onboard-title">Complete your profile</h1>
         <p className="onboard-copy">
-          Tell us more about you — earn {PROFILE_COMPLETION_1_CREDITS} Ruchi Credits, and we&apos;ll
-          match you to more relevant surveys.
+          {isRefresh
+            ? "Tell us more about you so we can keep matching you to relevant surveys."
+            : `Tell us more about you — earn ${PROFILE_COMPLETION_1_CREDITS} Ruchi Credits, and we'll match you to more relevant surveys.`}
         </p>
-        <DemographicsWizard onComplete={handleProfileComplete} />
+        <DemographicsWizard mode={mode} onComplete={handleProfileComplete} />
       </div>
     </OnboardingShell>
   );

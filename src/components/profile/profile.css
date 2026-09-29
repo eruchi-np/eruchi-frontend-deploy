@@ -41,6 +41,45 @@
   padding: 12px 28px 72px;
 }
 
+.profile-outdated-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  margin: 8px 0 4px;
+  padding: 14px 16px;
+  border: 1px solid #f0d56a;
+  border-radius: 16px;
+  background: #fff6d8;
+  color: #6b4e00;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.profile-outdated-alert:hover {
+  background: #ffefb8;
+}
+
+.profile-outdated-alert svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  color: #c8920a;
+}
+
+.profile-outdated-alert strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.profile-outdated-alert span {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .profile-hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

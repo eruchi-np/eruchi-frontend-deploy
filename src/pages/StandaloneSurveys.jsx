@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronDown, Search, SearchX } from "lucide-react";
 import toast from "react-hot-toast";
-import { sepSurveyAPI, userAPI } from "../services/api";
+import { sepSurveyAPI, fifteenDaySurveyAPI, userAPI } from "../services/api";
 import { StreakArc, pageWindow } from "../components/shop/CreditArc";
 import HomeFooter from "../components/homepage/HomeFooter";
 import { flipShopCatalog, initShopCinema, scrollShopToCatalog } from "../components/shop/shopCinema";
@@ -46,6 +46,11 @@ function SurveyRow({ survey, onView }) {
           {survey.isMerchantFeedback ? (
             <span className="surveys-row-tag">
               {survey.feedbackBusinessName ? `Feedback · ${survey.feedbackBusinessName}` : "Feedback"}
+            </span>
+          ) : null}
+          {survey.isDailySprint ? (
+            <span className="surveys-row-tag">
+              Day {survey.daySlot}{survey.wave > 1 ? ` · round ${survey.wave}` : ""}
             </span>
           ) : null}
           {survey.kind === "daily" ? (
@@ -95,6 +100,8 @@ export default function StandaloneSurveys() {
   const catalogPage = parsePage(searchParams.get("page"));
   const [searchDraft, setSearchDraft] = useState(search);
   const [surveys, setSurveys] = useState([]);
+  const [sprintSurveys, setSprintSurveys] = useState([]);
+  const [profileOutdated, setProfileOutdated] = useState(false);
   const [streak, setStreak] = useState(Number(user?.streakCount) || 0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -156,13 +163,14 @@ export default function StandaloneSurveys() {
       setLoading(true);
       setError(null);
       try {
-        const [surveysResult, profileResult] = await Promise.allSettled([
+        const [surveysResult, profileResult, sprintResult] = await Promise.allSettled([
           sepSurveyAPI.getAvailable({
             page: 1,
             limit: 200,
             skipErrorToast: true,
           }),
           userAPI.getProfile({ skipAuthRedirect: true, skipErrorToast: true }),
+          fifteenDaySurveyAPI.getMine({ skipErrorToast: true }),
         ]);
 
         if (cancelled) return;
@@ -176,6 +184,13 @@ export default function StandaloneSurveys() {
 
         const res = surveysResult.value;
         setSurveys(res.data.data || []);
+        if (sprintResult.status === "fulfilled") {
+          setSprintSurveys(sprintResult.value.data?.data || []);
+          setProfileOutdated(Boolean(sprintResult.value.data?.profileOutdated));
+        } else {
+          setSprintSurveys([]);
+          setProfileOutdated(false);
+        }
 
         if (profileResult.status === "fulfilled" && profileResult.value) {
           const nextUser =
@@ -268,6 +283,10 @@ export default function StandaloneSurveys() {
   };
 
   const openSurvey = (survey) => {
+    if (survey.isDailySprint) {
+      navigate(`/standalone-survey/${survey._id}?sprint=1`);
+      return;
+    }
     if (!isSurveyOpen(survey)) return;
     navigate(`/standalone-survey/${survey._id}`);
   };
@@ -305,6 +324,32 @@ export default function StandaloneSurveys() {
 
         <div className="home-sheet shop-sheet">
           <div className="shop-catalog">
+            {!loading && sprintSurveys.length > 0 ? (
+              <div className="mb-12">
+                <div className="shop-head mb-6">
+                  <div>
+                    <div className="shop-title-row">
+                      <span className="shop-dots" aria-hidden="true">
+                        {Array.from({ length: 16 }, (_, i) => (
+                          <i key={i} style={{ "--i": i }} />
+                        ))}
+                      </span>
+                      <h2>Daily Sprint</h2>
+                    </div>
+                    <p className="shop-head-copy">
+                      {profileOutdated
+                        ? "These stay here until you finish them. Your profile is marked outdated in the meantime, and the rest of the app still works."
+                        : "These stay here until you finish them."}
+                    </p>
+                  </div>
+                </div>
+                <div className="surveys-list">
+                  {sprintSurveys.map((survey) => (
+                    <SurveyRow key={`${survey._id}-${survey.wave}`} survey={survey} onView={openSurvey} />
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <div className="shop-head">
               <div>
                 <div className="shop-title-row">

@@ -6,12 +6,18 @@ import CreditRewardBadge from "../components/onboarding/CreditRewardBadge";
 import { PROFILE_COMPLETION_2_CREDITS, PROFILE_COMPLETION_2_QUESTION_COUNT } from "../utils/onboardingCredits";
 import { useAuth } from "../context/AuthContext";
 
-const CompleteAdditionalProfile = () => {
+const CompleteAdditionalProfile = ({ mode = "registration" }) => {
+  const isRefresh = mode === "refresh";
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
 
   const handleComplete = () => {
+    if (isRefresh) {
+      window.dispatchEvent(new Event("profileComplete"));
+      navigate("/profile", { replace: true });
+      return;
+    }
     navigate("/");
   };
 
@@ -28,15 +34,18 @@ const CompleteAdditionalProfile = () => {
   return (
     <OnboardingShell onLogout={handleLogout} loggingOut={loggingOut}>
       <div className="onboard-card">
-        <div className="onboard-kicker">
-          <CreditRewardBadge amount={PROFILE_COMPLETION_2_CREDITS} />
-        </div>
+        {!isRefresh && (
+          <div className="onboard-kicker">
+            <CreditRewardBadge amount={PROFILE_COMPLETION_2_CREDITS} />
+          </div>
+        )}
         <h1 className="onboard-title">A few more questions</h1>
         <p className="onboard-copy">
-          Earn {PROFILE_COMPLETION_2_CREDITS} Ruchi Credits — {PROFILE_COMPLETION_2_QUESTION_COUNT}{" "}
-          quick questions about your daily life. Takes about 2 minutes.
+          {isRefresh
+            ? `${PROFILE_COMPLETION_2_QUESTION_COUNT} quick questions about your daily life. Takes about 2 minutes.`
+            : `Earn ${PROFILE_COMPLETION_2_CREDITS} Ruchi Credits — ${PROFILE_COMPLETION_2_QUESTION_COUNT} quick questions about your daily life. Takes about 2 minutes.`}
         </p>
-        <AdditionalProfileSurvey onComplete={handleComplete} />
+        <AdditionalProfileSurvey mode={mode} onComplete={handleComplete} />
       </div>
     </OnboardingShell>
   );

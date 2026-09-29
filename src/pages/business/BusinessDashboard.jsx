@@ -1,313 +1,166 @@
 import React, { useEffect, useState } from "react";
 import { businessAPI } from "../../services/api";
-import { useNavigate } from "react-router-dom";
-import { ScanLine, Upload, Plus, Pencil, Store } from "lucide-react";
+import { Wallet, Users, Receipt } from "lucide-react";
 import { discountLabel, formatRs } from "../../utils/billMath";
+import { emptyMerchantMetrics, GrowthLine } from "../../components/business/MerchantMetrics";
+
+const cardShadow = "shadow-[0_12px_30px_rgba(37,99,235,0.08)]";
 
 export default function BusinessDashboard() {
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalScans: 0,
-    successfulScans: 0,
-    totalSales: 0,
-    totalGrossRevenue: 0,
-    totalDiscounts: 0,
-    recentScans: [],
-  });
-
-  const [vouchers, setVouchers] = useState([]);
-  const [vouchersLoading, setVouchersLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("scans");
-  const [profile, setProfile] = useState(null);
-  const [logoUploading, setLogoUploading] = useState(false);
-
-  const navigate = useNavigate();
+  const [metrics, setMetrics] = useState(() => emptyMerchantMetrics());
+  const [recentScans, setRecentScans] = useState([]);
 
   useEffect(() => {
-    fetchDashboard();
-    fetchVoucherOffers();
-    fetchProfile();
+    const load = async () => {
+      try {
+        const { data } = await businessAPI.getDashboard();
+        setMetrics({ ...emptyMerchantMetrics(), ...data.data });
+        setRecentScans(data.data.recentScans || []);
+      } catch (error) {
+        console.error("Failed to load dashboard", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
   }, []);
 
-  const fetchDashboard = async () => {
-    try {
-      const { data } = await businessAPI.getDashboard();
-
-      setStats({
-        totalScans: data.data.totalScans || 0,
-        successfulScans: data.data.successfulScans || 0,
-        totalSales: data.data.totalSales || 0,
-        totalGrossRevenue: data.data.totalGrossRevenue || 0,
-        totalDiscounts: data.data.totalDiscounts || 0,
-        recentScans: data.data.recentScans || [],
-      });
-    } catch (error) {
-      console.error("Failed to load dashboard", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchVoucherOffers = async () => {
-    try {
-      const { data } = await businessAPI.getVoucherOffers();
-      setVouchers(data.data || []);
-    } catch (error) {
-      console.error('Failed to load voucher offers', error);
-    } finally {
-      setVouchersLoading(false);
-    }
-  };
-
-  const fetchProfile = async () => {
-    try {
-      const { data } = await businessAPI.getProfile();
-      setProfile(data.data || null);
-    } catch (error) {
-      console.error('Failed to load business profile', error);
-    }
-  };
-
-  const handleLogoUpload = async (file) => {
-    if (!file) return;
-    try {
-      setLogoUploading(true);
-      const formData = new FormData();
-      formData.append('logo', file);
-      const { data } = await businessAPI.uploadLogo(formData);
-      setProfile(data.data);
-    } catch (error) {
-      console.error('Failed to upload logo', error);
-    } finally {
-      setLogoUploading(false);
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await businessAPI.logout();
-      localStorage.removeItem('is_business');
-      localStorage.removeItem('business_name');
-      window.dispatchEvent(new Event('authChange'));
-      navigate("/login");
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        Loading dashboard...
-      </div>
-    );
+    return <p className="text-sm text-gray-500 py-16 text-center">Loading dashboard...</p>;
   }
 
+  const customers = metrics.customers || emptyMerchantMetrics().customers;
+  const repeat = metrics.repeatVisits || emptyMerchantMetrics().repeatVisits;
+  const showRepeat = metrics.showRepeatVisits !== false;
+  const growth = metrics.growth || {};
+
   return (
-    <div className="min-h-screen bg-white p-4 pb-28">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
-          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-            <div className="relative shrink-0">
-              <div className="w-12 h-12 rounded-xl bg-gray-100 border border-gray-200 overflow-hidden flex items-center justify-center">
-                {profile?.logo ? (
-                  <img src={profile.logo} alt="Business logo" className="w-full h-full object-contain" />
-                ) : (
-                  <span className="text-gray-300 text-[10px]">Logo</span>
-                )}
-              </div>
-              <label
-                htmlFor="business-logo-upload"
-                className="absolute -bottom-1 -right-1 p-1 bg-white border border-gray-200 rounded-full shadow-sm cursor-pointer hover:bg-gray-50 transition-colors"
-                title="Upload logo"
-              >
-                <Upload className="h-3 w-3 text-gray-600" />
-              </label>
-              <input
-                id="business-logo-upload"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                disabled={logoUploading}
-                onChange={(e) => handleLogoUpload(e.target.files?.[0])}
-              />
-            </div>
-            <h1 className="text-lg sm:text-2xl font-bold leading-tight min-w-0">Dashboard</h1>
+    <div>
+      <div className="mb-8">
+        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-gray-900">Dashboard Overview</h1>
+        <p className="text-sm text-gray-500 mt-2">Monitor your business performance in real time</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <div className={`rounded-3xl p-6 text-white bg-gradient-to-br from-[#3b82f6] to-[#1d4ed8] shadow-[0_16px_40px_rgba(37,99,235,0.28)]`}>
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm font-medium text-white/80">Total sales</p>
+            <span className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
+              <Wallet size={18} />
+            </span>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-            <button
-              onClick={() => navigate('/business/profile')}
-              className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium hover:bg-gray-50"
-            >
-              <Store size={16} />
-              Profile
-            </button>
-            <button
-              onClick={() => navigate('/business/scan')}
-              className="hidden md:flex items-center gap-2 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700 transition-colors"
-            >
-              <ScanLine size={16} />
-              Scan Voucher
-            </button>
-            <button
-              onClick={handleLogout}
-              className="px-3 sm:px-4 py-2 rounded-lg bg-black text-white text-sm"
-            >
-              Logout
-            </button>
-          </div>
+          <p className="text-3xl font-bold mt-4">{formatRs(metrics.totalSales)}</p>
+          <GrowthLine value={growth.sales} light />
+          <p className="text-xs text-white/70 mt-2">Bill amount before discount</p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="border rounded-xl p-4">
-            <p className="text-sm text-gray-500">Total Scans</p>
-            <p className="text-2xl sm:text-3xl font-bold">{stats.totalScans}</p>
-            <p className="text-xs text-gray-400 mt-1">All scan attempts</p>
+        <div className={`rounded-3xl bg-white p-6 ${cardShadow}`}>
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm font-medium text-gray-500">Total visits</p>
+            <span className="w-10 h-10 rounded-full bg-gray-900 text-white flex items-center justify-center">
+              <Users size={18} />
+            </span>
           </div>
-
-          <div className="border rounded-xl p-4">
-            <p className="text-sm text-gray-500">Successful Scans</p>
-            <p className="text-2xl sm:text-3xl font-bold">{stats.successfulScans}</p>
-            <p className="text-xs text-gray-400 mt-1">Approved redemptions</p>
-          </div>
-
-          <div className="border rounded-xl p-4">
-            <p className="text-sm text-gray-500">Total Sales</p>
-            <p className="text-2xl sm:text-3xl font-bold">{formatRs(stats.totalSales)}</p>
-            <p className="text-xs text-gray-400 mt-1">Sum of all bill amounts before discount</p>
-          </div>
-
-          <div className="border rounded-xl p-4">
-            <p className="text-sm text-gray-500">Total Gross Revenue</p>
-            <p className="text-2xl sm:text-3xl font-bold">{formatRs(stats.totalGrossRevenue)}</p>
-            <p className="text-xs text-gray-400 mt-1">Sum of all bill amounts after discount</p>
-          </div>
-
-          <div className="border rounded-xl p-4 col-span-2">
-            <p className="text-sm text-gray-500">Total Discounts</p>
-            <p className="text-2xl sm:text-3xl font-bold">{formatRs(stats.totalDiscounts)}</p>
-            <p className="text-xs text-gray-400 mt-1">Total sales minus total gross revenue</p>
-          </div>
+          <p className="text-3xl font-bold text-gray-900 mt-4">{metrics.totalVisits ?? 0}</p>
+          <GrowthLine value={growth.visits} />
+          <p className="text-xs text-gray-400 mt-2">Approved redemptions</p>
         </div>
 
-        <div className="border rounded-xl overflow-hidden">
-          <div className="flex border-b">
-            <button
-              onClick={() => setActiveTab("scans")}
-              className={`px-5 py-3 text-sm font-medium transition-colors ${
-                activeTab === "scans"
-                  ? "border-b-2 border-gray-900 text-gray-900"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Recent Scans
-            </button>
-            <button
-              onClick={() => setActiveTab("offers")}
-              className={`px-5 py-3 text-sm font-medium transition-colors ${
-                activeTab === "offers"
-                  ? "border-b-2 border-gray-900 text-gray-900"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              Voucher Offers
-            </button>
+        <div className={`rounded-3xl bg-white p-6 ${cardShadow}`}>
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm font-medium text-gray-500">Average order value</p>
+            <span className="w-10 h-10 rounded-full bg-[#2f6fed] text-white flex items-center justify-center">
+              <Receipt size={18} />
+            </span>
           </div>
-
-          {activeTab === "scans" && (
-            <>
-              {stats.recentScans.length === 0 ? (
-                <div className="p-4 text-gray-500">No scan activity yet.</div>
-              ) : (
-                <div>
-                  {stats.recentScans.map((scan, index) => (
-                    <div
-                      key={index}
-                      className="p-4 border-b last:border-b-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
-                    >
-                      <div>
-                        <p className="font-medium">{scan.outcome || "Unknown"}</p>
-                        <p className="text-sm text-gray-500">
-                          {scan.attemptedAt
-                            ? new Date(scan.attemptedAt).toLocaleString()
-                            : "-"}
-                        </p>
-                        {scan.outcome === "success" && scan.billAmountAfterDiscount != null && (
-                          <p className="text-sm text-gray-600 mt-0.5">
-                            {scan.billAmountTotal != null
-                              ? `${formatRs(scan.billAmountTotal)} → ${formatRs(scan.billAmountAfterDiscount)}`
-                              : formatRs(scan.billAmountAfterDiscount)}
-                            {scan.offerSnapshot ? ` · ${discountLabel(scan.offerSnapshot)}` : ""}
-                          </p>
-                        )}
-                      </div>
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          scan.outcome === "success"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {scan.outcome}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
-
-          {activeTab === "offers" && (
-            <>
-              <div className="p-4 border-b flex justify-end">
-                <button
-                  onClick={() => navigate('/business/vouchers/new')}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-900 text-white text-sm font-medium hover:bg-gray-700"
-                >
-                  <Plus size={16} />
-                  Add voucher
-                </button>
-              </div>
-              {vouchersLoading ? (
-                <div className="p-4 text-gray-400 text-sm">Loading...</div>
-              ) : vouchers.length === 0 ? (
-                <div className="p-4 text-gray-500">No voucher offers yet. Add one to show it in the shop.</div>
-              ) : (
-                <div>
-                  {vouchers.map((offer) => (
-                    <div key={offer._id} className="p-4 border-b last:border-b-0 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-900 break-words">{offer.title}</p>
-                        <p className="text-sm text-gray-500">
-                          {offer.discountType === 'percentage' ? `${offer.discountValue}% off`
-                            : offer.discountType === 'free_item' ? (offer.discountValue ? `Free ${offer.discountValue}` : 'Free item')
-                            : offer.discountType === 'value_combo' ? 'Value combo'
-                            : `Rs. ${offer.discountValue} off`}
-                          {' · '}{offer.creditsRequired} credits · {offer.expiryDays}d expiry
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          offer.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {offer.status}
-                        </span>
-                        <button
-                          onClick={() => navigate(`/business/vouchers/${offer._id}/edit`)}
-                          className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50"
-                          title="Edit voucher"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
-          )}
+          <p className="text-3xl font-bold text-[#2f6fed] mt-4">
+            {metrics.averageOrderValue == null ? "—" : formatRs(metrics.averageOrderValue)}
+          </p>
+          <GrowthLine value={growth.averageOrderValue} />
+          <p className="text-xs text-gray-400 mt-2">Sales before discount ÷ visits</p>
         </div>
       </div>
+
+      <div className={`grid grid-cols-1 ${showRepeat ? "lg:grid-cols-2" : ""} gap-5 mt-5`}>
+        <div className={`rounded-3xl bg-white p-6 ${cardShadow}`}>
+          <p className="text-lg font-bold text-gray-900">Your eRuchi customers</p>
+          <p className="text-3xl font-bold text-[#2f6fed] mt-3">{metrics.totalVisits ?? 0} visits</p>
+          <div className="mt-4 space-y-1.5 text-sm text-gray-800">
+            <p><span className="font-semibold">Students:</span> {customers.student?.percent ?? 0}%</p>
+            <p><span className="font-semibold">Working professional:</span> {customers.workingProfessional?.percent ?? 0}%</p>
+            <p><span className="font-semibold">Others:</span> {customers.others?.percent ?? 0}%</p>
+          </div>
+        </div>
+
+        {showRepeat ? (
+          <div className={`rounded-3xl bg-white p-6 ${cardShadow}`}>
+            <p className="text-lg font-bold text-gray-900">Returning customers</p>
+            <div className="mt-4 space-y-2 text-sm text-gray-800">
+              <p><span className="font-semibold">First time visit:</span> {repeat.once ?? 0}</p>
+              <p><span className="font-semibold">Second time visit:</span> {repeat.twice ?? 0}</p>
+              <p><span className="font-semibold">More than 2 visits:</span> {repeat.moreThanTwice ?? 0}</p>
+            </div>
+            <p className="text-sm text-gray-500 mt-4">+{repeat.returnVisits ?? 0} return visits</p>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-5">
+        <MiniStat label="Gross revenue" value={formatRs(metrics.totalGrossRevenue)} hint="After discount" />
+        <MiniStat label="Discounts" value={formatRs(metrics.totalDiscounts)} hint="Sales minus gross revenue" />
+        <MiniStat label="Total scans" value={metrics.totalScans ?? 0} hint="All scan attempts" />
+      </div>
+
+      <div className={`mt-6 rounded-3xl bg-white ${cardShadow} overflow-hidden`}>
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h2 className="font-bold text-gray-900">Recent scans</h2>
+        </div>
+        {recentScans.length === 0 ? (
+          <p className="px-6 py-8 text-sm text-gray-500">No scan activity yet.</p>
+        ) : (
+          recentScans.map((scan, index) => (
+            <div
+              key={`${scan.voucherId || "scan"}-${index}`}
+              className="px-6 py-4 border-b last:border-b-0 border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+            >
+              <div>
+                <p className="font-medium text-gray-900">{scan.outcome || "Unknown"}</p>
+                <p className="text-sm text-gray-500">
+                  {scan.attemptedAt ? new Date(scan.attemptedAt).toLocaleString() : "—"}
+                </p>
+                {scan.outcome === "success" && scan.billAmountAfterDiscount != null && (
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    {scan.billAmountTotal != null
+                      ? `${formatRs(scan.billAmountTotal)} → ${formatRs(scan.billAmountAfterDiscount)}`
+                      : formatRs(scan.billAmountAfterDiscount)}
+                    {scan.offerSnapshot ? ` · ${discountLabel(scan.offerSnapshot)}` : ""}
+                  </p>
+                )}
+              </div>
+              <span
+                className={`px-3 py-1 rounded-full text-xs font-medium w-fit ${
+                  scan.outcome === "success"
+                    ? "bg-green-100 text-green-700"
+                    : "bg-red-100 text-red-700"
+                }`}
+              >
+                {scan.outcome}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+function MiniStat({ label, value, hint }) {
+  return (
+    <div className={`rounded-3xl bg-white p-5 ${cardShadow}`}>
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className="text-2xl font-bold text-gray-900 mt-2">{value}</p>
+      <p className="text-xs text-gray-400 mt-1">{hint}</p>
     </div>
   );
 }

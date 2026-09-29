@@ -12,6 +12,7 @@ import OnboardingGate from './components/layout/OnboardingGate';
 import AdminRoute from './components/layout/AdminRoute';
 import ProfileCompletionGuard from './components/layout/ProfileCompletionGuard';
 import BusinessProtectedRoute from './pages/business/BusinessProtectedRoutes';
+import MerchantLayout from './components/business/MerchantLayout';
 import ScrollToTop from './components/layout/ScrollToTop';
 import BusinessAccessGuard from './components/layout/BusinessAccessGuard';
 import RouteFallback from './components/ui/RouteFallback';
@@ -48,12 +49,13 @@ const PrivacyPolicy = lazy(() => import('./pages/LegalNotice'));
 const CompleteAdditionalProfile = lazy(() => import('./pages/CompleteAdditionalProfile'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const CreateSepSurvey = lazy(() => import('./pages/admin/CreateSepSurvey.jsx'));
+const FifteenDaySurveyAdmin = lazy(() => import('./pages/admin/FifteenDaySurveyAdmin.jsx'));
 const AdminBusinessManagement = lazy(() => import('./pages/admin/AdminBusinessManagement'));
 const AdminFaqManagement = lazy(() => import('./pages/admin/AdminFaqManagement.jsx'));
 const BusinessScan = lazy(() => import('./pages/business/BusinessScan'));
 const BusinessDashboard = lazy(() => import('./pages/business/BusinessDashboard'));
 const BusinessProfile = lazy(() => import('./pages/business/BusinessProfile'));
-const BusinessVoucherForm = lazy(() => import('./pages/business/BusinessVoucherForm'));
+const BusinessVouchers = lazy(() => import('./pages/business/BusinessVouchers'));
 const MerchantPublicProfile = lazy(() => import('./pages/MerchantPublicProfile'));
 const ResetPassword = lazy(() => import('./pages/ResetPassword'));
 const ResetPasswordToken = lazy(() => import('./pages/ResetPasswordToken'));
@@ -74,7 +76,9 @@ function AppChrome({ children }) {
   const isProfileCompletion =
     pathname === '/complete-basic-info' ||
     pathname === '/complete-profile' ||
-    pathname === '/additional-profile';
+    pathname === '/additional-profile' ||
+    pathname === '/refresh-profile' ||
+    pathname === '/refresh-additional-profile';
   const isOnboarding =
     isProfileCompletion ||
     pathname === '/login' ||
@@ -194,6 +198,24 @@ function App() {
               }
             />
 
+            <Route
+              path="/refresh-profile"
+              element={
+                <ProtectedRoute>
+                  <CompleteProfile mode="refresh" />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/refresh-additional-profile"
+              element={
+                <ProtectedRoute>
+                  <CompleteAdditionalProfile mode="refresh" />
+                </ProtectedRoute>
+              }
+            />
+
             {/* ==================== PROTECTED ROUTES ==================== */}
             <Route
               path="/profile"
@@ -299,6 +321,15 @@ function App() {
             />
 
             <Route
+              path="/admin/15-day-survey"
+              element={
+                <AdminRoute permission="surveys">
+                  <FifteenDaySurveyAdmin />
+                </AdminRoute>
+              }
+            />
+
+            <Route
               path="/admin/create-sep-survey"
               element={
                 <AdminRoute permission="surveys">
@@ -339,7 +370,9 @@ function App() {
               path="/business/scan"
               element={
                 <BusinessProtectedRoute>
-                  <BusinessScan />
+                  <MerchantLayout>
+                    <BusinessScan />
+                  </MerchantLayout>
                 </BusinessProtectedRoute>
               }
             />
@@ -348,7 +381,20 @@ function App() {
               path="/business/dashboard"
               element={
                 <BusinessProtectedRoute>
-                  <BusinessDashboard />
+                  <MerchantLayout>
+                    <BusinessDashboard />
+                  </MerchantLayout>
+                </BusinessProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/business/vouchers"
+              element={
+                <BusinessProtectedRoute>
+                  <MerchantLayout>
+                    <BusinessVouchers />
+                  </MerchantLayout>
                 </BusinessProtectedRoute>
               }
             />
@@ -357,28 +403,15 @@ function App() {
               path="/business/profile"
               element={
                 <BusinessProtectedRoute>
-                  <BusinessProfile />
+                  <MerchantLayout>
+                    <BusinessProfile />
+                  </MerchantLayout>
                 </BusinessProtectedRoute>
               }
             />
 
-            <Route
-              path="/business/vouchers/new"
-              element={
-                <BusinessProtectedRoute>
-                  <BusinessVoucherForm />
-                </BusinessProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/business/vouchers/:id/edit"
-              element={
-                <BusinessProtectedRoute>
-                  <BusinessVoucherForm />
-                </BusinessProtectedRoute>
-              }
-            />
+            <Route path="/business/vouchers/new" element={<Navigate to="/business/vouchers" replace />} />
+            <Route path="/business/vouchers/:id/edit" element={<Navigate to="/business/vouchers" replace />} />
 
             <Route path="/business/login" element={<Navigate to="/login" replace />} />
 

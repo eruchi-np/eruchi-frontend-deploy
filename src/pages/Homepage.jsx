@@ -11,30 +11,11 @@ import { useAuth } from "../context/AuthContext";
 import { discoverAPI } from "../services/api";
 import { trackEvent } from "../utils/visitorEvents";
 import skyBg from "../assets/home/sky.jpg";
-import climbImg from "../assets/home/climb.jpg";
-import productsImg from "../assets/home/products.jpg";
-import bottleImg from "../assets/home/bottle.jpg";
-import barImg from "../assets/home/bar.jpg";
 import opinionsLogo from "../assets/home/features/opinions.png";
 import creditsLogo from "../assets/home/features/credits.png";
 import rewardsLogo from "../assets/home/features/rewards.png";
 import trustedLogo from "../assets/home/features/trusted.png";
 import "../components/homepage/homepage.css";
-
-/** Empty-state / offline fallback — not live merchant data. */
-const FALLBACK_REWARDS = [
-  {
-    id: "ascend",
-    featured: true,
-    image: climbImg,
-    title: "15% off Day pass",
-    venue: "Ascend Climbing Gym",
-    creditsRequired: 30,
-  },
-  { id: "goods", image: productsImg, title: "Market picks", venue: "Local grocers" },
-  { id: "wine", image: bottleImg, title: "Wine night", venue: "Partner venues" },
-  { id: "dining", image: barImg, title: "Dining out", venue: "Cafes & bars" },
-];
 
 function mapDiscoverCard(card) {
   return {
@@ -54,8 +35,9 @@ export default function Homepage() {
   const { user } = useAuth();
   const [scrollPct, setScrollPct] = useState(0);
   const [thumbW, setThumbW] = useState(32);
-  const [rewards, setRewards] = useState(FALLBACK_REWARDS);
-  const [activeReward, setActiveReward] = useState(FALLBACK_REWARDS[0].id);
+  const [rewards, setRewards] = useState([]);
+  const [activeReward, setActiveReward] = useState(null);
+  const [discoverState, setDiscoverState] = useState("loading");
   const scrollerRef = useRef(null);
   const pageRef = useRef(null);
 
@@ -70,13 +52,19 @@ export default function Homepage() {
       try {
         const res = await discoverAPI.getRewards();
         const rows = res?.data?.data;
-        if (cancelled || !Array.isArray(rows) || rows.length === 0) return;
-        const next = rows.map(mapDiscoverCard).filter((card) => card.image);
-        if (!next.length) return;
+        if (cancelled) return;
+        const next = Array.isArray(rows)
+          ? rows.map(mapDiscoverCard).filter((card) => card.image && card.businessId)
+          : [];
         setRewards(next);
-        setActiveReward(next[0].id);
+        setActiveReward(next[0]?.id ?? null);
+        setDiscoverState("ready");
       } catch {
-        // Keep fallback cards when Discover is unavailable.
+        if (!cancelled) {
+          setRewards([]);
+          setActiveReward(null);
+          setDiscoverState("error");
+        }
       }
     };
 
@@ -126,7 +114,7 @@ export default function Homepage() {
       el.removeEventListener("scroll", syncCarousel);
       window.removeEventListener("resize", syncCarousel);
     };
-  }, []);
+  }, [rewards]);
 
   useEffect(() => {
     const timer = setTimeout(syncCarousel, 560);
@@ -136,6 +124,15 @@ export default function Homepage() {
   const goRewards = () => {
     trackEvent("cta_click", "/rewards");
     navigate("/shop");
+  };
+
+  const openPoster = (card) => {
+    if (card.businessId) {
+      trackEvent("cta_click", `/shop/merchant/${card.businessId}`);
+      navigate(`/shop/merchant/${card.businessId}`);
+      return;
+    }
+    goRewards();
   };
 
   const goSurveys = () => {
@@ -169,7 +166,7 @@ export default function Homepage() {
                   <Link to="/faqs">Learn More</Link>
                 </p>
                 <div className="home-hero-ctas">
-                  <button type="button" className="home-pill home-pill-lg home-pill-lime" onClick={goRewards}>
+                  <button type="button" className="home-pill home-pill-lg home-pill-turquoise" onClick={goRewards}>
                     Rewards
                   </button>
                   <button type="button" className="home-pill home-pill-lg home-pill-white" onClick={goSurveys}>
@@ -239,36 +236,35 @@ export default function Homepage() {
               Don&apos;t let those credits sit idle. See what the community is redeeming and grab it
               before it&apos;s gone.
             </p>
-            <div className="home-arrows">
-              <button type="button" className="home-arrow" aria-label="Previous rewards" onClick={() => scrollCarousel(-1)}>
-                <ChevronLeft size={18} />
-              </button>
-              <button type="button" className="home-arrow" aria-label="Next rewards" onClick={() => scrollCarousel(1)}>
-                <ChevronRight size={18} />
-              </button>
-            </div>
+            {rewards.length > 0 && (
+              <div className="home-arrows">
+                <button type="button" className="home-arrow" aria-label="Previous rewards" onClick={() => scrollCarousel(-1)}>
+                  <ChevronLeft size={18} />
+                </button>
+                <button type="button" className="home-arrow" aria-label="Next rewards" onClick={() => scrollCarousel(1)}>
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+            )}
           </div>
 
-          <div
-            className="home-carousel"
-            ref={scrollerRef}
-            onMouseLeave={() => setActiveReward(rewards[0]?.id)}
-          >
+          {rewards.length > 0 ? (
+          <div className="home-carousel" ref={scrollerRef}>
             {rewards.map((card) => {
               const expanded = activeReward === card.id;
               const needed = Number(card.creditsRequired) || 0;
-              const showRing = card.featured && needed > 0;
+              const showRing = needed > 0;
               return (
                 <article
                   key={card.id}
                   className={`home-card ${expanded ? "is-wide" : ""}`}
-                  onClick={goRewards}
+                  onClick={() => openPoster(card)}
                   onMouseEnter={() => setActiveReward(card.id)}
                   onFocus={() => setActiveReward(card.id)}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      goRewards();
+                      openPoster(card);
                     }
                   }}
                   role="button"
@@ -276,39 +272,43 @@ export default function Homepage() {
                 >
                   <img src={card.image} alt={card.title} />
                   <div className="home-card-overlay" />
-                  <div className="home-card-copy">
-                    <strong>{card.title}</strong>
-                    <span>{card.venue}</span>
-                  </div>
-                  {showRing && (
-                    <div className="home-credit-ring">
-                      <CreditRing earned={credits} needed={needed} />
-                      <div className="home-credit-label">
-                        <b>
-                          {credits} out of
-                          <br />
-                          {needed}
-                        </b>
-                        <small>credits</small>
-                      </div>
+                  <div className="home-card-foot">
+                    <div className="home-card-copy">
+                      <strong>{card.title}</strong>
+                      <span>{card.venue}</span>
                     </div>
-                  )}
+                    {showRing && (
+                      <div className="home-credit-ring">
+                        <CreditRing earned={credits} needed={needed} />
+                        <CreditRingLabel credits={credits} needed={needed} />
+                      </div>
+                    )}
+                  </div>
                 </article>
               );
             })}
           </div>
+          ) : discoverState !== "loading" ? (
+            <p className="home-discover-empty">
+              {discoverState === "error"
+                ? "Rewards could not be loaded. Refresh the page to try again."
+                : "Partner rewards show up here once a store has a poster and a live offer."}
+            </p>
+          ) : null}
 
           <div className="home-carousel-ui">
-            <div className="home-scroll-track" aria-hidden="true">
-              <span
-                className="home-scroll-thumb"
-                style={{
-                  width: `${thumbW}%`,
-                  left: `${scrollPct * (100 - thumbW)}%`,
-                }}
-              />
-            </div>
-            <button type="button" className="home-pill home-pill-lg home-pill-lime" onClick={goRewards}>
+            {rewards.length > 0 && (
+              <div className="home-scroll-track" aria-hidden="true">
+                <span
+                  className="home-scroll-thumb"
+                  style={{
+                    width: `${thumbW}%`,
+                    left: `${scrollPct * (100 - thumbW)}%`,
+                  }}
+                />
+              </div>
+            )}
+            <button type="button" className="home-pill home-pill-lg home-pill-blue" onClick={goRewards}>
               View All Rewards
             </button>
           </div>
@@ -335,6 +335,17 @@ function Feature({ icon, title, body }) {
   );
 }
 
+function CreditRingLabel({ credits, needed }) {
+  return (
+    <div className="home-credit-label" aria-label={`${credits} out of ${needed} credits`}>
+      <b>
+        {credits} out of {needed}
+      </b>
+      <small>credits</small>
+    </div>
+  );
+}
+
 function CreditRing({ earned, needed }) {
   const r = 34;
   const c = 2 * Math.PI * r;
@@ -346,7 +357,7 @@ function CreditRing({ earned, needed }) {
         cx="44"
         cy="44"
         r={r}
-        stroke="#c8f53a"
+        stroke="#3399ff"
         strokeWidth="6"
         strokeLinecap="round"
         strokeDasharray={c}

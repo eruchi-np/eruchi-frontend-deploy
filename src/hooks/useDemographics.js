@@ -11,8 +11,8 @@ import {
 
 export { clearDemographicsDraft, hasDraftProgress };
 
-const useDemographics = () => {
-  const draft = loadDraft();
+const useDemographics = ({ storageKey } = {}) => {
+  const draft = loadDraft(storageKey);
 
   const [currentStep, setCurrentStep] = useState(draft?.currentStep || 1);
   const [formData, setFormData] = useState(draft?.formData || { ...initialFormData });
@@ -26,11 +26,11 @@ const useDemographics = () => {
   // Clears storage when the form is fully empty so fresh visits stay blank.
   useEffect(() => {
     if (hasDraftProgress(formData, completedSteps, currentStep)) {
-      saveDraft(formData, completedSteps, currentStep);
+      saveDraft(formData, completedSteps, currentStep, storageKey);
     } else {
-      clearDemographicsDraft();
+      clearDemographicsDraft(storageKey);
     }
-  }, [formData, completedSteps, currentStep]);
+  }, [formData, completedSteps, currentStep, storageKey]);
 
   const validateStep = (step) => {
     const schema = demographicsStepSchema[step];
@@ -150,7 +150,7 @@ const useDemographics = () => {
     setCompletedSteps({ ...initialCompletedSteps });
     setErrors({});
     setCurrentStep(1);
-    clearDemographicsDraft();
+    clearDemographicsDraft(storageKey);
   };
 
   const isFormComplete = () => {

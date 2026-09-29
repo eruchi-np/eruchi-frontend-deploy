@@ -6,6 +6,7 @@ import { getNextStreakBonus } from "../utils/streakBonus";
 import { useAuth } from "../context/AuthContext";
 import HomeFooter from "../components/homepage/HomeFooter";
 import StreakGuardModal from "../components/profile/StreakGuardModal";
+import { CreditDelta, SurveyStreakMark } from "../components/profile/ActivityMarks";
 import { initProfileCinema } from "../components/profile/profileCinema";
 import sectionIcon from "../assets/home/features/opinions.png";
 import skyBg from "../assets/home/sky.jpg";
@@ -67,33 +68,25 @@ function Credits1kBadge() {
   );
 }
 
+function showCredits1kBadge(user, firstName) {
+  const name = String(firstName || "").trim().toLowerCase();
+  const username = String(user?.username || "").trim().toLowerCase();
+  const email = String(user?.email || "").trim().toLowerCase();
+  return name === "mks" || username === "ryanshr02" || email === "ryanshr02@gmail.com";
+}
+
 function creditGoal(credits) {
   const caps = [50, 100, 200, 300, 400, 500, 750, 1000, 1500, 2000, 5000];
   return caps.find((cap) => credits <= cap) || credits;
 }
 
 function mapActivity(entry) {
-  const credits =
-    entry.creditsDelta == null
-      ? null
-      : entry.creditsDelta > 0
-        ? `+${entry.creditsDelta} credits`
-        : `−${Math.abs(entry.creditsDelta)} credits`;
-  const streakLabel =
-    entry.type === "survey_completed" && entry.streakAfter != null
-      ? `Streak ${entry.streakAfter}`
-      : entry.type === "streak_lost"
-        ? "Streak lost"
-        : entry.type === "streak_reward" && entry.streakAfter != null
-          ? `Streak ${entry.streakAfter}`
-          : null;
-
   return {
     id: entry._id,
     title: entry.title || "Activity",
     description: entry.description || "",
-    metaLeft: streakLabel,
-    metaRight: credits,
+    creditsDelta: entry.creditsDelta,
+    streakAfter: entry.streakAfter,
     createdAt: entry.createdAt,
     type: entry.type,
   };
@@ -356,11 +349,24 @@ export default function Profile() {
   return (
     <ProfileShell footer={<HomeFooter />} shellRef={pageRef}>
       <main className="profile-main">
+        {user.profileOutdated && (
+          <button
+            type="button"
+            className="profile-outdated-alert"
+            onClick={() => navigate("/refresh-profile")}
+          >
+            <AlertCircle size={20} aria-hidden="true" />
+            <span>
+              <strong>Update your profile</strong>
+              Your answers are more than 6 months old. Fill in the same two surveys again.
+            </span>
+          </button>
+        )}
         <section className="profile-hero">
           <div>
             <div className="profile-hero-name">
               <h1>Hi, {firstName}.</h1>
-              {String(firstName).trim().toLowerCase() === "mks" ? <Credits1kBadge /> : null}
+              {showCredits1kBadge(user, firstName) ? <Credits1kBadge /> : null}
               <button
                 type="button"
                 className="profile-guard-btn"
@@ -521,8 +527,8 @@ export default function Profile() {
                     <p>{item.description || " "}</p>
                   </div>
                   <div className="profile-survey-meta">
-                    <span>{item.metaLeft || "—"}</span>
-                    <span>{item.metaRight || "—"}</span>
+                    <SurveyStreakMark type={item.type} streakAfter={item.streakAfter} />
+                    <CreditDelta amount={item.creditsDelta} />
                   </div>
                   <button
                     type="button"

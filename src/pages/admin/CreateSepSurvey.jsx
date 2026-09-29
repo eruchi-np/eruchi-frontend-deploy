@@ -1,7 +1,7 @@
 // src/pages/admin/CreateSepSurvey.jsx
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { sepSurveyAPI, clusterAPI } from '../../services/api';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { sepSurveyAPI, fifteenDaySurveyAPI, clusterAPI } from '../../services/api';
 import { ArrowLeft, Plus, Trash2, Save, Type, FileText, CheckSquare, Loader2, Sliders, AlertCircle, Eye, Settings as SettingsIcon, Clock, Calendar, Award, Users, Target, Table2, ChevronUp, ChevronDown } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MatrixQuestion from '../../components/survey/MatrixQuestion';
@@ -60,13 +60,18 @@ const CreateSepSurvey = () => {
   });
 
   const params = useParams();
+  const [searchParams] = useSearchParams();
   const surveyId = params.surveyId || params.id;
+  const isSprint = searchParams.get('sprint') === '1';
+  const sprintDay = Number(searchParams.get('day'));
   const isEditMode = Boolean(surveyId);
   const [initialLoading, setInitialLoading] = useState(isEditMode);
+  const backTo = isSprint ? '/admin/15-day-survey' : '/admin';
 
   useEffect(() => {
     let cancelled = false;
     const loadClusters = async () => {
+      if (isSprint) return;
       setClustersLoading(true);
       try {
         const res = await clusterAPI.list({ skipErrorToast: true, limit: 100 });
@@ -79,14 +84,16 @@ const CreateSepSurvey = () => {
     };
     loadClusters();
     return () => { cancelled = true; };
-  }, []);
+  }, [isSprint]);
 
   useEffect(() => {
     if (!isEditMode) return;
 
     const fetchSurvey = async () => {
       try {
-        const res = await sepSurveyAPI.getById(surveyId, { skipErrorToast: true });
+        const res = isSprint
+          ? await fifteenDaySurveyAPI.getById(surveyId, { skipErrorToast: true })
+          : await sepSurveyAPI.getById(surveyId, { skipErrorToast: true });
         const survey = res.data.data;
 
         const startDate = survey.startDate ? new Date(survey.startDate) : new Date();
@@ -121,14 +128,14 @@ const CreateSepSurvey = () => {
       } catch (err) {
         console.error('Failed to load survey for editing', err);
         toast.error('Failed to load survey');
-        navigate('/admin');
+        navigate(isSprint ? '/admin/15-day-survey' : '/admin');
       } finally {
         setInitialLoading(false);
       }
     };
 
     fetchSurvey();
-  }, [isEditMode, surveyId, navigate]);
+  }, [isEditMode, isSprint, surveyId, navigate]);
 
   const questionTypes = [
     { value: 'text_short', label: 'Short Text', icon: Type, description: 'Brief text response' },
@@ -197,8 +204,10 @@ const CreateSepSurvey = () => {
   };
 
   const needsPublicWindow =
-    formData.visibility === 'public' ||
-    (formData.visibility === 'targeted' && formData.alsoPublishToOthers);
+    !isSprint && (
+      formData.visibility === 'public' ||
+      (formData.visibility === 'targeted' && formData.alsoPublishToOthers)
+    );
 
   const handleQuestionChange = (index, field, value) => {
     const updated = [...formData.questions];
@@ -330,7 +339,11 @@ const CreateSepSurvey = () => {
     if (!trimmedTitle) return toast.error('Survey title is required');
     if (!trimmedDesc) return toast.error('Description is required');
 
-    if (needsPublicWindow) {
+    if (isSprint && (!Number.isInteger(sprintDay) || sprintDay < 1 || sprintDay > 15)) {
+      return toast.error('Pick a day from 1 to 15');
+    }
+
+    if (!isSprint && needsPublicWindow) {
       if (!formData.publishedAt) return toast.error('Published date is required');
       if (!formData.availableDays || Number(formData.availableDays) < 1) {
         return toast.error('Available days must be at least 1');
@@ -341,11 +354,12 @@ const CreateSepSurvey = () => {
       return toast.error('Estimated time must be at least 1 minute');
     }
 
-    if (formData.visibility === 'targeted' && (!formData.validityDays || Number(formData.validityDays) < 1)) {
+    if (!isSprint && formData.visibility === 'targeted' && (!formData.validityDays || Number(formData.validityDays) < 1)) {
       return toast.error('Validity days must be at least 1');
     }
 
     if (
+      !isSprint &&
       formData.visibility === 'targeted' &&
       formData.status === 'published' &&
       formData.clusterIds.length > 0 &&
@@ -382,6 +396,52 @@ const CreateSepSurvey = () => {
       const derivedEndDate = new Date(publishedAt);
       derivedEndDate.setDate(derivedEndDate.getDate() + availableDays);
 
+      const questions = formData.questions.map(q => {
+          const base = {
+            questionText: q.questionText.trim(),
+            questionType: q.questionType,
+            isRequired: q.isRequired !== false,
+            metricTag: q.metricTag === 'cep' || q.metricTag === 'nps' ? q.metricTag : 'none'
+          };
+          if (['single_checkbox', 'multiple_checkbox'].includes(q.questionType)) {
+            base.options = q.options.map(o => o.trim()).filter(Boolean);
+            base.maxSelections = q.maxSelections;
+          }
+          if (q.questionType === 'matrix_radio') {
+            base.options = (q.options || []).map(o => o.trim()).filter(Boolean);
+            base.rows = (q.rows || []).map(r => r.trim()).filter(Boolean);
+            base.maxSelections = 1;
+          }
+          if (q.questionType === 'slider') {
+            base.minValue = Number(q.minValue);
+            base.maxValue = Number(q.maxValue);
+          }
+          return base;
+        });
+
+      if (isSprint) {
+        const sprintPayload = {
+          daySlot: sprintDay,
+          title: trimmedTitle,
+          description: trimmedDesc,
+          status: formData.status,
+          credits: Number(formData.credits),
+          questions
+        };
+        if (formData.estimatedMinutes !== '' && formData.estimatedMinutes != null) {
+          sprintPayload.estimatedMinutes = Number(formData.estimatedMinutes);
+        }
+        if (isEditMode) {
+          await fifteenDaySurveyAPI.update(surveyId, sprintPayload);
+          toast.success('15-day survey updated');
+        } else {
+          await fifteenDaySurveyAPI.create(sprintPayload);
+          toast.success('15-day survey saved');
+        }
+        navigate('/admin/15-day-survey');
+        return;
+      }
+
       const payload = {
         title: trimmedTitle,
         description: trimmedDesc,
@@ -404,28 +464,7 @@ const CreateSepSurvey = () => {
           formData.clusterIds.length > 0
             ? new Date(formData.clusterSendAt).toISOString()
             : undefined,
-        questions: formData.questions.map(q => {
-          const base = {
-            questionText: q.questionText.trim(),
-            questionType: q.questionType,
-            isRequired: q.isRequired !== false,
-            metricTag: q.metricTag === 'cep' || q.metricTag === 'nps' ? q.metricTag : 'none'
-          };
-          if (['single_checkbox', 'multiple_checkbox'].includes(q.questionType)) {
-            base.options = q.options.map(o => o.trim()).filter(Boolean);
-            base.maxSelections = q.maxSelections;
-          }
-          if (q.questionType === 'matrix_radio') {
-            base.options = (q.options || []).map(o => o.trim()).filter(Boolean);
-            base.rows = (q.rows || []).map(r => r.trim()).filter(Boolean);
-            base.maxSelections = 1;
-          }
-          if (q.questionType === 'slider') {
-            base.minValue = Number(q.minValue);
-            base.maxValue = Number(q.maxValue);
-          }
-          return base;
-        })
+        questions
       };
       if (formData.estimatedMinutes !== '' && formData.estimatedMinutes != null) {
         payload.estimatedMinutes = Number(formData.estimatedMinutes);
@@ -500,14 +539,23 @@ const CreateSepSurvey = () => {
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 sm:py-6">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
-              onClick={() => navigate('/admin')}
+              type="button"
+              onClick={() => navigate(backTo)}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
             >
               <ArrowLeft className="h-5 w-5 text-gray-600" />
             </button>
             <div className="min-w-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{isEditMode ? 'Edit Standalone Survey' : 'Create Standalone Survey'}</h1>
-              <p className="text-sm text-gray-500">{isEditMode ? 'Admins and customer admins can edit questions, rows, and scale labels any time' : 'Independent survey (not tied to a campaign)'}</p>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+                {isSprint
+                  ? `${isEditMode ? 'Edit' : 'Create'} 15-day survey · Day ${sprintDay}`
+                  : (isEditMode ? 'Edit Standalone Survey' : 'Create Standalone Survey')}
+              </h1>
+              <p className="text-sm text-gray-500">
+                {isSprint
+                  ? 'This preset stays on Daily Sprint until the user finishes it'
+                  : (isEditMode ? 'Admins and customer admins can edit questions, rows, and scale labels any time' : 'Independent survey (not tied to a campaign)')}
+              </p>
             </div>
           </div>
         </div>
@@ -551,7 +599,8 @@ const CreateSepSurvey = () => {
                 />
               </div>
 
-              {/* Survey kind */}
+              {!isSprint && (
+              <>
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
                   Survey type
@@ -722,6 +771,8 @@ const CreateSepSurvey = () => {
                     </label>
                   </div>
                 </>
+              )}
+              </>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1303,7 +1354,7 @@ const CreateSepSurvey = () => {
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   type="button"
-                  onClick={() => navigate('/admin')}
+                  onClick={() => navigate(backTo)}
                   className="px-8 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-all"
                 >
                   Cancel

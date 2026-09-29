@@ -5,6 +5,7 @@ import ProfileCompletionBar from "../layout/ProfileCompletionBar";
 import { useAuth } from "../../context/AuthContext";
 import { trackEvent } from "../../utils/visitorEvents";
 import { adminHomePath, isStaffAdmin } from "../../utils/adminRoles";
+import { businessAPI } from "../../services/api";
 import "./homepage.css";
 
 export default function HomeNav({ variant = "page" }) {
@@ -38,6 +39,8 @@ export default function HomeNav({ variant = "page" }) {
         "/complete-basic-info",
         "/complete-profile",
         "/additional-profile",
+        "/refresh-profile",
+        "/refresh-additional-profile",
         "/profile",
       ]);
       const threshold = shortSkyPaths.has(pathname) ? 120 : window.innerHeight * 0.62;
@@ -68,6 +71,26 @@ export default function HomeNav({ variant = "page" }) {
   const goProfile = () => {
     trackEvent("cta_click", "/profile");
     navigate(isBusiness ? "/business/profile" : "/profile");
+  };
+
+  const logoutBusiness = async () => {
+    try {
+      await businessAPI.logout();
+      localStorage.removeItem("is_business");
+      localStorage.removeItem("business_name");
+      window.dispatchEvent(new Event("authChange"));
+      navigate("/login");
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const businessLinkActive = (to) => {
+    if (to === "/business/dashboard") return pathname === to;
+    if (to === "/business/profile") {
+      return pathname.startsWith("/business/profile") || pathname.startsWith("/business/vouchers");
+    }
+    return pathname === to || pathname.startsWith(`${to}/`);
   };
 
   const goSurveys = () => {
@@ -113,15 +136,22 @@ export default function HomeNav({ variant = "page" }) {
           <nav className="home-nav-links">
             {isBusiness ? (
               <>
-                <Link to="/business/dashboard" style={{ color: linkColor }}>
-                  Dashboard
-                </Link>
-                <Link to="/business/scan" style={{ color: linkColor }}>
-                  Scan
-                </Link>
-                <Link to="/business/profile" style={{ color: linkColor }}>
-                  Profile
-                </Link>
+                {[
+                  ["/business/dashboard", "Dashboard"],
+                  ["/business/scan", "Scan"],
+                  ["/business/profile", "Profile"],
+                ].map(([to, label]) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    style={{
+                      color: linkColor,
+                      opacity: businessLinkActive(to) ? 1 : 0.5,
+                    }}
+                  >
+                    {label}
+                  </Link>
+                ))}
               </>
             ) : (
               <>
@@ -149,6 +179,15 @@ export default function HomeNav({ variant = "page" }) {
           </nav>
 
           <div className="home-nav-end">
+            {isBusiness && (
+              <button
+                type="button"
+                onClick={logoutBusiness}
+                className="hidden lg:inline text-[12px] font-semibold tracking-[0.16em] uppercase text-[#0c1520]/70 hover:text-[#0c1520]"
+              >
+                Log out
+              </button>
+            )}
             {isLoggedIn || isBusiness ? (
               <button
                 type="button"
@@ -208,6 +247,16 @@ export default function HomeNav({ variant = "page" }) {
               <Link to="/business/profile" onClick={() => setMenuOpen(false)}>
                 Profile
               </Link>
+              <button
+                type="button"
+                className="text-left py-3.5 border-b border-[#f1f3f5] font-semibold tracking-[0.12em] uppercase text-sm text-[#0c1520]"
+                onClick={() => {
+                  setMenuOpen(false);
+                  logoutBusiness();
+                }}
+              >
+                Log out
+              </button>
             </>
           ) : (
             <>

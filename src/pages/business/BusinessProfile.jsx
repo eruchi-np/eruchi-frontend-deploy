@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ExternalLink, Loader2, Star, Upload } from 'lucide-react';
+import { ExternalLink, Loader2, Star, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { businessAPI } from '../../services/api';
 import { BUSINESS_CATEGORIES, DAYS_OF_WEEK, inputCls } from './businessFormConstants';
@@ -121,15 +121,8 @@ export default function BusinessProfile() {
   }
 
   return (
-    <div className="min-h-screen bg-white p-4 pb-24" style={{ fontFamily: "'Inter', sans-serif" }}>
+    <div style={{ fontFamily: "'Inter', sans-serif" }}>
       <div className="max-w-xl mx-auto">
-        <button
-          onClick={() => navigate('/business/dashboard')}
-          className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 mb-4"
-        >
-          <ArrowLeft size={16} /> Dashboard
-        </button>
-
         <div className="flex items-start justify-between gap-3 mb-6">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Store profile</h1>

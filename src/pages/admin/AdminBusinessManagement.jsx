@@ -9,6 +9,7 @@ import {
 import toast from 'react-hot-toast';
 import Pagination from '../../components/ui/Pagination';
 import StatsGrid from './components/StatsGrid.jsx';
+import BusinessDashboardModal from './components/BusinessDashboardModal.jsx';
 
 const NAVY = "#1B2A4A";
 const MAX_POSTERS = 5;
@@ -140,6 +141,8 @@ export default function AdminBusinessManagement() {
   const [passwordModalError, setPasswordModalError]                   = useState('');
   const [passwordSubmitLoading, setPasswordSubmitLoading]             = useState(false);
   const [showNewPassword, setShowNewPassword]                         = useState(false);
+  const [dashboardBusiness, setDashboardBusiness]                     = useState(null);
+  const [repeatVisitSaving, setRepeatVisitSaving]                   = useState({});
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -211,6 +214,25 @@ export default function AdminBusinessManagement() {
       toast.error('Failed to load businesses');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRepeatVisitsToggle = async (business, showRepeatVisits) => {
+    const previous = business.showRepeatVisits !== false;
+    setBusinesses((prev) => prev.map((row) => (
+      row._id === business._id ? { ...row, showRepeatVisits } : row
+    )));
+    setRepeatVisitSaving((prev) => ({ ...prev, [business._id]: true }));
+    try {
+      await adminAPI.setRepeatVisits(business._id, showRepeatVisits, { skipErrorToast: true });
+    } catch (err) {
+      console.error(err);
+      setBusinesses((prev) => prev.map((row) => (
+        row._id === business._id ? { ...row, showRepeatVisits: previous } : row
+      )));
+      toast.error('Failed to update visit counts');
+    } finally {
+      setRepeatVisitSaving((prev) => ({ ...prev, [business._id]: false }));
     }
   };
 
@@ -753,16 +775,26 @@ export default function AdminBusinessManagement() {
                             {business.category || 'N/A'} · {business.phone || 'N/A'}
                           </p>
                         </div>
-                        <div className="flex items-center md:justify-start">
+                        <div className="flex flex-col items-start gap-2 md:justify-start">
                           <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                             business.isVerified ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
                           }`}>
                             {business.isVerified ? 'Verified' : 'Unverified'}
                           </span>
+                          <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              className="rounded border-gray-300"
+                              checked={business.showRepeatVisits !== false}
+                              disabled={!!repeatVisitSaving[business._id]}
+                              onChange={(e) => handleRepeatVisitsToggle(business, e.target.checked)}
+                            />
+                            Show 1st and 2nd visits
+                          </label>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
                       <button
                         onClick={() => openEditBusinessModal(business)}
                         className="p-2 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
@@ -788,6 +820,12 @@ export default function AdminBusinessManagement() {
                         title="Delete business"
                       >
                         <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-600" />
+                      </button>
+                      <button
+                        onClick={() => setDashboardBusiness(business)}
+                        className="px-3 py-2 text-sm font-medium border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                      >
+                        Dashboard
                       </button>
                       <button
                         onClick={() => toggleExpand(business._id)}
@@ -1741,6 +1779,13 @@ export default function AdminBusinessManagement() {
             </form>
           </div>
         </div>
+      )}
+
+      {dashboardBusiness && (
+        <BusinessDashboardModal
+          business={dashboardBusiness}
+          onClose={() => setDashboardBusiness(null)}
+        />
       )}
     </div>
   );

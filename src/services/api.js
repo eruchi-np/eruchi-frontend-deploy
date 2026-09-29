@@ -100,9 +100,12 @@ export const adminAPI = {
   getStats: (options = {}) => getRequest('/admin/stats', options),
   updateUserStatus: (userId, data, config = {}) => api.put(`/admin/users/${userId}/status`, data, config),
   getBusinesses: (options = {}) => getRequest('/admin/businesses', options),
+  getBusinessDashboard: (id, options = {}) => getRequest(`/admin/businesses/${id}/dashboard`, options),
   createBusiness: (data, config = {}) => api.post('/admin/businesses', data, config),
   updateBusiness: (id, data, config = {}) => api.put(`/admin/businesses/${id}`, data, config),
   verifyBusiness: (id, data, config = {}) => api.put(`/admin/businesses/${id}/verify`, data, config),
+  setRepeatVisits: (id, showRepeatVisits, config = {}) =>
+    api.put(`/admin/businesses/${id}/repeat-visits`, { showRepeatVisits }, config),
   deleteBusiness: (id, config = {}) => api.delete(`/admin/businesses/${id}`, config),
   changeBusinessPassword: (id, data, config = {}) => api.put(`/admin/businesses/${id}/password`, data, config),
   uploadBusinessPoster: (id, formData, config = {}) =>
@@ -188,6 +191,20 @@ export const sepSurveyAPI = {
   exportTimingsCSV: (surveyId, config = {}) => api.get(`/sepsurveys/${surveyId}/timings/csv`, { responseType: 'blob', ...config }),
 };
 
+export const fifteenDaySurveyAPI = {
+  getBoard: (config = {}) => api.get('/fifteen-day/board', config),
+  create: (data, config = {}) => api.post('/fifteen-day', data, config),
+  getById: (surveyId, config = {}) => api.get(`/fifteen-day/${surveyId}`, config),
+  update: (surveyId, data, config = {}) => api.put(`/fifteen-day/${surveyId}`, data, config),
+  archive: (surveyId, config = {}) => api.delete(`/fifteen-day/${surveyId}`, config),
+  updateProgram: (existingUsersSendAt, config = {}) =>
+    api.put('/fifteen-day/program', { existingUsersSendAt }, config),
+  getMine: (config = {}) => api.get('/fifteen-day/mine', config),
+  getToTake: (surveyId, config = {}) => api.get(`/fifteen-day/take/${surveyId}`, config),
+  submit: (surveyId, responses, timingData, config = {}) =>
+    api.post(`/fifteen-day/take/${surveyId}/submit`, { responses, timingData }, config),
+};
+
 export const voucherAPI = {
   // ALL PATHS PERFECTLY ALIGNED TO BACKEND BASE PATH
   getOffers: (options = {}) => getRequest('/vouchers/voucher-offers', options),
@@ -218,8 +235,6 @@ export const businessAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
       ...config,
     }),
-  createVoucherOffer: (data, config = {}) => api.post('/business/voucher-offers', data, config),
-  updateVoucherOffer: (id, data, config = {}) => api.put(`/business/voucher-offers/${id}`, data, config),
   getPublicProfile: (id, config = {}) => api.get(`/business/public/${id}`, config),
 };
 

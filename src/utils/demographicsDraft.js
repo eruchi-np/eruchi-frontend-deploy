@@ -1,5 +1,8 @@
 const STORAGE_KEY = 'demographics_draft_v2';
 const LEGACY_STORAGE_KEY = 'demographics_draft_v1';
+export const REFRESH_STORAGE_KEY = 'demographics_refresh_draft_v1';
+
+const isDefaultKey = (storageKey) => !storageKey || storageKey === STORAGE_KEY;
 
 export const initialFormData = {
   firstLanguage: '',
@@ -59,22 +62,23 @@ export const normalizeFormData = (raw = {}) => {
   return next;
 };
 
-export const saveDraft = (formData, completedSteps, currentStep) => {
+export const saveDraft = (formData, completedSteps, currentStep, storageKey) => {
+  const key = storageKey || STORAGE_KEY;
   try {
     localStorage.setItem(
-      STORAGE_KEY,
+      key,
       JSON.stringify({ formData, completedSteps, currentStep })
     );
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    if (isDefaultKey(storageKey)) localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch (err) {
     console.warn('Failed to save demographics draft:', err);
   }
 };
 
-export const clearDemographicsDraft = () => {
+export const clearDemographicsDraft = (storageKey) => {
   try {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(LEGACY_STORAGE_KEY);
+    localStorage.removeItem(storageKey || STORAGE_KEY);
+    if (isDefaultKey(storageKey)) localStorage.removeItem(LEGACY_STORAGE_KEY);
   } catch (err) {
     console.warn('Failed to clear demographics draft:', err);
   }
@@ -84,9 +88,11 @@ export const clearDemographicsDraft = () => {
  * Load a draft only when it has real progress.
  * Empty / junk drafts are cleared so selects stay blank by default.
  */
-export const loadDraft = () => {
+export const loadDraft = (storageKey) => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = isDefaultKey(storageKey)
+      ? localStorage.getItem(STORAGE_KEY) || localStorage.getItem(LEGACY_STORAGE_KEY)
+      : localStorage.getItem(storageKey);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed?.formData?.selectedInterests) {
@@ -105,7 +111,7 @@ export const loadDraft = () => {
     const currentStep = Math.min(Math.max(parsed?.currentStep || 1, 1), 3);
 
     if (!hasDraftProgress(formData, completedSteps, currentStep)) {
-      clearDemographicsDraft();
+      clearDemographicsDraft(storageKey);
       return null;
     }
 

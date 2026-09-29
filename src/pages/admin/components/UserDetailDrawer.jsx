@@ -40,7 +40,6 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
-  const [restoreAmount, setRestoreAmount] = useState("");
   const [grantGuard, setGrantGuard] = useState(false);
   const [restoring, setRestoring] = useState(false);
 
@@ -49,8 +48,6 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
     try {
       const res = await adminAPI.getUser(userId, { skipErrorToast: true });
       setDetail(res.data.data);
-      const saved = res.data.data?.user?.lastBrokenStreakCount || 0;
-      setRestoreAmount(saved > 0 ? String(saved) : "");
       setGrantGuard(false);
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to load user");
@@ -106,23 +103,15 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
   const handleRestoreStreak = async (e) => {
     e.preventDefault();
     const saved = detail?.user?.lastBrokenStreakCount || 0;
-    const typed = restoreAmount.trim();
-    const payload = { grantStreakGuard: grantGuard };
-    if (typed) {
-      const n = Number(typed);
-      if (!Number.isFinite(n) || n < 1) {
-        toast.error("Enter a streak of at least 1 day");
-        return;
-      }
-      payload.streakCount = Math.floor(n);
-    } else if (saved < 1) {
-      toast.error("Enter the streak days to restore");
-      return;
-    }
+    if ((detail?.user?.streakCount || 0) > 0 || saved < 1) return;
 
     setRestoring(true);
     try {
-      const res = await adminAPI.restoreUserStreak(userId, payload, { skipErrorToast: true });
+      const res = await adminAPI.restoreUserStreak(
+        userId,
+        { grantStreakGuard: grantGuard },
+        { skipErrorToast: true }
+      );
       toast.success(res.data?.message || "Streak restored");
       await load();
     } catch (err) {
@@ -235,51 +224,29 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
             </form>
             )}
 
-            {canAdjustCredits && (
+            {canAdjustCredits && !hasActiveStreak && (user.lastBrokenStreakCount || 0) > 0 && (
             <form onSubmit={handleRestoreStreak} className="rounded-xl border border-gray-200 p-4 space-y-3">
               <p className="text-sm font-semibold text-gray-900">Restore streak</p>
-              {hasActiveStreak ? (
-                <p className="text-sm text-gray-500">
-                  User already has an active streak ({user.streakCount} day{user.streakCount === 1 ? "" : "s"}).
-                </p>
-              ) : (
-                <>
-                  <p className="text-xs text-gray-500">
-                    {(user.lastBrokenStreakCount || 0) > 0
-                      ? `Saved last streak: ${user.lastBrokenStreakCount}. Leave blank to use it, or type a different amount.`
-                      : "No saved last streak — enter the days to restore."}
-                  </p>
-                  <input
-                    type="number"
-                    min={1}
-                    value={restoreAmount}
-                    onChange={(e) => setRestoreAmount(e.target.value)}
-                    placeholder={
-                      (user.lastBrokenStreakCount || 0) > 0
-                        ? String(user.lastBrokenStreakCount)
-                        : "e.g. 12"
-                    }
-                    className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm"
-                  />
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                      type="checkbox"
-                      checked={grantGuard}
-                      onChange={(e) => setGrantGuard(e.target.checked)}
-                      className="rounded border-gray-300"
-                    />
-                    Also give 1-day Streak Guard
-                  </label>
-                  <button
-                    type="submit"
-                    disabled={restoring}
-                    className="w-full py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-50"
-                    style={{ backgroundColor: NAVY }}
-                  >
-                    {restoring ? "Restoring…" : "Restore streak"}
-                  </button>
-                </>
-              )}
+              <p className="text-xs text-gray-500">
+                Puts the streak back to {user.lastBrokenStreakCount} day{user.lastBrokenStreakCount === 1 ? "" : "s"}, the count before it reset.
+              </p>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={grantGuard}
+                  onChange={(e) => setGrantGuard(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                Also give 1-day Streak Guard
+              </label>
+              <button
+                type="submit"
+                disabled={restoring}
+                className="w-full py-2.5 rounded-lg text-sm font-medium text-white disabled:opacity-50"
+                style={{ backgroundColor: NAVY }}
+              >
+                {restoring ? "Restoring…" : "Restore streak"}
+              </button>
             </form>
             )}
 

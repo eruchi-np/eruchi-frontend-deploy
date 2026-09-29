@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
-import { sepSurveyAPI } from "../services/api";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
+import { sepSurveyAPI, fifteenDaySurveyAPI } from "../services/api";
 import {
   ArrowLeft,
   Loader2,
@@ -18,6 +18,8 @@ import MatrixQuestion, {
 
 const StandaloneSurvey = () => {
   const { surveyId } = useParams();
+  const [searchParams] = useSearchParams();
+  const isSprint = searchParams.get("sprint") === "1";
   const navigate = useNavigate();
   const { user } = useAuth();
   const [survey, setSurvey] = useState(null);
@@ -31,7 +33,9 @@ const StandaloneSurvey = () => {
   useEffect(() => {
     const fetchSurvey = async () => {
       try {
-        const res = await sepSurveyAPI.getById(surveyId);
+        const res = isSprint
+          ? await fifteenDaySurveyAPI.getToTake(surveyId)
+          : await sepSurveyAPI.getById(surveyId);
         setSurvey(res.data.data);
 
         const initial = {};
@@ -55,7 +59,7 @@ const StandaloneSurvey = () => {
     };
 
     fetchSurvey();
-  }, [surveyId]);
+  }, [surveyId, isSprint]);
 
   const handleChange = (qText, value) => {
     setResponses((prev) => ({ ...prev, [qText]: value }));
@@ -101,7 +105,9 @@ const StandaloneSurvey = () => {
     try {
       const timingData = getTimingData();
       const previousStreak = user?.streakCount ?? 0;
-      const res = await sepSurveyAPI.submit(surveyId, responses, timingData);
+      const res = isSprint
+        ? await fifteenDaySurveyAPI.submit(surveyId, responses, timingData)
+        : await sepSurveyAPI.submit(surveyId, responses, timingData);
       setConfirmOpen(false);
       window.dispatchEvent(new Event("authChange"));
       goToSurveyComplete(

@@ -63,6 +63,7 @@ const PRIVATE_TITLES = [
   { test: (path) => path.startsWith('/admin'), title: 'Admin' },
   { test: (path) => path.startsWith('/business'), title: 'Business' },
   { test: (path) => path.startsWith('/complete-'), title: 'Complete profile' },
+  { test: (path) => path === '/refresh-profile' || path === '/refresh-additional-profile', title: 'Update profile' },
   { test: (path) => path === '/edit-profile', title: 'Edit profile' },
 ];
 

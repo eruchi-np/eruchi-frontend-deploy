@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
-import { CheckCircle2, XCircle, ScanLine, LayoutDashboard } from "lucide-react";
+import { CheckCircle2, XCircle, ScanLine } from "lucide-react";
 import { businessAPI } from "../../services/api";
 import { discountLabel, formatRs } from "../../utils/billMath";
 
@@ -16,7 +15,6 @@ const parseAmount = (raw) => {
 };
 
 export default function BusinessScan() {
-  const navigate = useNavigate();
   const [scannerActive, setScannerActive] = useState(false);
   const [result, setResult] = useState(RESULT_IDLE);
   const [loading, setLoading] = useState(false);
@@ -211,22 +209,10 @@ export default function BusinessScan() {
 
   return (
     <div
-      className="min-h-screen bg-gray-50 flex flex-col pb-28"
+      className="flex flex-col"
       style={{ fontFamily: "'Inter', sans-serif" }}
     >
-      {/* Top bar */}
-      <div className="bg-white border-b border-gray-100 px-4 py-4 flex items-center justify-between">
-        <h1 className="text-lg font-bold text-gray-900">Scan Voucher</h1>
-        <button
-          onClick={() => navigate("/business/dashboard")}
-          className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors"
-        >
-          <LayoutDashboard size={16} />
-          Dashboard
-        </button>
-      </div>
-
-      <div className="flex-1 flex flex-col items-center px-4 py-6 gap-6 max-w-md mx-auto w-full">
+      <div className="flex-1 flex flex-col items-center gap-6 max-w-md mx-auto w-full">
         {/* Result card */}
         {result && (
           <div

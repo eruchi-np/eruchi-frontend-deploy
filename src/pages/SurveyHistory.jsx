@@ -3,10 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { userAPI } from '../services/api';
 import {
-  Loader2, ArrowLeft, Award, Calendar, AlertCircle,
+  Loader2, ArrowLeft, Calendar, AlertCircle,
   History as HistoryIcon, Package, FileText, Ticket,
   Flame, Shield, Gift,
 } from 'lucide-react';
+import { CreditDelta, SurveyStreakMark } from '../components/profile/ActivityMarks';
 import toast from 'react-hot-toast';
 
 const TYPE_META = {
@@ -138,13 +139,6 @@ const SurveyHistory = () => {
                 const date = new Date(entry.createdAt).toLocaleDateString('en-US', {
                   year: 'numeric', month: 'short', day: 'numeric',
                 });
-                const credits = entry.creditsDelta;
-                const showStreak =
-                  entry.streakAfter != null &&
-                  (entry.type === 'survey_completed' ||
-                    entry.type === 'streak_reward' ||
-                    entry.type === 'streak_lost');
-
                 return (
                   <div
                     key={entry._id}
@@ -166,20 +160,12 @@ const SurveyHistory = () => {
                     </div>
 
                     <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      {credits != null && credits !== 0 && (
-                        <div className={`flex items-center gap-1 ${credits > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                          <Award className="w-3.5 h-3.5" />
-                          <span className="text-xs font-bold">
-                            {credits > 0 ? '+' : '−'}{Math.abs(credits)}
-                          </span>
-                        </div>
-                      )}
-                      {showStreak && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-orange-50 text-orange-600 flex items-center gap-1">
-                          <Flame className="w-3 h-3" />
-                          Streak {entry.streakAfter}
-                        </span>
-                      )}
+                      <CreditDelta amount={entry.creditsDelta} placeholder={false} />
+                      <SurveyStreakMark
+                        type={entry.type}
+                        streakAfter={entry.streakAfter}
+                        placeholder={false}
+                      />
                       <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${toneClass[meta.tone]}`}>
                         {meta.label}
                       </span>

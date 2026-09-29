@@ -7,11 +7,14 @@ import HouseholdDurables from "./steps/HouseholdDurables";
 import { userAPI } from "../../services/api";
 import toast from "react-hot-toast";
 import { demographicsStepSchema, parseStep } from "../../utils/onboardingSchemas";
+import { REFRESH_STORAGE_KEY } from "../../utils/demographicsDraft";
 import "../onboarding/onboarding.css";
 
-const DemographicsWizard = ({ onComplete }) => {
+const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
+  const isRefresh = mode === "refresh";
+  const storageKey = isRefresh ? REFRESH_STORAGE_KEY : undefined;
   const { formData, updateFormData, errors: hookErrors, currentStep, goToStep } =
-    useDemographics();
+    useDemographics({ storageKey });
   const [localErrors, setLocalErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
 
@@ -61,14 +64,19 @@ const DemographicsWizard = ({ onComplete }) => {
       householdDurables: formData.durableGoods || [],
       mainIncomeSource: (formData.mainHouseholdEarner || "").trim(),
       mainIncomeSourceEducation: formData.earnerEducation ? formData.earnerEducation.trim() : null,
+      ...(isRefresh ? { profileSurvey: true } : {}),
     };
 
     try {
       const response = await userAPI.updateDemographics(payload, { skipErrorToast: true });
 
       if (response.data.success) {
-        toast.success("You're in. Your first survey is ready. Takes under 2 minutes.");
-        clearDemographicsDraft();
+        toast.success(
+          isRefresh
+            ? "Saved. One more short survey."
+            : "You're in. Your first survey is ready. Takes under 2 minutes."
+        );
+        clearDemographicsDraft(storageKey);
         onComplete();
       } else {
         setSubmitError(response.data.message || "Failed to save profile. Please try again.");

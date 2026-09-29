@@ -62,7 +62,8 @@ const OptionPill = ({ label, selected, onClick, multi }) => (
   </button>
 );
 
-const AdditionalProfileSurvey = ({ onComplete }) => {
+const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
+  const isRefresh = mode === 'refresh';
   const { formData, updateField, toggleArrayField } = useAdditionalProfile();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
@@ -82,7 +83,11 @@ const AdditionalProfileSurvey = ({ onComplete }) => {
     const fieldErrors = parseStep(additionalProfileSchema, formData);
     if (Object.keys(fieldErrors).length) {
       setErrors(fieldErrors);
-      setSubmitError('Please answer every question before claiming your credits.');
+      setSubmitError(
+        isRefresh
+          ? 'Please answer every question.'
+          : 'Please answer every question before claiming your credits.'
+      );
       return;
     }
 
@@ -90,9 +95,14 @@ const AdditionalProfileSurvey = ({ onComplete }) => {
     setSubmitError('');
     setErrors({});
     try {
-      const response = await userAPI.updateAdditionalProfile(formData, { skipErrorToast: true });
+      const response = await userAPI.updateAdditionalProfile(
+        isRefresh ? { ...formData, profileSurvey: true } : formData,
+        { skipErrorToast: true }
+      );
       if (response.data.success) {
-        toast.success(`${PROFILE_COMPLETION_2_CREDITS} Ruchi Credits added.`);
+        toast.success(
+          isRefresh ? 'Profile updated.' : `${PROFILE_COMPLETION_2_CREDITS} Ruchi Credits added.`
+        );
         onComplete?.();
       } else {
         setSubmitError(response.data.message || 'Failed to save your answers');
@@ -158,7 +168,7 @@ const AdditionalProfileSurvey = ({ onComplete }) => {
           disabled={submitting}
           className="home-pill home-pill-lg home-pill-lime"
         >
-          {submitting ? 'Saving...' : 'Claim your credits'}
+          {submitting ? 'Saving...' : isRefresh ? 'Save answers' : 'Claim your credits'}
         </button>
       </div>
     </div>

@@ -430,6 +430,11 @@ const AdminDashboard = () => {
 
             <div className="flex items-center flex-wrap gap-2 sm:gap-3">
               {can("surveys") && (
+                <button onClick={() => navigate("/admin/15-day-survey")} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
+                  <CalendarDays className="h-4 w-4" /> 15-day survey
+                </button>
+              )}
+              {can("surveys") && (
                 <button onClick={() => navigate("/admin/create-sep-survey")} className="flex items-center gap-2 text-white px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90" style={{ backgroundColor: NAVY }}>
                   <Plus className="h-4 w-4" /> <span className="hidden sm:inline">New Standalone </span>Survey
                 </button>

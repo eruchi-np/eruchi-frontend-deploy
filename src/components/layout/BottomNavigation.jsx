@@ -9,7 +9,7 @@ const BusinessBottomNavigation = () => {
 
   const isDashboard = location.pathname === '/business/dashboard';
   const isScan = location.pathname === '/business/scan';
-  const isProfile = location.pathname.startsWith('/business/profile') || location.pathname.startsWith('/business/vouchers');
+  const isVouchers = location.pathname.startsWith('/business/vouchers');
 
   return (
     <nav className="fixed block md:hidden bottom-0 z-50 left-0 right-0 bg-white border-t border-gray-200 px-4 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
@@ -32,12 +32,12 @@ const BusinessBottomNavigation = () => {
           </li>
         </Link>
 
-        <Link to="/business/profile">
+        <Link to="/business/vouchers">
           <li className="flex flex-col items-center pb-1">
-            <button className={`p-1 rounded-full focus:outline-none ${isProfile ? 'text-blue-600' : 'text-gray-500'}`}>
+            <button className={`p-1 rounded-full focus:outline-none ${isVouchers ? 'text-blue-600' : 'text-gray-500'}`}>
               <Store size={24} />
             </button>
-            <span className={`text-xs mt-1 ${isProfile ? 'text-blue-600' : 'text-gray-500'}`}>Profile</span>
+            <span className={`text-xs mt-1 ${isVouchers ? 'text-blue-600' : 'text-gray-500'}`}>Vouchers</span>
           </li>
         </Link>
       </ul>
