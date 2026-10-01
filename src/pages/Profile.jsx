@@ -349,7 +349,7 @@ export default function Profile() {
   return (
     <ProfileShell footer={<HomeFooter />} shellRef={pageRef}>
       <main className="profile-main">
-        {user.profileOutdated && (
+        {(user.profileSurveyBlocked || user.profileOutdated) && (
           <button
             type="button"
             className="profile-outdated-alert"
@@ -358,7 +358,8 @@ export default function Profile() {
             <AlertCircle size={20} aria-hidden="true" />
             <span>
               <strong>Update your profile</strong>
-              Your answers are more than 6 months old. Fill in the same two surveys again.
+              You last updated your profile more than 6 months ago. Update your profile to stay up to date, and earn some extra Ruchi Credits!
+              {user.profileSurveyBlocked ? " Surveys stay closed until you update it." : ""}
             </span>
           </button>
         )}

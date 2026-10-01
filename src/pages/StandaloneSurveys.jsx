@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { ChevronDown, Search, SearchX } from "lucide-react";
+import { ChevronDown, SearchX } from "lucide-react";
 import toast from "react-hot-toast";
 import { sepSurveyAPI, fifteenDaySurveyAPI, userAPI } from "../services/api";
 import { StreakArc, pageWindow } from "../components/shop/CreditArc";
@@ -67,7 +67,10 @@ function SurveyRow({ survey, onView }) {
         type="button"
         className="surveys-row-view"
         disabled={expired}
-        onClick={() => onView(survey)}
+        onClick={(event) => {
+          event.stopPropagation();
+          onView(survey);
+        }}
       >
         {expired ? "closed" : "view"}
       </button>
@@ -95,13 +98,10 @@ export default function StandaloneSurveys() {
   const rectsRef = useRef(new Map());
   const lastCatalogPage = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const search = searchParams.get("q") || "";
   const sortOrder = searchParams.get("sort") || "latest";
   const catalogPage = parsePage(searchParams.get("page"));
-  const [searchDraft, setSearchDraft] = useState(search);
   const [surveys, setSurveys] = useState([]);
   const [sprintSurveys, setSprintSurveys] = useState([]);
-  const [profileOutdated, setProfileOutdated] = useState(false);
   const [streak, setStreak] = useState(Number(user?.streakCount) || 0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -110,7 +110,6 @@ export default function StandaloneSurveys() {
   const setListParams = useCallback(
     (patch) =>
       writeSearchParams(setSearchParams, patch, {
-        q: "",
         sort: "latest",
         page: 1,
       }),
@@ -118,16 +117,9 @@ export default function StandaloneSurveys() {
   );
 
   useEffect(() => {
-    setSearchDraft(search);
-  }, [search]);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (searchDraft === search) return;
-      setListParams({ q: searchDraft, page: 1 });
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchDraft, search, setListParams]);
+    if (!searchParams.get("q")) return;
+    setListParams({ q: "" });
+  }, [searchParams, setListParams]);
 
   useEffect(() => {
     trackEvent("page_view", "/standalone-surveys");
@@ -160,6 +152,13 @@ export default function StandaloneSurveys() {
     let cancelled = false;
 
     const fetchData = async () => {
+      if (user?.profileSurveyBlocked) {
+        setSurveys([]);
+        setSprintSurveys([]);
+        setLoading(false);
+        setError(null);
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
@@ -186,10 +185,8 @@ export default function StandaloneSurveys() {
         setSurveys(res.data.data || []);
         if (sprintResult.status === "fulfilled") {
           setSprintSurveys(sprintResult.value.data?.data || []);
-          setProfileOutdated(Boolean(sprintResult.value.data?.profileOutdated));
         } else {
           setSprintSurveys([]);
-          setProfileOutdated(false);
         }
 
         if (profileResult.status === "fulfilled" && profileResult.value) {
@@ -216,42 +213,16 @@ export default function StandaloneSurveys() {
   }, [user, retryTick]);
 
   const filteredCatalog = useMemo(() => {
-    const q = searchDraft.toLowerCase().replace(/\s/g, "");
-    let items = surveys.filter(isSurveyOpen).filter((survey) => survey.kind !== "daily");
-
-    if (q) {
-      items = items.filter((survey) =>
-        `${survey.title || ""} ${survey.description || ""} ${survey.credits || ""} ${
-          survey.estimatedMinutes || ""
-        } ${survey.feedbackBusinessName || ""}`
-          .toLowerCase()
-          .replace(/\s/g, "")
-          .includes(q)
-      );
-    }
-
+    const items = surveys.filter(isSurveyOpen).filter((survey) => survey.kind !== "daily");
     return sortSurveys(items, sortOrder);
-  }, [searchDraft, sortOrder, surveys]);
+  }, [sortOrder, surveys]);
 
   const dailyCatalog = useMemo(() => {
-    const q = searchDraft.toLowerCase().replace(/\s/g, "");
-    let items = surveys.filter(isSurveyOpen).filter((survey) => survey.kind === "daily");
-
-    if (q) {
-      items = items.filter((survey) =>
-        `${survey.title || ""} ${survey.description || ""} ${survey.credits || ""} ${
-          survey.estimatedMinutes || ""
-        }`
-          .toLowerCase()
-          .replace(/\s/g, "")
-          .includes(q)
-      );
-    }
-
+    const items = surveys.filter(isSurveyOpen).filter((survey) => survey.kind === "daily");
     return sortSurveys(items, sortOrder);
-  }, [searchDraft, sortOrder, surveys]);
+  }, [sortOrder, surveys]);
 
-  const listPage = searchDraft === search ? catalogPage : 1;
+  const listPage = catalogPage;
   const catalogTotal = filteredCatalog.length;
   const catalogPages = Math.max(1, Math.ceil(catalogTotal / SURVEY_PAGE_SIZE) || 1);
   const safePage = Math.min(listPage, catalogPages);
@@ -276,7 +247,7 @@ export default function StandaloneSurveys() {
       return;
     }
     flipShopCatalog(listRef.current, rectsRef);
-  }, [loading, pageIds, error, searchDraft, sortOrder]);
+  }, [loading, pageIds, error, sortOrder]);
 
   const goCatalog = () => {
     scrollShopToCatalog(pageRef.current, { behavior: "smooth" });
@@ -284,7 +255,8 @@ export default function StandaloneSurveys() {
 
   const openSurvey = (survey) => {
     if (survey.isDailySprint) {
-      navigate(`/standalone-survey/${survey._id}?sprint=1`);
+      const wave = Number(survey.wave) >= 1 ? Number(survey.wave) : 1;
+      navigate(`/standalone-survey/${survey._id}?sprint=1&wave=${wave}`);
       return;
     }
     if (!isSurveyOpen(survey)) return;
@@ -324,7 +296,20 @@ export default function StandaloneSurveys() {
 
         <div className="home-sheet shop-sheet">
           <div className="shop-catalog">
-            {!loading && sprintSurveys.length > 0 ? (
+            {user?.profileSurveyBlocked ? (
+              <div className="shop-status">
+                <h3>Update your profile</h3>
+                <p>You last updated your profile more than 6 months ago. Update your profile to stay up to date, and earn some extra Ruchi Credits! Surveys stay closed until you update it.</p>
+                <button
+                  type="button"
+                  className="home-pill home-pill-sm home-pill-navy"
+                  onClick={() => navigate("/refresh-profile")}
+                >
+                  Update profile
+                </button>
+              </div>
+            ) : null}
+            {!user?.profileSurveyBlocked && !loading && sprintSurveys.length > 0 ? (
               <div className="mb-12">
                 <div className="shop-head mb-6">
                   <div>
@@ -337,9 +322,7 @@ export default function StandaloneSurveys() {
                       <h2>Daily Sprint</h2>
                     </div>
                     <p className="shop-head-copy">
-                      {profileOutdated
-                        ? "These stay here until you finish them. Your profile is marked outdated in the meantime, and the rest of the app still works."
-                        : "These stay here until you finish them."}
+                      These stay here until you finish them. The rest of the app still works.
                     </p>
                   </div>
                 </div>
@@ -350,6 +333,7 @@ export default function StandaloneSurveys() {
                 </div>
               </div>
             ) : null}
+            {!user?.profileSurveyBlocked && <>
             <div className="shop-head">
               <div>
                 <div className="shop-title-row">
@@ -364,15 +348,6 @@ export default function StandaloneSurveys() {
                   Every survey you have been a part of, all in one place.
                 </p>
               </div>
-              <label className="shop-search">
-                <span className="sr-only">Search surveys</span>
-                <input
-                  value={searchDraft}
-                  onChange={(event) => setSearchDraft(event.target.value)}
-                  placeholder="Upark, restaurant, cafe..."
-                />
-                <Search size={16} />
-              </label>
             </div>
 
             <div className="shop-toolbar">
@@ -458,29 +433,17 @@ export default function StandaloneSurveys() {
                 <SearchX className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                 <h3>No surveys right now</h3>
                 <p>
-                  {searchDraft.trim()
-                    ? "Nothing matches your search. Try clearing it to see all surveys."
-                    : dailyCatalog.length > 0
-                      ? "No regular surveys right now — check daily surveys below for extra credits."
-                      : "New surveys tailored to your profile will appear here when they’re published."}
+                  {dailyCatalog.length > 0
+                    ? "No regular surveys right now — check daily surveys below for extra credits."
+                    : "New surveys tailored to your profile will appear here when they’re published."}
                 </p>
-                {searchDraft.trim() ? (
-                  <button
-                    type="button"
-                    className="home-pill home-pill-sm home-pill-navy"
-                    onClick={() => setListParams({ q: "", sort: "latest", page: 1 })}
-                  >
-                    Clear search
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="home-pill home-pill-sm home-pill-navy"
-                    onClick={() => navigate("/profile")}
-                  >
-                    Return to profile
-                  </button>
-                )}
+                <button
+                  type="button"
+                  className="home-pill home-pill-sm home-pill-navy"
+                  onClick={() => navigate("/profile")}
+                >
+                  Return to profile
+                </button>
               </div>
             )}
 
@@ -508,6 +471,7 @@ export default function StandaloneSurveys() {
                 </div>
               </div>
             ) : null}
+            </>}
           </div>
         </div>
       </div>

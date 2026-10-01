@@ -15,12 +15,12 @@ export const normalizeStaffRole = (role) =>
  */
 export const PERMISSIONS = {
   stats: ['admin', 'business_admin', 'customer_admin'],
-  users: ['admin', 'customer_admin'],
+  users: ['admin', 'business_admin', 'customer_admin'],
   credits_view: ['admin', 'customer_admin'],
   credits_adjust: ['admin'],
-  surveys: ['admin', 'customer_admin'],
+  surveys: ['admin', 'business_admin', 'customer_admin'],
   surveys_catalog: ['admin', 'business_admin', 'customer_admin'],
-  clusters: ['admin', 'customer_admin'],
+  clusters: ['admin', 'business_admin', 'customer_admin'],
   businesses: ['admin', 'business_admin'],
   vouchers: ['admin', 'business_admin'],
   scans: ['admin', 'business_admin'],

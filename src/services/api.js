@@ -197,12 +197,25 @@ export const fifteenDaySurveyAPI = {
   getById: (surveyId, config = {}) => api.get(`/fifteen-day/${surveyId}`, config),
   update: (surveyId, data, config = {}) => api.put(`/fifteen-day/${surveyId}`, data, config),
   archive: (surveyId, config = {}) => api.delete(`/fifteen-day/${surveyId}`, config),
+  exportTimings: (surveyId, config = {}) =>
+    api.get(`/fifteen-day/${surveyId}/timings/csv`, { responseType: "blob", ...config }),
   updateProgram: (existingUsersSendAt, config = {}) =>
     api.put('/fifteen-day/program', { existingUsersSendAt }, config),
   getMine: (config = {}) => api.get('/fifteen-day/mine', config),
-  getToTake: (surveyId, config = {}) => api.get(`/fifteen-day/take/${surveyId}`, config),
-  submit: (surveyId, responses, timingData, config = {}) =>
-    api.post(`/fifteen-day/take/${surveyId}/submit`, { responses, timingData }, config),
+  getToTake: (surveyId, wave, config = {}) =>
+    api.get(`/fifteen-day/take/${surveyId}`, {
+      ...config,
+      params: {
+        ...(config.params || {}),
+        ...(Number.isInteger(Number(wave)) && Number(wave) >= 1 ? { wave: Number(wave) } : {}),
+      },
+    }),
+  submit: (surveyId, responses, timingData, wave) =>
+    api.post(`/fifteen-day/take/${surveyId}/submit`, {
+      responses,
+      timingData,
+      ...(Number.isInteger(Number(wave)) && Number(wave) >= 1 ? { wave: Number(wave) } : {}),
+    }),
 };
 
 export const voucherAPI = {

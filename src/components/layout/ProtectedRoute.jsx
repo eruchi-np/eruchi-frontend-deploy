@@ -2,6 +2,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { isStaffAdmin } from '../../utils/adminRoles';
 
 const ProtectedRoute = ({ children, requireProfileComplete = false }) => {
   const { user, loading } = useAuth();
@@ -20,6 +21,10 @@ const ProtectedRoute = ({ children, requireProfileComplete = false }) => {
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (isStaffAdmin(user.role)) {
+    return children;
   }
 
   if (isCompletionRoute) {

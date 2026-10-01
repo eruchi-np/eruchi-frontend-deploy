@@ -20,13 +20,18 @@ const Survey = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [responses, setResponses] = useState({});
   const [error, setError] = useState(null);
-
   useEffect(() => {
     const fetchData = async () => {
       try {
         // Fetch user data first to check campaign status
         const userResponse = await userAPI.getProfile();
         setUser(userResponse.data.data.user);
+
+        if (userResponse.data.data.user.profileSurveyBlocked) {
+          setError('You last updated your profile more than 6 months ago. Update your profile to stay up to date, and earn some extra Ruchi Credits! Surveys stay closed until you update it.');
+          setLoading(false);
+          return;
+        }
 
         // Check if user can access this survey
         const userCampaign = userResponse.data.data.user.activeCampaign;
@@ -444,10 +449,10 @@ const Survey = () => {
           <p className="text-gray-600 mb-4">{error}</p>
           <div className="space-y-2">
             <button 
-              onClick={() => navigate('/profile')}
+              onClick={() => navigate(user?.profileSurveyBlocked ? '/refresh-profile' : '/profile')}
               className="w-full bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
             >
-              Check Profile Status
+              {user?.profileSurveyBlocked ? 'Update profile' : 'Check Profile Status'}
             </button>
             <button 
               onClick={() => navigate('/campaigns')}

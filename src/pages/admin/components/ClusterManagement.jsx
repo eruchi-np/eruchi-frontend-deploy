@@ -123,6 +123,7 @@ const ClusterManagement = ({ NAVY }) => {
           q: userSearch.trim(),
           page: 1,
           limit: 10,
+          includeAdmins: "1",
           skipErrorToast: true,
         });
         setUserResults(res.data.data || []);
@@ -653,6 +654,15 @@ const ClusterManagement = ({ NAVY }) => {
                     <span className="font-medium">
                       {u.firstName} {u.lastName}
                     </span>
+                    {u.role && u.role !== "user" && (
+                      <span className="ml-2 text-xs font-medium text-gray-500">
+                        {u.role === "business_admin"
+                          ? "Business admin"
+                          : u.role === "customer_admin"
+                            ? "Customer admin"
+                            : "Admin"}
+                      </span>
+                    )}
                     <span className="text-gray-500 ml-2">{u.email}</span>
                   </button>
                 ))}

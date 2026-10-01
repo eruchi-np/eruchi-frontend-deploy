@@ -156,6 +156,11 @@ const AdminDashboard = () => {
     setIf("dateOfBirthTo", filters.dateOfBirthTo);
     setIf("lastSurveyCompletedAtFrom", filters.lastSurveyCompletedAtFrom);
     setIf("lastSurveyCompletedAtTo", filters.lastSurveyCompletedAtTo);
+    if (Array.isArray(filters.addresses) && filters.addresses.length > 0) {
+      params.addresses = filters.addresses
+        .map((item) => `${item.municipality}|${item.ward}`)
+        .join(",");
+    }
     return params;
   };
 

@@ -123,7 +123,10 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
 
   const user = detail?.user;
   const campaign = user?.activeCampaign?.campaign;
-  const hasActiveStreak = (user?.streakCount || 0) > 0;
+  const currentStreak = user?.streakCount || 0;
+  const latestStreak = user?.lastBrokenStreakCount || 0;
+  const highestStreak = Math.max(user?.highestStreak || 0, currentStreak, latestStreak);
+  const hasActiveStreak = currentStreak > 0;
 
   return createPortal(
     <div className="fixed inset-0 z-[80] flex justify-end bg-black/40" onClick={onClose}>
@@ -157,10 +160,20 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
                 </p>
               </div>
               <div className="rounded-xl border border-gray-200 p-3">
-                <p className="text-xs text-gray-500 mb-1">Streak</p>
+                <p className="text-xs text-gray-500 mb-1">Current streak</p>
                 <p className="text-xl font-bold text-gray-900 flex items-center gap-1.5">
-                  <Flame className="h-4 w-4 text-orange-500" /> {user.streakCount || 0}
+                  <Flame className="h-4 w-4 text-orange-500" /> {currentStreak}
                 </p>
+                <div className="mt-3 grid grid-cols-2 gap-2 border-t border-gray-100 pt-2">
+                  <div>
+                    <p className="text-[11px] text-gray-500">Highest</p>
+                    <p className="text-base font-semibold text-gray-900">{highestStreak}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-gray-500">Latest</p>
+                    <p className="text-base font-semibold text-gray-900">{latestStreak}</p>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -177,12 +190,6 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
                 <Shield className="h-4 w-4 text-gray-400" />
                 Streak Guard: {user.streakGuardDays || 0} day{(user.streakGuardDays || 0) === 1 ? "" : "s"}
               </p>
-              {(user.lastBrokenStreakCount || 0) > 0 && (
-                <p className="flex items-center gap-2">
-                  <Flame className="h-4 w-4 text-gray-400" />
-                  Last broken streak: {user.lastBrokenStreakCount} day{user.lastBrokenStreakCount === 1 ? "" : "s"}
-                </p>
-              )}
               <p>
                 Surveys completed: {detail.surveysCompleted ?? 0} · Campaigns completed: {detail.campaignsCompleted ?? 0}
               </p>
@@ -224,11 +231,11 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
             </form>
             )}
 
-            {canAdjustCredits && !hasActiveStreak && (user.lastBrokenStreakCount || 0) > 0 && (
+            {canAdjustCredits && !hasActiveStreak && latestStreak > 0 && (
             <form onSubmit={handleRestoreStreak} className="rounded-xl border border-gray-200 p-4 space-y-3">
               <p className="text-sm font-semibold text-gray-900">Restore streak</p>
               <p className="text-xs text-gray-500">
-                Puts the streak back to {user.lastBrokenStreakCount} day{user.lastBrokenStreakCount === 1 ? "" : "s"}, the count before it reset.
+                Sets the current streak to {latestStreak}, their latest lost streak.
               </p>
               <label className="flex items-center gap-2 text-sm text-gray-700">
                 <input

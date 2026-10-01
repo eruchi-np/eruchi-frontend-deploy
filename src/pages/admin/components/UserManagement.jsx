@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { groupedMunicipalities, getMaxWards } from "../../../utils/municipalityData";
 import {
   Search,
   Filter,
@@ -57,6 +58,7 @@ const EMPTY_ADVANCED = {
   dateOfBirthTo: "",
   lastSurveyCompletedAtFrom: "",
   lastSurveyCompletedAtTo: "",
+  addresses: [],
 };
 
 const NEPAL_TZ = "Asia/Kathmandu";
@@ -79,7 +81,10 @@ const formatLastOnline = (user) => {
 };
 
 const countActiveAdvanced = (filters) =>
-  Object.values(filters).filter((v) => v !== "" && v != null).length;
+  Object.values(filters).filter((value) => {
+    if (Array.isArray(value)) return value.length > 0;
+    return value !== "" && value != null;
+  }).length;
 
 const UserManagement = ({
   users,
@@ -102,6 +107,10 @@ const UserManagement = ({
   const [exporting, setExporting] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [exportType, setExportType] = useState("promotional");
+  const [addressQuery, setAddressQuery] = useState("");
+  const [addressMenuOpen, setAddressMenuOpen] = useState(false);
+  const [addressMunicipality, setAddressMunicipality] = useState("");
+  const [addressWard, setAddressWard] = useState("");
 
   const buildFilters = (overrides = {}) => ({
     activity: activityFilter,
@@ -148,7 +157,51 @@ const UserManagement = ({
   const clearAdvanced = () => {
     setAdvancedDraft(EMPTY_ADVANCED);
     setAdvancedApplied(EMPTY_ADVANCED);
+    setAddressQuery("");
+    setAddressMunicipality("");
+    setAddressWard("");
+    setAddressMenuOpen(false);
     fetchUsers({ activity: activityFilter, q: searchTerm, ...EMPTY_ADVANCED }, 1);
+  };
+
+  const filteredMunicipalities = useMemo(() => {
+    const query = addressQuery.trim().toLowerCase();
+    if (!query) return {};
+    const groups = {};
+    let shown = 0;
+    for (const [type, municipalities] of Object.entries(groupedMunicipalities)) {
+      const matches = municipalities.filter((municipality) =>
+        municipality.name.toLowerCase().includes(query)
+      );
+      if (!matches.length || shown >= 40) continue;
+      const slice = matches.slice(0, 40 - shown);
+      groups[type] = slice;
+      shown += slice.length;
+    }
+    return groups;
+  }, [addressQuery]);
+
+  const addAddress = () => {
+    const ward = Number(addressWard);
+    const maxWards = getMaxWards(addressMunicipality);
+    if (!addressMunicipality || !Number.isInteger(ward) || ward < 1 || ward > maxWards) return;
+    setAdvancedDraft((prev) => {
+      const addresses = prev.addresses || [];
+      if (addresses.some((item) => item.municipality === addressMunicipality && item.ward === ward)) {
+        return prev;
+      }
+      return { ...prev, addresses: [...addresses, { municipality: addressMunicipality, ward }] };
+    });
+    setAddressWard("");
+  };
+
+  const removeAddress = (municipality, ward) => {
+    setAdvancedDraft((prev) => ({
+      ...prev,
+      addresses: (prev.addresses || []).filter(
+        (item) => !(item.municipality === municipality && item.ward === ward)
+      ),
+    }));
   };
 
   const goToPage = (page) => {
@@ -353,6 +406,106 @@ const UserManagement = ({
                     className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-200"
                   />
                 </label>
+              </div>
+
+              <div>
+                <p className="text-xs font-medium text-gray-600 mb-1">Address</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={addressMenuOpen ? addressQuery : addressMunicipality}
+                      onChange={(event) => {
+                        setAddressQuery(event.target.value);
+                        setAddressMenuOpen(true);
+                      }}
+                      onFocus={() => {
+                        setAddressQuery("");
+                        setAddressMenuOpen(true);
+                      }}
+                      onBlur={() => {
+                        setTimeout(() => setAddressMenuOpen(false), 150);
+                      }}
+                      placeholder="Search municipality"
+                      autoComplete="off"
+                      className="w-full rounded-lg border border-gray-200 bg-white pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-200"
+                    />
+                    {addressMenuOpen && (
+                      <div className="absolute z-20 mt-1 w-full max-h-64 overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                        {Object.keys(filteredMunicipalities).length === 0 ? (
+                          <p className="px-3 py-3 text-sm text-gray-500">
+                            {addressQuery.trim() ? "No municipalities found" : "Type to search municipalities"}
+                          </p>
+                        ) : (
+                          Object.entries(filteredMunicipalities).map(([type, municipalities]) => (
+                            <div key={type}>
+                              <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500 bg-gray-50">
+                                {type}
+                              </p>
+                              {municipalities.map((municipality) => (
+                                <button
+                                  key={`${type}-${municipality.name}`}
+                                  type="button"
+                                  onMouseDown={(event) => {
+                                    event.preventDefault();
+                                    setAddressMunicipality(municipality.name);
+                                    setAddressQuery("");
+                                    setAddressMenuOpen(false);
+                                    setAddressWard("");
+                                  }}
+                                  className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50"
+                                >
+                                  {municipality.name}
+                                  <span className="ml-2 text-xs text-gray-500">{municipality.wards} wards</span>
+                                </button>
+                              ))}
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <select
+                    value={addressWard}
+                    onChange={(event) => setAddressWard(event.target.value)}
+                    disabled={!addressMunicipality}
+                    className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm disabled:bg-gray-100 disabled:text-gray-400"
+                    aria-label="Ward"
+                  >
+                    <option value="">Ward</option>
+                    {addressMunicipality
+                      ? Array.from({ length: getMaxWards(addressMunicipality) }, (_, index) => index + 1).map((ward) => (
+                          <option key={ward} value={String(ward)}>
+                            Ward {ward}
+                          </option>
+                        ))
+                      : null}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={addAddress}
+                    disabled={!addressMunicipality || !addressWard}
+                    className="px-4 py-2 rounded-lg text-sm font-medium text-gray-900 border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Add
+                  </button>
+                </div>
+                {(advancedDraft.addresses || []).length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {advancedDraft.addresses.map((item) => (
+                      <button
+                        key={`${item.municipality}|${item.ward}`}
+                        type="button"
+                        onClick={() => removeAddress(item.municipality, item.ward)}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-800 hover:bg-gray-100"
+                      >
+                        {item.municipality} · Ward {item.ward}
+                        <X className="h-3 w-3" />
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">

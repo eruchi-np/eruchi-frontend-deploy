@@ -65,6 +65,27 @@ const FifteenDaySurveyAdmin = () => {
     }
   };
 
+  const downloadTimes = async (survey) => {
+    try {
+      const res = await fifteenDaySurveyAPI.exportTimings(survey._id);
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `timings-${survey.title || survey._id}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success("Times downloaded");
+    } catch (err) {
+      toast.error(
+        err.response?.status === 404
+          ? "No times saved for this day yet"
+          : "Could not download times"
+      );
+    }
+  };
+
   const archive = async (survey) => {
     if (!window.confirm(`Archive day ${survey.daySlot}? It leaves Daily Sprint for anyone who has not finished it.`)) return;
     try {
@@ -164,6 +185,13 @@ const FifteenDaySurveyAdmin = () => {
                     <div className="flex gap-2">
                       {survey ? (
                         <>
+                          <button
+                            type="button"
+                            onClick={() => downloadTimes(survey)}
+                            className="px-3 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:bg-gray-50"
+                          >
+                            Times
+                          </button>
                           <button
                             type="button"
                             onClick={() => navigate(`/admin/edit-sep-survey/${survey._id}?sprint=1&day=${day}`)}

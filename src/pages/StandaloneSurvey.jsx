@@ -20,6 +20,7 @@ const StandaloneSurvey = () => {
   const { surveyId } = useParams();
   const [searchParams] = useSearchParams();
   const isSprint = searchParams.get("sprint") === "1";
+  const sprintWave = Number(searchParams.get("wave"));
   const navigate = useNavigate();
   const { user } = useAuth();
   const [survey, setSurvey] = useState(null);
@@ -29,13 +30,23 @@ const StandaloneSurvey = () => {
   const [responses, setResponses] = useState({});
   const [error, setError] = useState(null);
   const { startQuestion, getTimingData } = useSurveyTimer();
-
   useEffect(() => {
+    let cancelled = false;
     const fetchSurvey = async () => {
+      setLoading(true);
+      setError(null);
+      if (user?.profileSurveyBlocked) {
+        if (!cancelled) {
+          setError("You last updated your profile more than 6 months ago. Update your profile to stay up to date, and earn some extra Ruchi Credits! Surveys stay closed until you update it.");
+          setLoading(false);
+        }
+        return;
+      }
       try {
         const res = isSprint
-          ? await fifteenDaySurveyAPI.getToTake(surveyId)
+          ? await fifteenDaySurveyAPI.getToTake(surveyId, sprintWave)
           : await sepSurveyAPI.getById(surveyId);
+        if (cancelled) return;
         setSurvey(res.data.data);
 
         const initial = {};
@@ -43,35 +54,44 @@ const StandaloneSurvey = () => {
           if (q.questionType === "multiple_checkbox") {
             initial[q.questionText] = [];
           } else if (q.questionType === "slider") {
-            initial[q.questionText] = q.minValue || 0;
+            initial[q.questionText] = Number.isFinite(Number(q.minValue)) ? Number(q.minValue) : 0;
           } else if (q.questionType === "matrix_radio") {
             initial[q.questionText] = emptyMatrixValue(q.rows || []);
           } else {
             initial[q.questionText] = "";
           }
         });
-        setResponses(initial);
+        if (!cancelled) setResponses(initial);
       } catch (err) {
-        setError(err.response?.data?.message || "Failed to load survey");
+        if (!cancelled) setError(err.response?.data?.message || "Failed to load survey");
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
     fetchSurvey();
-  }, [surveyId, isSprint]);
+    return () => {
+      cancelled = true;
+    };
+  }, [surveyId, isSprint, sprintWave, user?.profileSurveyBlocked]);
 
   const handleChange = (qText, value) => {
     setResponses((prev) => ({ ...prev, [qText]: value }));
   };
 
   const handleCheckbox = (qText, option, checked) => {
+    const current = Array.isArray(responses[qText]) ? responses[qText] : [];
+    const question = survey?.questions?.find((item) => item.questionText === qText);
+    const max = Math.max(1, Number(question?.maxSelections) || 1);
+    if (checked && !current.includes(option) && current.length >= max) {
+      toast.error(max === 1 ? "You can pick one option" : `You can pick up to ${max} options`);
+      return;
+    }
     setResponses((prev) => {
-      const arr = prev[qText] || [];
-      return {
-        ...prev,
-        [qText]: checked ? [...arr, option] : arr.filter((v) => v !== option),
-      };
+      const arr = Array.isArray(prev[qText]) ? prev[qText] : [];
+      if (!checked) return { ...prev, [qText]: arr.filter((v) => v !== option) };
+      if (arr.includes(option) || arr.length >= max) return prev;
+      return { ...prev, [qText]: [...arr, option] };
     });
   };
 
@@ -79,11 +99,25 @@ const StandaloneSurvey = () => {
     startQuestion(questionText);
   };
 
+  const matrixTouched = (val) =>
+    val &&
+    typeof val === "object" &&
+    !Array.isArray(val) &&
+    Object.values(val).some((item) => item != null && item !== "");
+
   const isComplete = () => {
     return survey.questions.every((q) => {
-      if (q.isRequired === false) return true;
       const val = responses[q.questionText];
-      if (q.questionType === "multiple_checkbox") return val?.length > 0;
+      if (q.isRequired === false) {
+        if (q.questionType === "matrix_radio" && matrixTouched(val)) {
+          return isMatrixComplete(val, q.rows || []);
+        }
+        return true;
+      }
+      if (q.questionType === "multiple_checkbox") return Array.isArray(val) && val.length > 0;
+      if (q.questionType === "single_checkbox") {
+        return typeof val === "string" && (q.options || []).includes(val);
+      }
       if (q.questionType === "slider") return true;
       if (q.questionType === "matrix_radio") {
         return isMatrixComplete(val, q.rows || []);
@@ -106,7 +140,7 @@ const StandaloneSurvey = () => {
       const timingData = getTimingData();
       const previousStreak = user?.streakCount ?? 0;
       const res = isSprint
-        ? await fifteenDaySurveyAPI.submit(surveyId, responses, timingData)
+        ? await fifteenDaySurveyAPI.submit(surveyId, responses, timingData, survey.wave)
         : await sepSurveyAPI.submit(surveyId, responses, timingData);
       setConfirmOpen(false);
       window.dispatchEvent(new Event("authChange"));
@@ -133,8 +167,18 @@ const StandaloneSurvey = () => {
     );
   if (error)
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center text-neutral-900 p-6">
-        {error}
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center text-neutral-900 p-6 text-center gap-4">
+        <p>{error}</p>
+        {user?.profileSurveyBlocked ? (
+          <button
+            type="button"
+            onClick={() => navigate("/refresh-profile")}
+            className="text-white py-3 px-6 rounded-md"
+            style={{ backgroundColor: "#134074" }}
+          >
+            Update profile
+          </button>
+        ) : null}
       </div>
     );
 
@@ -151,6 +195,12 @@ const StandaloneSurvey = () => {
         <div className="mb-12">
           <h1 className="text-2xl sm:text-[40px] font-light text-neutral-900 mb-4 break-words">{survey.title}</h1>
           <p className="text-neutral-600 text-lg leading-relaxed">{survey.description}</p>
+          {survey.isDailySprint ? (
+            <p className="mt-3 text-sm text-neutral-500">
+              Daily Sprint · Day {survey.daySlot}
+              {survey.wave > 1 ? ` · round ${survey.wave}` : ""}
+            </p>
+          ) : null}
 
           <div className="flex flex-wrap gap-6 mt-8 text-sm text-neutral-500 border-t border-neutral-100 pt-6">
             <div className="flex items-center gap-2">
@@ -219,7 +269,7 @@ const StandaloneSurvey = () => {
                     <label key={opt} className="flex items-center gap-3 cursor-pointer group">
                       <input
                         type="checkbox"
-                        checked={(responses[q.questionText] || []).includes(opt)}
+                        checked={Array.isArray(responses[q.questionText]) && responses[q.questionText].includes(opt)}
                         onChange={(e) => handleCheckbox(q.questionText, opt, e.target.checked)}
                         className="h-4 w-4 text-neutral-900 border-neutral-300 rounded focus:ring-0"
                       />
@@ -235,13 +285,13 @@ const StandaloneSurvey = () => {
                     type="range"
                     min={q.minValue}
                     max={q.maxValue}
-                    value={responses[q.questionText] || q.minValue}
+                    value={responses[q.questionText] ?? q.minValue}
                     onChange={(e) => handleChange(q.questionText, Number(e.target.value))}
                     className="w-full h-1 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-neutral-900"
                   />
                   <div className="flex justify-between text-xs mt-3 text-neutral-400">
                     <span>{q.minValue}</span>
-                    <span className="font-medium text-neutral-900">{responses[q.questionText] || q.minValue}</span>
+                    <span className="font-medium text-neutral-900">{responses[q.questionText] ?? q.minValue}</span>
                     <span>{q.maxValue}</span>
                   </div>
                 </div>

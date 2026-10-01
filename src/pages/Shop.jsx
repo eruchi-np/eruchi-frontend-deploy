@@ -172,10 +172,6 @@ export default function Shop() {
     setSelectedOffer(offer);
   };
 
-  const goCatalog = () => {
-    scrollShopToCatalog(pageRef.current, { behavior: "smooth" });
-  };
-
   const goSurveys = () => {
     trackEvent("cta_click", "/surveys");
     navigate(isLoggedIn ? "/standalone-surveys" : "/signup");
@@ -285,7 +281,7 @@ export default function Shop() {
                     A coffee on your way. A climb after work. Turn your everyday opinions into a
                     little more of what you love.
                   </p>
-                  <button type="button" className="home-pill home-pill-lg home-pill-white" onClick={goCatalog}>
+                  <button type="button" className="home-pill home-pill-lg home-pill-white" onClick={goRewards}>
                     Rewards
                   </button>
                 </div>
