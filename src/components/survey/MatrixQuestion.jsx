@@ -21,7 +21,7 @@ export default function MatrixQuestion({
   onChange,
   disabled = false,
   preview = false,
-  headerRepeatEvery = 3,
+  headerRepeatEvery = 0,
   namePrefix = 'matrix',
 }) {
   const rowItems = rows.map(toItem);

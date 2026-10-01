@@ -254,7 +254,6 @@ const StandaloneSurvey = () => {
                   value={responses[q.questionText] || {}}
                   onChange={(next) => handleChange(q.questionText, next)}
                   namePrefix={`q-${i}`}
-                  headerRepeatEvery={3}
                 />
               )}
             </div>

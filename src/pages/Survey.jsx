@@ -389,7 +389,6 @@ const Survey = () => {
             value={responses[question.questionText] || {}}
             onChange={(next) => handleResponseChange(question.questionText, next)}
             namePrefix={`q-${index}`}
-            headerRepeatEvery={3}
           />
         );
 

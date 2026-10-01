@@ -1313,7 +1313,6 @@ const CreateSepSurvey = () => {
                               columns={q.options || []}
                               value={{}}
                               namePrefix={`preview-${idx}`}
-                              headerRepeatEvery={3}
                             />
                           </div>
                         )}
