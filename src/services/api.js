@@ -50,6 +50,19 @@ function getRequest(url, options = {}) {
   return api.get(url, { params, skipErrorToast, skipAuthRedirect });
 }
 
+export const healthAPI = {
+  track: (data, config = {}) => api.post('/signals/event', data, {
+    skipErrorToast: true,
+    skipAuthRedirect: true,
+    ...config,
+  }),
+  visit: (data, config = {}) => api.post('/signals/visit', data, {
+    skipErrorToast: true,
+    skipAuthRedirect: true,
+    ...config,
+  }),
+};
+
 export const authAPI = {
   login: (data, config = {}) => api.post('/auth/login', data, config),
   register: (data, config = {}) => api.post('/auth/register', data, config),
