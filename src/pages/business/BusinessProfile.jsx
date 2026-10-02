@@ -4,12 +4,15 @@ import { ExternalLink, Loader2, Star, Upload } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { businessAPI } from '../../services/api';
 import { BUSINESS_CATEGORIES, DAYS_OF_WEEK, inputCls } from './businessFormConstants';
+import AddressInfo from '../../components/demographics/steps/AddressInfo';
 
 const emptyForm = {
   name: '',
   brandName: '',
   phone: '',
   address: '',
+  municipality: '',
+  wardNumber: '',
   category: '',
   description: '',
   instagram: '',
@@ -39,6 +42,8 @@ export default function BusinessProfile() {
           brandName: biz.brandName || '',
           phone: biz.phone || '',
           address: biz.address || '',
+          municipality: biz.municipality || '',
+          wardNumber: biz.wardNumber || '',
           category: biz.category || '',
           description: biz.description || '',
           instagram: biz.instagram || '',
@@ -93,6 +98,8 @@ export default function BusinessProfile() {
         brandName: form.brandName,
         phone: form.phone,
         address: form.address,
+        municipality: form.municipality,
+        wardNumber: form.wardNumber,
         category: form.category,
         description: form.description,
         instagram: form.instagram,
@@ -203,9 +210,16 @@ export default function BusinessProfile() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Address</label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Street address</label>
             <input value={form.address} onChange={setField('address')} className={inputCls} />
           </div>
+          <AddressInfo
+            title="Municipality"
+            copy="Same municipality and ward list as a customer address."
+            showProgress={false}
+            formData={{ municipality: form.municipality, wardNumber: form.wardNumber }}
+            updateFormData={(key, value) => setForm((current) => ({ ...current, [key]: value }))}
+          />
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Phone</label>
             <input value={form.phone} onChange={setField('phone')} className={inputCls} />

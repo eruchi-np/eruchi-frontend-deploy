@@ -40,6 +40,7 @@ export function goToSurveyComplete(
     streakBonus: toNumber(streakBonus, 0),
     kind: kind === "daily" ? "daily" : "normal",
     completedAt: Date.now(),
+    promptId: crypto.randomUUID(),
   };
 
   if (streakCount != null) payload.streakCount = toNumber(streakCount, 0);

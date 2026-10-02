@@ -54,7 +54,9 @@ const CreateSepSurvey = () => {
         minValue: 0,
         maxValue: 5,
         isRequired: true,
-        metricTag: 'none'
+        metricTag: 'none',
+        attentionCheck: false,
+        attentionAnswer: ''
       }
     ]
   });
@@ -122,7 +124,7 @@ const CreateSepSurvey = () => {
             rows: Array.isArray(q.rows) ? q.rows : [],
             metricTag: q.metricTag === 'cep' || q.metricTag === 'nps' ? q.metricTag : 'none'
           })) : [
-            { questionText: '', questionType: 'text_short', options: [], rows: [], maxSelections: 1, minValue: 0, maxValue: 5, isRequired: true, metricTag: 'none' }
+            { questionText: '', questionType: 'text_short', options: [], rows: [], maxSelections: 1, minValue: 0, maxValue: 5, isRequired: true, metricTag: 'none', attentionCheck: false, attentionAnswer: '' }
           ]
         });
       } catch (err) {
@@ -238,6 +240,10 @@ const CreateSepSurvey = () => {
         updated[index].minValue = 0;
         updated[index].maxValue = 5;
       }
+      if (value !== 'single_checkbox') {
+        updated[index].attentionCheck = false;
+        updated[index].attentionAnswer = '';
+      }
     }
 
     setFormData(prev => ({ ...prev, questions: updated }));
@@ -317,6 +323,8 @@ const CreateSepSurvey = () => {
           minValue: 0,
           maxValue: 5,
           isRequired: true,
+          attentionCheck: false,
+          attentionAnswer: '',
           metricTag: 'none'
         }
       ]
@@ -350,8 +358,15 @@ const CreateSepSurvey = () => {
       }
     }
 
-    if (formData.estimatedMinutes !== '' && Number(formData.estimatedMinutes) < 1) {
-      return toast.error('Estimated time must be at least 1 minute');
+    if (formData.estimatedMinutes !== '' && formData.estimatedMinutes != null) {
+      const minutes = Number(formData.estimatedMinutes);
+      if (!Number.isFinite(minutes) || minutes < 1) {
+        return toast.error('Estimated time must be at least 1 minute');
+      }
+    }
+
+    if (!Number.isFinite(Number(formData.credits)) || Number(formData.credits) < 0) {
+      return toast.error('Credits must be zero or more');
     }
 
     if (!isSprint && formData.visibility === 'targeted' && (!formData.validityDays || Number(formData.validityDays) < 1)) {
@@ -368,12 +383,18 @@ const CreateSepSurvey = () => {
       return toast.error('Cluster send date/time is required');
     }
 
-    const emptyQuestions = formData.questions.filter(q => !q.questionText.trim());
-    if (emptyQuestions.length) return toast.error('All questions must have text');
+    const questionTexts = formData.questions.map((q) => q.questionText.trim());
+    if (questionTexts.some((text) => !text)) return toast.error('All questions must have text');
+    if (questionTexts.some((text) => text.length > 200)) {
+      return toast.error('Question text must be 200 characters or less');
+    }
+    if (new Set(questionTexts).size !== questionTexts.length) {
+      return toast.error('Each question needs its own wording');
+    }
 
     const invalidCheckboxes = formData.questions.filter(q =>
       (q.questionType === 'single_checkbox' || q.questionType === 'multiple_checkbox') &&
-      (!q.options || q.options.length === 0)
+      !(q.options || []).map((option) => option.trim()).filter(Boolean).length
     );
     if (invalidCheckboxes.length) return toast.error('Checkbox questions need at least one option');
 
@@ -385,6 +406,31 @@ const CreateSepSurvey = () => {
     if (invalidMatrices.length) {
       return toast.error('Matrix questions need at least one row and one column option');
     }
+
+    const duplicateLabels = formData.questions.some((q) => {
+      if (!['single_checkbox', 'multiple_checkbox', 'matrix_radio'].includes(q.questionType)) return false;
+      const options = (q.options || []).map((option) => option.trim()).filter(Boolean);
+      if (new Set(options).size !== options.length) return true;
+      if (q.questionType !== 'matrix_radio') return false;
+      const rows = (q.rows || []).map((row) => row.trim()).filter(Boolean);
+      return new Set(rows).size !== rows.length;
+    });
+    if (duplicateLabels) return toast.error('Options and matrix rows must be unique');
+
+    const invalidSliders = formData.questions.filter((q) => {
+      if (q.questionType !== 'slider') return false;
+      const min = Number(q.minValue);
+      const max = Number(q.maxValue);
+      return !Number.isFinite(min) || !Number.isFinite(max) || max <= min;
+    });
+    if (invalidSliders.length) return toast.error('Slider max must be greater than min');
+
+    const badAttention = formData.questions.some((q) => {
+      if (q.questionType !== 'single_checkbox' || !q.attentionCheck) return false;
+      const options = (q.options || []).map((option) => option.trim()).filter(Boolean);
+      return !options.includes(String(q.attentionAnswer || '').trim());
+    });
+    if (badAttention) return toast.error('An attention check needs its correct option');
 
     setLoading(true);
 
@@ -406,6 +452,10 @@ const CreateSepSurvey = () => {
           if (['single_checkbox', 'multiple_checkbox'].includes(q.questionType)) {
             base.options = q.options.map(o => o.trim()).filter(Boolean);
             base.maxSelections = q.maxSelections;
+          }
+          if (q.questionType === 'single_checkbox' && q.attentionCheck) {
+            base.attentionCheck = true;
+            base.attentionAnswer = String(q.attentionAnswer || '').trim();
           }
           if (q.questionType === 'matrix_radio') {
             base.options = (q.options || []).map(o => o.trim()).filter(Boolean);
@@ -1064,6 +1114,34 @@ const CreateSepSurvey = () => {
                               </div>
                             ))}
                           </div>
+
+                          {q.questionType === 'single_checkbox' && (
+                            <div className="mt-4 pt-4 border-t border-green-100 space-y-3">
+                              <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                                <input
+                                  type="checkbox"
+                                  checked={!!q.attentionCheck}
+                                  onChange={(e) => handleQuestionChange(idx, 'attentionCheck', e.target.checked)}
+                                />
+                                Attention check
+                              </label>
+                              <p className="text-xs text-gray-500">
+                                A wrong answer is counted on the health page. Surveys without this check are left out.
+                              </p>
+                              {q.attentionCheck && (
+                                <select
+                                  value={q.attentionAnswer || ''}
+                                  onChange={(e) => handleQuestionChange(idx, 'attentionAnswer', e.target.value)}
+                                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-white"
+                                >
+                                  <option value="">Correct answer</option>
+                                  {q.options.map((opt, optIdx) => (
+                                    <option key={optIdx} value={opt}>{opt || `Option ${optIdx + 1}`}</option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                          )}
 
                           {q.questionType === 'multiple_checkbox' && (
                             <div className="mt-4 pt-4 border-t border-green-100">

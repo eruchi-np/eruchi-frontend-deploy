@@ -1434,6 +1434,32 @@
   transform-origin: center center;
 }
 
+.reward-claim-code {
+  margin: 14px 0 0;
+  text-align: center;
+}
+
+.reward-claim-code-label,
+.reward-claim-code-value {
+  margin: 0;
+}
+
+.reward-claim-code-label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #9aa1a8;
+}
+
+.reward-claim-code-value {
+  margin-top: 4px;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.28em;
+  color: #0c1520;
+}
+
 .reward-claim-success-actions {
   display: flex;
   flex-wrap: wrap;

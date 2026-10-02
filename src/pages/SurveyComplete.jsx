@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { Loader2, SearchX } from "lucide-react";
 import { userAPI, voucherAPI } from "../services/api";
@@ -14,6 +14,7 @@ import {
   matchesOfferSearch,
   pickSuggestedOffers,
 } from "../utils/pickSurveyOffers";
+import { trackHealthEvent } from "../utils/healthEvents";
 
 const headingStyle = {
   fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
@@ -41,6 +42,24 @@ export default function SurveyComplete() {
   const [search, setSearch] = useState("");
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [retryTick, setRetryTick] = useState(0);
+  const searched = useRef(false);
+
+  useEffect(() => {
+    if (!completion?.promptId) return undefined;
+    try {
+      sessionStorage.setItem("eruchi_reward_prompt", completion.promptId);
+    } catch {
+      // The action still records without the buy flag.
+    }
+    trackHealthEvent("reward_prompt_shown", { eventId: completion.promptId });
+    return () => {
+      try {
+        sessionStorage.removeItem("eruchi_reward_prompt");
+      } catch {
+        // Ignore storage failures.
+      }
+    };
+  }, [completion?.promptId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,7 +126,17 @@ export default function SurveyComplete() {
     return <Navigate to="/standalone-surveys" replace />;
   }
 
+  const trackAction = (action, refId) => {
+    if (!completion?.promptId) return;
+    trackHealthEvent("reward_prompt_action", {
+      eventId: `${action}:${completion.promptId}${refId ? `:${refId}` : ""}`,
+      refId,
+      detail: { action },
+    });
+  };
+
   const handleSelectOffer = (offer) => {
+    trackAction("voucher", offer?._id);
     setSelectedOffer(offer);
   };
 
@@ -182,11 +211,19 @@ export default function SurveyComplete() {
             <div className="w-full lg:max-w-sm flex flex-col gap-3">
               <SearchBar
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setSearch(next);
+                  if (!searched.current && next.trim()) {
+                    searched.current = true;
+                    trackAction("search");
+                  }
+                }}
                 placeholder="Search rewards..."
               />
               <Link
                 to={shopLink}
+                onClick={() => trackAction("shop")}
                 className="w-full text-center py-3 rounded-full text-sm font-medium text-white hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: "#134074" }}
               >
@@ -225,6 +262,7 @@ export default function SurveyComplete() {
               </p>
               <Link
                 to="/shop"
+                onClick={() => trackAction("shop")}
                 className="inline-block px-6 py-3 text-white rounded-full text-sm font-medium hover:opacity-90"
                 style={{ backgroundColor: "#134074" }}
               >
@@ -261,12 +299,14 @@ export default function SurveyComplete() {
         <div className="mt-12 flex flex-wrap gap-3">
           <Link
             to="/standalone-surveys"
+            onClick={() => trackAction("next_survey")}
             className="px-6 py-3 rounded-full text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50"
           >
             More surveys
           </Link>
           <Link
             to="/"
+            onClick={() => trackAction("home")}
             className="px-6 py-3 rounded-full text-sm font-medium text-gray-500 hover:text-gray-800"
           >
             Back home

@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import { authAPI } from '../services/api';
+import { clearHealthSession, trackSessionStart } from '../utils/healthEvents';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -37,6 +38,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('username', `${userData.firstName} ${userData.lastName}`);
       localStorage.setItem('email', userData.email);
       localStorage.setItem('user_id', userData.id);
+      trackSessionStart();
     } catch (err) {
       console.error('Failed to fetch user:', err);
 
@@ -73,6 +75,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     clearSessionHint();
+    clearHealthSession();
     localStorage.removeItem('is_business');
     localStorage.removeItem('business_name');
     setUser(null);

@@ -10,6 +10,8 @@ import toast from 'react-hot-toast';
 import Pagination from '../../components/ui/Pagination';
 import StatsGrid from './components/StatsGrid.jsx';
 import BusinessDashboardModal from './components/BusinessDashboardModal.jsx';
+import AddressInfo from '../../components/demographics/steps/AddressInfo';
+import { getMaxWards } from '../../utils/municipalityData';
 
 const NAVY = "#1B2A4A";
 const MAX_POSTERS = 5;
@@ -92,7 +94,20 @@ const EMPTY_BUSINESS_FORM = {
   instagram: '',
   website: '',
   googleMapsUrl: '',
+  municipality: '',
+  wardNumber: '',
   isVerified: false,
+};
+
+const placeError = (municipality, wardNumber) => {
+  const name = String(municipality || '').trim();
+  if (!name) return 'Municipality is required';
+  const maxWards = getMaxWards(name);
+  if (!maxWards) return 'Choose a municipality from the list';
+  const ward = Number(wardNumber);
+  if (!Number.isInteger(ward) || ward < 1) return 'Ward number is required';
+  if (ward > maxWards) return `This municipality only has ${maxWards} wards`;
+  return '';
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -455,6 +470,8 @@ export default function AdminBusinessManagement() {
     instagram: business.instagram || '',
     website: business.website || '',
     googleMapsUrl: business.googleMapsUrl || '',
+    municipality: business.municipality || '',
+    wardNumber: business.wardNumber || '',
     isVerified: !!business.isVerified,
   });
 
@@ -476,6 +493,8 @@ export default function AdminBusinessManagement() {
     brandName:    businessForm.brandName,
     phone:        businessForm.phone,
     address:      businessForm.address,
+    municipality: businessForm.municipality,
+    wardNumber:   businessForm.wardNumber,
     category:     businessForm.category,
     description:  businessForm.description,
     contactPerson: {
@@ -496,6 +515,11 @@ export default function AdminBusinessManagement() {
 
   const handleSaveBusiness = async (e) => {
     e.preventDefault();
+    const localityError = placeError(businessForm.municipality, businessForm.wardNumber);
+    if (localityError) {
+      setBusinessModalError(localityError);
+      return;
+    }
     if (!editingBusiness && businessForm.password.length < 8) {
       setBusinessModalError('Password must be at least 8 characters.');
       return;
@@ -963,8 +987,9 @@ export default function AdminBusinessManagement() {
           ADD BUSINESS MODAL
       ════════════════════════════════════════════════════════════════════ */}
       {showAddBusinessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-xl max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black/40">
+          <div className="flex min-h-full items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg p-6 shadow-xl my-8">
 
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
@@ -1047,16 +1072,24 @@ export default function AdminBusinessManagement() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Address *</label>
+                      <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Street address *</label>
                       <input
                         type="text"
-                        placeholder="Physical address"
+                        placeholder="Street or landmark"
                         required
                         {...bField('address')}
                         className={inputCls}
                       />
                     </div>
                   </div>
+
+                  <AddressInfo
+                    title="Municipality"
+                    copy="Same municipality and ward list as a customer address."
+                    showProgress={false}
+                    formData={{ municipality: businessForm.municipality, wardNumber: businessForm.wardNumber }}
+                    updateFormData={(key, value) => setBusinessForm((current) => ({ ...current, [key]: value }))}
+                  />
 
                   <div>
                     <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">One-line Description</label>
@@ -1383,6 +1416,7 @@ export default function AdminBusinessManagement() {
                   : (editingBusiness ? 'Save Changes' : 'Create Business Account')}
               </button>
             </form>
+          </div>
           </div>
         </div>
       )}

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import QRCode from "react-qr-code";
 import { ArrowLeft, Maximize2, Download } from "lucide-react";
 import { voucherAPI } from "../services/api";
+import { healthSessionId, trackHealthEvent } from "../utils/healthEvents";
 import { VOUCHER_TERMS } from "../constants/voucherTerms";
 
 // Vibrant ticket palettes — bg, darker accent, and soft ray color
@@ -50,6 +51,16 @@ export default function VoucherDetail() {
     };
     fetch();
   }, [id]);
+
+  useEffect(() => {
+    if (!voucher?._id) return;
+    const sessionId = healthSessionId();
+    trackHealthEvent("voucher_opened", {
+      refId: voucher._id,
+      eventId: `open:${voucher._id}:${sessionId}`,
+      detail: { sessionId },
+    });
+  }, [voucher?._id]);
 
   const handleFullscreen = () => {
     document.documentElement.requestFullscreen().catch(() => {});

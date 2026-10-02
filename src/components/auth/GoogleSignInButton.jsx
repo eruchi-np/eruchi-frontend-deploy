@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { persistAuthSession } from "../../utils/auth";
+import { readAcquisition } from "../../utils/acquisition";
+import { readVisitorId } from "../../utils/healthEvents";
 import { fetchGoogleClientId, renderGoogleButton } from "../../utils/googleGis";
 
 const API_BASE_URL =
@@ -62,9 +64,15 @@ const GoogleSignInButton = ({
             setBusy(true);
             setError("");
             try {
+              const acquisition = readAcquisition();
+              const visitorId = readVisitorId();
               const result = await axios.post(
                 `${API_BASE_URL}/auth/google`,
-                { credential },
+                {
+                  credential,
+                  ...(acquisition ? { acquisition } : {}),
+                  ...(visitorId ? { visitorId } : {}),
+                },
                 { withCredentials: true }
               );
               const userData = result?.data?.data?.user;

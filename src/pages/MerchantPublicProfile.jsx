@@ -215,6 +215,12 @@ export default function MerchantPublicProfile() {
               <p className="flex items-center gap-2"><MapPin size={16} className="text-gray-400 shrink-0" /> {business.address}</p>
             )
           )}
+          {(business.municipality || business.wardNumber) && (
+            <p className="flex items-center gap-2">
+              <MapPin size={16} className="text-gray-400 shrink-0" />
+              {[business.municipality, business.wardNumber ? `Ward ${business.wardNumber}` : ''].filter(Boolean).join(', ')}
+            </p>
+          )}
           {business.phone && (
             <p className="flex items-center gap-2"><Phone size={16} className="text-gray-400" /> {business.phone}</p>
           )}

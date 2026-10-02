@@ -11,6 +11,7 @@ import OnboardingShell from "../components/onboarding/OnboardingShell";
 import CreditRewardBadge from "../components/onboarding/CreditRewardBadge";
 import { BASIC_DETAILS_CREDITS } from "../utils/onboardingCredits";
 import { formatNepalPhone, phoneFormatError } from "../utils/phoneFormat";
+import { trackOnboardingError, trackOnboardingSubmit, trackOnboardingView } from "../utils/healthEvents";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -67,6 +68,11 @@ const CompleteBasicInfo = () => {
   });
 
   useEffect(() => {
+    if (authLoading || !user) return;
+    trackOnboardingView("step2");
+  }, [authLoading, user]);
+
+  useEffect(() => {
     if (authLoading) return;
 
     if (!user) {
@@ -114,6 +120,7 @@ const CompleteBasicInfo = () => {
       );
 
       toast.success(`Saved — ${BASIC_DETAILS_CREDITS} Ruchi Credits added.`);
+      trackOnboardingSubmit("step2");
       await refreshUser();
       navigate("/complete-profile", { replace: true });
     } catch (err) {
@@ -168,7 +175,12 @@ const CompleteBasicInfo = () => {
           account.
         </p>
 
-        <form className="onboard-form" onSubmit={handleSubmit(onSubmit)}>
+        <form
+          className="onboard-form"
+          onSubmit={handleSubmit(onSubmit, (formErrors) => {
+            Object.keys(formErrors).forEach((field) => trackOnboardingError("step2", field));
+          })}
+        >
           <div className={`onboard-field ${errors.phone ? "is-error" : ""}`}>
             <label htmlFor="phone">Phone number</label>
             <Controller

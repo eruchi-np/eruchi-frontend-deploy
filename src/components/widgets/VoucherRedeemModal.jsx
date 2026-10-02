@@ -8,6 +8,7 @@ import { VOUCHER_TERMS } from "../../constants/voucherTerms";
 import { CARD_COLORS } from "../shop/RewardCard";
 import { playClaimBody, playClaimOpen } from "../shop/shopCinema";
 import { getOfferStock } from "../../utils/pickSurveyOffers";
+import { healthSessionId, trackHealthEvent } from "../../utils/healthEvents";
 import "../shop/shop.css";
 
 const TICKET_PALETTES = [
@@ -145,13 +146,43 @@ export default function VoucherRedeemModal({
 
   useLayoutEffect(() => playClaimBody(cardRef.current, step), [step]);
 
+  useEffect(() => {
+    if (!offer?._id) return;
+    const sessionId = healthSessionId();
+    trackHealthEvent("voucher_viewed", { refId: offer._id, detail: { sessionId } });
+    if (!notEnoughCredits) return;
+    trackHealthEvent("insufficient_credits_shown", {
+      refId: offer._id,
+      eventId: `short:${offer._id}:${sessionId}`,
+      detail: { sessionId },
+    });
+  }, [offer?._id, notEnoughCredits]);
+
   const handleRedeem = async () => {
     setLoading(true);
     setError("");
+    let fromPrompt = false;
+    try {
+      fromPrompt = Boolean(sessionStorage.getItem("eruchi_reward_prompt"));
+    } catch {
+      fromPrompt = false;
+    }
+    trackHealthEvent("purchase_clicked", {
+      refId: offer?._id,
+      detail: fromPrompt ? { action: "bought", sessionId: healthSessionId() } : undefined,
+    });
     try {
       const res = await voucherAPI.redeem(offer._id);
       setVoucher(res.data.voucher);
       setStep("success");
+      if (res.data.voucher?._id) {
+        const sessionId = healthSessionId();
+        trackHealthEvent("voucher_opened", {
+          refId: res.data.voucher._id,
+          eventId: `open:${res.data.voucher._id}:${sessionId}`,
+          detail: { sessionId },
+        });
+      }
       onRedeemed?.(res.data.voucher);
     } catch (err) {
       setError(err.response?.data?.message || "Failed to redeem voucher");
@@ -232,7 +263,7 @@ export default function VoucherRedeemModal({
 
     const BODY_PAD_TOP = 28;
     const DIVIDER_GAP = 24;
-    const HINT_H = 40;
+    const HINT_H = voucher.redemptionCode ? 66 : 40;
     const EXPIRY_H = 24;
     const BODY_BOTTOM_PAD = 30;
 
@@ -386,6 +417,15 @@ export default function VoucherRedeemModal({
     ctx.fillText("Show this QR to store staff to redeem", CX, y + 26);
     ctx.globalAlpha = 1;
 
+    if (voucher.redemptionCode) {
+      ctx.fillStyle = "#94a3b8";
+      ctx.font = "600 10px system-ui, sans-serif";
+      ctx.fillText("OR GIVE STAFF THIS CODE", CX, y + 44);
+      ctx.fillStyle = "#1e293b";
+      ctx.font = "bold 20px system-ui, sans-serif";
+      ctx.fillText(voucher.redemptionCode.split("").join(" "), CX, y + 66);
+    }
+
     if (voucher.expiresAt) {
       ctx.fillStyle = "#0f172a";
       ctx.font = "600 14px system-ui, sans-serif";
@@ -396,7 +436,7 @@ export default function VoucherRedeemModal({
           year: "numeric",
         })}`,
         CX,
-        y + 50
+        y + (voucher.redemptionCode ? 90 : 50)
       );
     }
 
@@ -542,6 +582,12 @@ export default function VoucherRedeemModal({
                 />
               </div>
               <p className="reward-claim-copy">Show this QR to store staff to redeem.</p>
+              {voucher.redemptionCode ? (
+                <div className="reward-claim-code">
+                  <p className="reward-claim-code-label">Or give staff this code</p>
+                  <p className="reward-claim-code-value">{voucher.redemptionCode}</p>
+                </div>
+              ) : null}
               <div className="reward-claim-success-actions">
                 <button type="button" className="reward-claim-secondary" onClick={downloadVoucher}>
                   Download voucher

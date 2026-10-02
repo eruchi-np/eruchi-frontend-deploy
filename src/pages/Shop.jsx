@@ -12,6 +12,7 @@ import { toast } from "react-hot-toast";
 import { isOfferAvailable } from "../utils/pickSurveyOffers";
 import { parsePage, writeSearchParams } from "../utils/searchParams";
 import { trackEvent } from "../utils/visitorEvents";
+import { healthSessionId, trackHealthEvent } from "../utils/healthEvents";
 import skyBg from "../assets/home/sky.jpg";
 import "../components/homepage/homepage.css";
 import "../components/shop/shop.css";
@@ -61,6 +62,13 @@ export default function Shop() {
     }, 300);
     return () => clearTimeout(timer);
   }, [searchDraft, search, setShopParams]);
+
+  const trackedShopVisit = useRef(false);
+  useEffect(() => {
+    if (!user || trackedShopVisit.current) return;
+    trackedShopVisit.current = true;
+    trackHealthEvent("shop_viewed", { detail: { sessionId: healthSessionId() } });
+  }, [user]);
 
   useEffect(() => {
     trackEvent("page_view", "/shop");

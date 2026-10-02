@@ -91,11 +91,11 @@ export default defineConfig(({ mode }) => {
       "base-uri 'self'",
       "frame-ancestors 'none'",
       "object-src 'none'",
-      "script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.googletagmanager.com https://connect.facebook.net",
+      "script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.googletagmanager.com https://connect.facebook.net https://www.clarity.ms https://scripts.clarity.ms",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",
-      `connect-src 'self' ${apiOrigin} http://localhost:5000 http://localhost:5001 https://eruchi.com.np https://www.eruchi.com.np https://accounts.google.com https://www.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://connect.facebook.net https://www.facebook.com`,
+      `connect-src 'self' ${apiOrigin} http://localhost:5000 http://localhost:5001 https://eruchi.com.np https://www.eruchi.com.np https://accounts.google.com https://www.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://connect.facebook.net https://www.facebook.com https://www.clarity.ms https://c.clarity.ms https://*.clarity.ms`,
       "frame-src https://accounts.google.com https://www.googletagmanager.com",
       "form-action 'self'",
     ].join('; '),
@@ -106,7 +106,15 @@ export default defineConfig(({ mode }) => {
 
   return {
     server: {
+      host: '127.0.0.1',
+      allowedHosts: ['localhost', '127.0.0.1', '.trycloudflare.com'],
       headers: securityHeaders,
+      proxy: {
+        '/api': {
+          target: 'http://127.0.0.1:5001',
+          changeOrigin: false,
+        },
+      },
     },
     preview: {
       headers: securityHeaders,

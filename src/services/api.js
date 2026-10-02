@@ -132,6 +132,7 @@ export const adminAPI = {
   createVoucherOffer: (data, config = {}) => api.post('/admin/voucher-offers', data, config),
   updateVoucherOffer: (id, data, config = {}) => api.put(`/admin/voucher-offers/${id}`, data, config),
   getVouchers: (options = {}) => getRequest('/admin/vouchers', options),
+  cancelVoucher: (id, config = {}) => api.post(`/admin/vouchers/${id}/cancel`, {}, config),
   getVoucherStats: (options = {}) => getRequest('/admin/vouchers/stats', options),
   getScanLog: (options = {}) => getRequest('/admin/scan-log', options),
   deleteVoucherOffer: (id, config = {}) => api.delete(`/admin/voucher-offers/${id}`, config),
@@ -151,6 +152,7 @@ export const adminAPI = {
   promoteStaff: (data, config = {}) => api.post('/admin/staff', data, config),
   getNpsMetrics: (options = {}) => getRequest('/admin/metrics/nps', options),
   getCepMetrics: (options = {}) => getRequest('/admin/metrics/cep', options),
+  getPhase1Health: (options = {}) => getRequest('/admin/health/phase1', options),
 };
 
 export const faqAPI = {

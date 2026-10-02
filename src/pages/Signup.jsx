@@ -9,6 +9,8 @@ import { useAuth } from "../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import OnboardingShell from "../components/onboarding/OnboardingShell";
+import { readAcquisition } from "../utils/acquisition";
+import { readVisitorId } from "../utils/healthEvents";
 import "../components/onboarding/onboarding.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -77,6 +79,8 @@ const Signup = () => {
     const safeUsername = emailPrefix.replace(/[^a-zA-Z0-9]/g, "").slice(0, 30).padEnd(3, "0");
 
     try {
+      const acquisition = readAcquisition();
+      const visitorId = readVisitorId();
       const payload = {
         username: safeUsername,
         email: data.email,
@@ -85,6 +89,8 @@ const Signup = () => {
         lastName: data.lastName,
         nationality: data.nationality || null,
         promotionalEmails: data.promotionalEmails === true,
+        ...(acquisition ? { acquisition } : {}),
+        ...(visitorId ? { visitorId } : {}),
       };
 
       const response = await axios.post(`${API_BASE_URL}/auth/register`, payload);

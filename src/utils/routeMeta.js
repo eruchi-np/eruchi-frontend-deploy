@@ -60,6 +60,7 @@ const PRIVATE_TITLES = [
   { test: (path) => path === '/campaigns', title: 'Campaigns' },
   { test: (path) => path.startsWith('/survey/'), title: 'Campaign survey' },
   { test: (path) => path === '/campaign-history', title: 'Campaign history' },
+  { test: (path) => path === '/admin/health', title: 'Platform health' },
   { test: (path) => path.startsWith('/admin'), title: 'Admin' },
   { test: (path) => path.startsWith('/business'), title: 'Business' },
   { test: (path) => path.startsWith('/complete-'), title: 'Complete profile' },

@@ -19,6 +19,9 @@ import RouteFallback from './components/ui/RouteFallback';
 import { RouteErrorBoundary } from './components/layout/ErrorBoundary';
 import usePageMeta from './hooks/usePageMeta';
 import { getRouteMeta } from './utils/routeMeta';
+import { rememberAcquisition } from './utils/acquisition';
+import { rememberLandingVisit, rememberMailClick } from './utils/healthEvents';
+import { identifyClarity, installClarity } from './utils/clarity';
 import { useAuth } from './context/AuthContext';
 import { isProfileOnboardingLocked } from './utils/onboardingGate';
 
@@ -52,6 +55,7 @@ const CreateSepSurvey = lazy(() => import('./pages/admin/CreateSepSurvey.jsx'));
 const FifteenDaySurveyAdmin = lazy(() => import('./pages/admin/FifteenDaySurveyAdmin.jsx'));
 const AdminBusinessManagement = lazy(() => import('./pages/admin/AdminBusinessManagement'));
 const AdminFaqManagement = lazy(() => import('./pages/admin/AdminFaqManagement.jsx'));
+const AdminHealth = lazy(() => import('./pages/admin/AdminHealth.jsx'));
 const BusinessScan = lazy(() => import('./pages/business/BusinessScan'));
 const BusinessDashboard = lazy(() => import('./pages/business/BusinessDashboard'));
 const BusinessProfile = lazy(() => import('./pages/business/BusinessProfile'));
@@ -102,6 +106,7 @@ function AppChrome({ children }) {
 
 function RouteChangeHandler() {
   const location = useLocation();
+  const { user } = useAuth();
   const isFirstLoad = useRef(true);
   const isMerchantPage = location.pathname.startsWith('/shop/merchant/');
   usePageMeta({
@@ -110,6 +115,14 @@ function RouteChangeHandler() {
   });
 
   useEffect(() => {
+    installClarity();
+    if (user?._id) identifyClarity(user._id);
+  }, [user?._id]);
+
+  useEffect(() => {
+    rememberAcquisition(location.search);
+    rememberMailClick(location.search);
+    rememberLandingVisit(location.pathname);
     toast.dismiss();
     if (isFirstLoad.current) {
       isFirstLoad.current = false;
@@ -118,7 +131,7 @@ function RouteChangeHandler() {
     if (typeof window.fbq === 'function') {
       window.fbq('track', 'PageView');
     }
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
   return null;
 }
 
@@ -360,6 +373,14 @@ function App() {
               element={
                 <AdminRoute permission="faqs">
                   <AdminFaqManagement />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/health"
+              element={
+                <AdminRoute permission="analytics">
+                  <AdminHealth />
                 </AdminRoute>
               }
             />

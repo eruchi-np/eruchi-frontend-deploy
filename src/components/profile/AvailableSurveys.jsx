@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { trackSurveyCards } from "../../utils/healthEvents";
 
 const EmptyState = ({ icon, text }) => (
   <div className="flex flex-col items-center justify-center py-10 px-5 text-[#6B7A8A] text-[13px] text-center gap-2.5">
@@ -13,6 +14,9 @@ const EmptyState = ({ icon, text }) => (
 
 const SurveyRow = ({ survey }) => {
   const navigate = useNavigate();
+  useEffect(() => {
+    trackSurveyCards([survey]);
+  }, [survey]);
   return (
     <div
       className="flex items-center gap-3.5 py-3.5 border-b border-[#EDF2F7] last:border-b-0 cursor-pointer hover:opacity-80"

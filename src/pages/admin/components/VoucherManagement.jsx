@@ -22,6 +22,7 @@ const VoucherManagement = ({
   NAVY,
 }) => {
   const [qrModal, setQrModal] = useState(null);
+  const [cancellingId, setCancellingId] = useState(null);
   const qrModalRef = useRef(null);
   const [localFrom, setLocalFrom] = useState(dateFrom || "");
   const [localTo, setLocalTo] = useState(dateTo || "");
@@ -87,7 +88,21 @@ const VoucherManagement = ({
     onDateRangeChange?.({ from: "", to: "" });
   };
 
-  const counts = statusCounts || { active: 0, used: 0, expired: 0 };
+  const counts = statusCounts || { active: 0, used: 0, expired: 0, cancelled: 0 };
+
+  const handleCancel = async (voucher) => {
+    if (!window.confirm("Cancel this voucher and return the credits?")) return;
+    setCancellingId(voucher._id);
+    try {
+      await adminAPI.cancelVoucher(voucher._id);
+      toast.success("Voucher cancelled");
+      onPageChange?.(pagination?.currentPage || 1);
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Could not cancel this voucher");
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden shadow-sm">
@@ -100,7 +115,7 @@ const VoucherManagement = ({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {["active", "used", "expired"].map((s) => (
+            {["active", "used", "expired", "cancelled"].map((s) => (
               <button
                 key={s}
                 type="button"
@@ -224,7 +239,9 @@ const VoucherManagement = ({
                           ? `Redeemed ${new Date(voucher.usedAt).toLocaleString()}`
                           : voucher.status === "expired"
                             ? `Expired ${new Date(voucher.expiresAt).toLocaleDateString()}`
-                            : `Issued ${new Date(voucher.issuedAt || voucher.createdAt).toLocaleDateString()} · Expires ${new Date(voucher.expiresAt).toLocaleDateString()}`}
+                            : voucher.status === "cancelled"
+                              ? `Cancelled ${voucher.cancelledAt ? new Date(voucher.cancelledAt).toLocaleString() : ""}`
+                              : `Issued ${new Date(voucher.issuedAt || voucher.createdAt).toLocaleDateString()} · Expires ${new Date(voucher.expiresAt).toLocaleDateString()}`}
                       </p>
                     </div>
                   </div>
@@ -241,14 +258,24 @@ const VoucherManagement = ({
                       {voucher.status}
                     </span>
                     {voucher.status === "active" && (
-                      <button
-                        type="button"
-                        onClick={() => handleOpenQR(voucher._id, snap.title)}
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors hover:opacity-90"
-                        style={{ backgroundColor: NAVY }}
-                      >
-                        <QrCode className="h-4 w-4" /> QR
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleCancel(voucher)}
+                          disabled={cancellingId === voucher._id}
+                          className="px-4 py-2 rounded-xl text-sm font-medium text-red-700 bg-red-50 hover:bg-red-100 disabled:opacity-50"
+                        >
+                          {cancellingId === voucher._id ? "Cancelling" : "Cancel"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenQR(voucher._id, snap.title)}
+                          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors hover:opacity-90"
+                          style={{ backgroundColor: NAVY }}
+                        >
+                          <QrCode className="h-4 w-4" /> QR
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

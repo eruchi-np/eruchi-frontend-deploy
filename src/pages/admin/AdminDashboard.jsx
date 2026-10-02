@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { adminAPI, sepSurveyAPI } from "../../services/api";
 import {
   Users, Plus, ArrowLeft, Award, Clock, X, Building2, FileText,
-  HelpCircle, CalendarDays, Ticket, ScanLine, Layers, Shield, BarChart3,
+  HelpCircle, CalendarDays, Ticket, ScanLine, Layers, Shield, BarChart3, Activity,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
@@ -92,7 +92,7 @@ const AdminDashboard = () => {
   const pageSize = 50;
 
   const voucherStatusParam = searchParams.get("status");
-  const initialVoucherStatus = ["active", "used", "expired"].includes(voucherStatusParam)
+  const initialVoucherStatus = ["active", "used", "expired", "cancelled"].includes(voucherStatusParam)
     ? voucherStatusParam
     : "active";
   const [vouchers, setVouchers] = useState([]);
@@ -323,7 +323,7 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     if (activeTab !== "vouchers") return;
-    const status = ["active", "used", "expired"].includes(voucherStatusParam)
+    const status = ["active", "used", "expired", "cancelled"].includes(voucherStatusParam)
       ? voucherStatusParam
       : "active";
     setVoucherStatusFilter(status);
@@ -434,6 +434,11 @@ const AdminDashboard = () => {
             </div>
 
             <div className="flex items-center flex-wrap gap-2 sm:gap-3">
+              {can("analytics") && (
+                <button onClick={() => navigate("/admin/health")} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
+                  <Activity className="h-4 w-4" /> Health
+                </button>
+              )}
               {can("surveys") && (
                 <button onClick={() => navigate("/admin/15-day-survey")} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
                   <CalendarDays className="h-4 w-4" /> 15-day survey
