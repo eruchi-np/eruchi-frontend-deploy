@@ -5,13 +5,27 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000
 let csrfToken = '';
 let inflight = null;
 
+const isCsrfError = (error) =>
+  error.response?.status === 403 &&
+  /csrf/i.test(String(error.response?.data?.message || ''));
+
 export const getCsrfToken = () => csrfToken;
 
-export const ensureCsrfToken = async () => {
+export const clearCsrfToken = () => {
+  csrfToken = '';
+  inflight = null;
+};
+
+export const ensureCsrfToken = async (force = false) => {
+  if (force) clearCsrfToken();
   if (csrfToken) return csrfToken;
   if (!inflight) {
     inflight = axios
-      .get(`${API_BASE_URL}/csrf`, { withCredentials: true })
+      .get(`${API_BASE_URL}/csrf`, {
+        withCredentials: true,
+        headers: { 'Cache-Control': 'no-cache', Pragma: 'no-cache' },
+        params: { _: Date.now() },
+      })
       .then((res) => {
         csrfToken = res.data?.csrfToken || '';
         return csrfToken;
@@ -35,4 +49,20 @@ export const attachCsrf = (instance) => {
     config.withCredentials = true;
     return config;
   });
+
+  instance.interceptors.response.use(
+    (response) => response,
+    async (error) => {
+      const config = error.config;
+      if (!config || config._csrfRetried || !isCsrfError(error)) {
+        return Promise.reject(error);
+      }
+      config._csrfRetried = true;
+      const token = await ensureCsrfToken(true);
+      if (!token) return Promise.reject(error);
+      config.headers = config.headers || {};
+      config.headers['X-CSRF-Token'] = token;
+      return instance.request(config);
+    }
+  );
 };

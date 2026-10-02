@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 // Import the AnimatedContent component
 import AnimatedContent from "../components/animations/AnimatedContent";
+import { clearCsrfToken, ensureCsrfToken } from "../utils/csrf";
 
 const ForBusiness = () => {
   const [modalOpen, setModalOpen] = useState(false);
@@ -15,11 +16,23 @@ const ForBusiness = () => {
     if (!form.businessName || !form.phone || !form.email) return;
     setStatus("loading");
     try {
-      const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/inquiries`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+      const postInquiry = async (force) => {
+        const csrfToken = await ensureCsrfToken(force);
+        return fetch(`${import.meta.env.VITE_API_BASE_URL}/inquiries`, {
+          method: "POST",
+          credentials: "include",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRF-Token": csrfToken,
+          },
+          body: JSON.stringify(form),
+        });
+      };
+      let res = await postInquiry(false);
+      if (res.status === 403) {
+        clearCsrfToken();
+        res = await postInquiry(true);
+      }
       if (!res.ok) throw new Error();
       setStatus("success");
     } catch {
