@@ -16,6 +16,7 @@ export default function Stepper({
   nextButtonProps = {},
   backButtonText = 'Back',
   nextButtonText = 'Continue',
+  completeButtonText = 'Complete',
   disableStepIndicators = false,
   renderStepIndicator,
   ...rest
@@ -123,7 +124,7 @@ export default function Stepper({
                 className="next-button"
                 {...nextButtonProps}
               >
-                {isLastStep ? 'Complete' : nextButtonText}
+                {isLastStep ? completeButtonText : nextButtonText}
               </button>
             </div>
           </div>

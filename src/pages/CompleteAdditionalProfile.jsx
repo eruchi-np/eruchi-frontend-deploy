@@ -4,6 +4,7 @@ import AdditionalProfileSurvey from "../components/demographics/AdditionalProfil
 import OnboardingShell from "../components/onboarding/OnboardingShell";
 import CreditRewardBadge from "../components/onboarding/CreditRewardBadge";
 import { PROFILE_COMPLETION_2_CREDITS, PROFILE_COMPLETION_2_QUESTION_COUNT } from "../utils/onboardingCredits";
+import { PROFILE_REFRESH_BODY } from "../utils/profileRefreshCopy";
 import { useAuth } from "../context/AuthContext";
 
 const CompleteAdditionalProfile = ({ mode = "registration" }) => {
@@ -52,12 +53,12 @@ const CompleteAdditionalProfile = ({ mode = "registration" }) => {
             <CreditRewardBadge amount={PROFILE_COMPLETION_2_CREDITS} />
           </div>
         )}
-        <h1 className="onboard-title">A few more questions</h1>
+        <h1 className="onboard-title">{isRefresh ? "Update your profile" : "A few more questions"}</h1>
         <p className="onboard-copy">
           {refreshPays
-            ? `Earn ${PROFILE_COMPLETION_2_CREDITS} Ruchi Credits again — ${PROFILE_COMPLETION_2_QUESTION_COUNT} quick questions about your daily life. Takes about 2 minutes.`
+            ? `${PROFILE_REFRESH_BODY} Your current answers are filled in. Confirm same or change each one, then submit to earn ${PROFILE_COMPLETION_2_CREDITS} Ruchi Credits.`
             : isRefresh
-            ? `${PROFILE_COMPLETION_2_QUESTION_COUNT} quick questions about your daily life. Takes about 2 minutes.`
+            ? "Your current answers are filled in. Confirm same or change each one, then submit."
             : `Earn ${PROFILE_COMPLETION_2_CREDITS} Ruchi Credits — ${PROFILE_COMPLETION_2_QUESTION_COUNT} quick questions about your daily life. Takes about 2 minutes.`}
         </p>
         <AdditionalProfileSurvey mode={mode} onComplete={handleComplete} />

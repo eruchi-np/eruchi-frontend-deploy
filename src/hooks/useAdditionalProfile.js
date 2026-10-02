@@ -12,6 +12,14 @@ const initialFormData = {
 const useAdditionalProfile = () => {
   const [formData, setFormData] = useState(initialFormData);
 
+  const replaceForm = (next) => {
+    setFormData({
+      ...initialFormData,
+      ...next,
+      transportation: Array.isArray(next?.transportation) ? next.transportation : [],
+    });
+  };
+
   const updateField = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -32,6 +40,7 @@ const useAdditionalProfile = () => {
   return {
     formData,
     updateField,
+    replaceForm,
     toggleArrayField,
     resetForm
   };

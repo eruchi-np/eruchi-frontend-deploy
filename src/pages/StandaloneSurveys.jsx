@@ -9,6 +9,8 @@ import { flipShopCatalog, initShopCinema, scrollShopToCatalog } from "../compone
 import { useAuth } from "../context/AuthContext";
 import { parsePage, writeSearchParams } from "../utils/searchParams";
 import { trackEvent } from "../utils/visitorEvents";
+import { trackSurveyCards } from "../utils/healthEvents";
+import { PROFILE_REFRESH_BLOCKED, PROFILE_REFRESH_BODY, PROFILE_REFRESH_TITLE } from "../utils/profileRefreshCopy";
 import skyBg from "../assets/home/sky.jpg";
 import "../components/homepage/homepage.css";
 import "../components/shop/shop.css";
@@ -120,6 +122,14 @@ export default function StandaloneSurveys() {
     if (!searchParams.get("q")) return;
     setListParams({ q: "" });
   }, [searchParams, setListParams]);
+
+  useEffect(() => {
+    trackSurveyCards(surveys);
+  }, [surveys]);
+
+  useEffect(() => {
+    trackSurveyCards(sprintSurveys);
+  }, [sprintSurveys]);
 
   useEffect(() => {
     trackEvent("page_view", "/standalone-surveys");
@@ -296,10 +306,13 @@ export default function StandaloneSurveys() {
 
         <div className="home-sheet shop-sheet">
           <div className="shop-catalog">
-            {user?.profileSurveyBlocked ? (
+            {user?.profileSurveyBlocked || user?.profileOutdated ? (
               <div className="shop-status">
-                <h3>Update your profile</h3>
-                <p>You last updated your profile more than 6 months ago. Update your profile to stay up to date, and earn some extra Ruchi Credits! Surveys stay closed until you update it.</p>
+                <h3>{PROFILE_REFRESH_TITLE}</h3>
+                <p>
+                  {PROFILE_REFRESH_BODY}
+                  {user?.profileSurveyBlocked ? ` ${PROFILE_REFRESH_BLOCKED}` : ""}
+                </p>
                 <button
                   type="button"
                   className="home-pill home-pill-sm home-pill-navy"

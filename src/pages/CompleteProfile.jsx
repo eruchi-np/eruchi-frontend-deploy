@@ -4,7 +4,8 @@ import DemographicsWizard from "../components/demographics/DemographicsWizard";
 import WelcomeToERuchi from "../components/demographics/steps/WelcomeToERuchi";
 import OnboardingShell from "../components/onboarding/OnboardingShell";
 import CreditRewardBadge from "../components/onboarding/CreditRewardBadge";
-import { PROFILE_COMPLETION_1_CREDITS } from "../utils/onboardingCredits";
+import { PROFILE_COMPLETION_1_CREDITS, PROFILE_COMPLETION_2_CREDITS } from "../utils/onboardingCredits";
+import { PROFILE_REFRESH_BODY } from "../utils/profileRefreshCopy";
 import { useAuth } from "../context/AuthContext";
 
 const CompleteProfile = ({ mode = "registration" }) => {
@@ -50,12 +51,12 @@ const CompleteProfile = ({ mode = "registration" }) => {
             <CreditRewardBadge amount={PROFILE_COMPLETION_1_CREDITS} />
           </div>
         )}
-        <h1 className="onboard-title">Complete your profile</h1>
+        <h1 className="onboard-title">{isRefresh ? "Update your profile" : "Complete your profile"}</h1>
         <p className="onboard-copy">
           {refreshPays
-            ? `Tell us more about you — earn ${PROFILE_COMPLETION_1_CREDITS} Ruchi Credits again, same as the first time.`
+            ? `${PROFILE_REFRESH_BODY} Your current answers are filled in. Confirm same or change each one, then submit to earn ${PROFILE_COMPLETION_1_CREDITS} Ruchi Credits. The next part earns ${PROFILE_COMPLETION_2_CREDITS} more.`
             : isRefresh
-            ? "Tell us more about you so we can keep matching you to relevant surveys."
+            ? "Your current answers are filled in. Confirm same or change each one, then submit."
             : `Tell us more about you — earn ${PROFILE_COMPLETION_1_CREDITS} Ruchi Credits, and we'll match you to more relevant surveys.`}
         </p>
         <DemographicsWizard mode={mode} onComplete={handleProfileComplete} />

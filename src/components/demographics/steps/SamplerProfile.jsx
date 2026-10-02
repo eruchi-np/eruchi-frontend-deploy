@@ -1,9 +1,10 @@
 import React from 'react';
 import SearchableSelect from '../ui/SearchableSelect';
 import EnhancedSelect from '../ui/EnhancedSelect';
+import ConfirmSame from '../ConfirmSame';
 import { occupationOptions } from '../../../utils/occupation-data';
 
-const SamplerProfile = ({ formData, updateFormData, errors = {} }) => {
+const SamplerProfile = ({ formData, updateFormData, errors = {}, saved = null, confirmed = {}, onConfirm }) => {
 const educationOptions = [
   { value: 'Illiterate', label: 'Illiterate' },
   { value: 'Literate without formal schooling / Grade 4', label: 'Literate without formal schooling / Grade 4' },
@@ -48,6 +49,7 @@ const languageOptions = [
             label="First Language"
           />
           {errors.firstLanguage && <p className="onboard-error">{errors.firstLanguage}</p>}
+          <ConfirmSame saved={saved?.firstLanguage} value={formData.firstLanguage} confirmed={confirmed.firstLanguage} onConfirm={() => onConfirm?.('firstLanguage')} />
         </div>
 
         {/* Highest Level of Completed Education */}
@@ -60,6 +62,7 @@ const languageOptions = [
             label="Highest Level of Completed Education"
           />
           {errors.education && <p className="onboard-error">{errors.education}</p>}
+          <ConfirmSame saved={saved?.education} value={formData.education} confirmed={confirmed.education} onConfirm={() => onConfirm?.('education')} />
         </div>
 
         {/* Marital Status */}
@@ -72,6 +75,7 @@ const languageOptions = [
             label="Marital Status"
           />
           {errors.maritalStatus && <p className="onboard-error">{errors.maritalStatus}</p>}
+          <ConfirmSame saved={saved?.maritalStatus} value={formData.maritalStatus} confirmed={confirmed.maritalStatus} onConfirm={() => onConfirm?.('maritalStatus')} />
         </div>
 
         {/* Occupation - Searchable Select */}
@@ -87,6 +91,7 @@ const languageOptions = [
             searchPlaceholder="Search occupations..."
           />
           {errors.occupation && <p className="onboard-error">{errors.occupation}</p>}
+          <ConfirmSame saved={saved?.occupation} value={formData.occupation} confirmed={confirmed.occupation} onConfirm={() => onConfirm?.('occupation')} />
         </div>
       </div>
 

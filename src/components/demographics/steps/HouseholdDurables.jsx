@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { HelpCircle, Check } from 'lucide-react';
 import EnhancedSelect from '../ui/EnhancedSelect';
+import ConfirmSame from '../ConfirmSame';
 
-const HouseholdDurables = ({ formData, updateFormData, errors = {} }) => {
+const HouseholdDurables = ({ formData, updateFormData, errors = {}, saved = null, confirmed = {}, onConfirm }) => {
   const [showTooltip, setShowTooltip] = useState(false);
 
   const durableGoodsOptions = [
@@ -100,6 +101,7 @@ const educationOptions = [
             </p>
           )}
           {errors.durableGoods && <p className="onboard-error">{errors.durableGoods}</p>}
+          <ConfirmSame saved={saved?.durableGoods} value={formData.durableGoods} confirmed={confirmed.durableGoods} onConfirm={() => onConfirm?.('durableGoods')} />
         </div>
 
         {/* Main Household Earner */}
@@ -140,6 +142,7 @@ const educationOptions = [
           {errors.mainHouseholdEarner && (
             <p className="onboard-error">{errors.mainHouseholdEarner}</p>
           )}
+          <ConfirmSame saved={saved?.mainHouseholdEarner} value={formData.mainHouseholdEarner} confirmed={confirmed.mainHouseholdEarner} onConfirm={() => onConfirm?.('mainHouseholdEarner')} />
         </div>
 
         {/* Conditional Education Field */}
@@ -164,6 +167,7 @@ const educationOptions = [
               </div>
             )}
             {errors.earnerEducation && <p className="onboard-error">{errors.earnerEducation}</p>}
+            <ConfirmSame saved={saved?.earnerEducation} value={formData.earnerEducation} confirmed={confirmed.earnerEducation} onConfirm={() => onConfirm?.('earnerEducation')} />
           </div>
         )}
 

@@ -7,6 +7,7 @@ import {
   loadDraft,
   saveDraft,
   clearDemographicsDraft,
+  normalizeFormData,
 } from '../utils/demographicsDraft';
 
 export { clearDemographicsDraft, hasDraftProgress };
@@ -71,6 +72,12 @@ const useDemographics = ({ storageKey } = {}) => {
       }
       return step;
     });
+  };
+
+  const replaceFormData = (next) => {
+    setFormData(normalizeFormData(next));
+    setCurrentStep(1);
+    setCompletedSteps({ ...initialCompletedSteps });
   };
 
   const updateFormData = (field, value) => {
@@ -182,6 +189,7 @@ const useDemographics = ({ storageKey } = {}) => {
     prevStep,
     goToStep,
     updateFormData,
+    replaceFormData,
     updateArrayField,
     submitForm,
     resetForm,

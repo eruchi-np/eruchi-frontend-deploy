@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { sepSurveyAPI, fifteenDaySurveyAPI } from "../services/api";
 import {
@@ -8,7 +8,9 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import useSurveyTimer from "../hooks/userSurveyTimer";
+import { trackHealthEvent, useSurveyVisit } from "../utils/healthEvents";
 import { useAuth } from "../context/AuthContext";
+import { PROFILE_REFRESH_BLOCKED, PROFILE_REFRESH_BODY, PROFILE_REFRESH_TITLE } from "../utils/profileRefreshCopy";
 import { completionFromSubmitResponse, goToSurveyComplete } from "../utils/surveyComplete";
 import SurveySubmitConfirm from "../components/survey/SurveySubmitConfirm";
 import MatrixQuestion, {
@@ -30,6 +32,28 @@ const StandaloneSurvey = () => {
   const [responses, setResponses] = useState({});
   const [error, setError] = useState(null);
   const { startQuestion, getTimingData } = useSurveyTimer();
+  const surveyRef = useRef(null);
+  surveyRef.current = survey;
+  const markSurveySaved = useSurveyVisit(surveyId, ({ sessionId }) => {
+    const current = surveyRef.current;
+    let last = null;
+    for (const question of getTimingData().questions || []) {
+      const position = current?.questions?.findIndex((item) => item.questionText === question.questionText) ?? -1;
+      if (position < 0 || !question.durationMs) continue;
+      last = last == null ? position : Math.max(last, position);
+      trackHealthEvent("survey_question_answered", {
+        refId: surveyId,
+        eventId: `q:${surveyId}:${position}:${sessionId}`,
+        detail: { position, durationMs: Math.round(question.durationMs), sessionId },
+      });
+    }
+    trackHealthEvent("survey_abandoned", {
+      refId: surveyId,
+      eventId: `abandon:${surveyId}:${sessionId}`,
+      detail: last == null ? { sessionId } : { sessionId, position: last },
+    });
+  });
+
   useEffect(() => {
     let cancelled = false;
     const fetchSurvey = async () => {
@@ -37,7 +61,7 @@ const StandaloneSurvey = () => {
       setError(null);
       if (user?.profileSurveyBlocked) {
         if (!cancelled) {
-          setError("You last updated your profile more than 6 months ago. Update your profile to stay up to date, and earn some extra Ruchi Credits! Surveys stay closed until you update it.");
+          setError(`${PROFILE_REFRESH_BODY} ${PROFILE_REFRESH_BLOCKED}`);
           setLoading(false);
         }
         return;
@@ -143,6 +167,7 @@ const StandaloneSurvey = () => {
         ? await fifteenDaySurveyAPI.submit(surveyId, responses, timingData, survey.wave)
         : await sepSurveyAPI.submit(surveyId, responses, timingData);
       setConfirmOpen(false);
+      markSurveySaved();
       window.dispatchEvent(new Event("authChange"));
       goToSurveyComplete(
         navigate,
@@ -168,6 +193,7 @@ const StandaloneSurvey = () => {
   if (error)
     return (
       <div className="min-h-screen bg-white flex flex-col items-center justify-center text-neutral-900 p-6 text-center gap-4">
+        {user?.profileSurveyBlocked ? <h3>{PROFILE_REFRESH_TITLE}</h3> : null}
         <p>{error}</p>
         {user?.profileSurveyBlocked ? (
           <button

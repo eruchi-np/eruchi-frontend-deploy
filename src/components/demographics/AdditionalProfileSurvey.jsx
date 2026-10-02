@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Check } from 'lucide-react';
 import useAdditionalProfile from '../../hooks/useAdditionalProfile';
 import { userAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import { PROFILE_COMPLETION_2_CREDITS } from '../../utils/onboardingCredits';
 import { additionalProfileSchema, parseStep } from '../../utils/onboardingSchemas';
+import ConfirmSame, { hasSavedValue, valuesMatch } from './ConfirmSame';
 import '../onboarding/onboarding.css';
+import { trackOnboardingError, trackOnboardingSubmit, trackOnboardingView } from '../../utils/healthEvents';
 
 const QUESTIONS = [
   {
@@ -64,30 +66,80 @@ const OptionPill = ({ label, selected, onClick, multi }) => (
 
 const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
   const isRefresh = mode === 'refresh';
-  const { formData, updateField, toggleArrayField } = useAdditionalProfile();
+  const { formData, updateField, toggleArrayField, replaceForm } = useAdditionalProfile();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [errors, setErrors] = useState({});
+  const [saved, setSaved] = useState(null);
+  const [confirmed, setConfirmed] = useState({});
+  const [seedState, setSeedState] = useState(isRefresh ? 'loading' : 'ready');
+
+  useEffect(() => {
+    trackOnboardingView('pc2');
+  }, []);
+
+  useEffect(() => {
+    if (!isRefresh) return undefined;
+    let cancel = false;
+    userAPI.getProfile({ skipErrorToast: true }).then((res) => {
+      if (cancel) return;
+      const extra = res.data?.data?.user?.additionalProfile || {};
+      const seeded = {
+        livingSituation: extra.livingSituation || '',
+        householdSize: extra.householdSize || '',
+        hasChildrenUnder12: extra.hasChildrenUnder12 || '',
+        ownsPets: extra.ownsPets || '',
+        transportation: Array.isArray(extra.transportation) ? extra.transportation : [],
+        dailySchedule: extra.dailySchedule || '',
+      };
+      setSaved(seeded);
+      replaceForm(seeded);
+      setSeedState('ready');
+    }).catch(() => {
+      if (!cancel) setSeedState('ready');
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [isRefresh]);
+
+  const markChanged = (field) => {
+    setErrors((prev) => (prev[field] ? { ...prev, [field]: '' } : prev));
+    setSubmitError('');
+    setConfirmed((prev) => ({ ...prev, [field]: false }));
+  };
 
   const handleFieldChange = (field, value) => {
-    setErrors((prev) => (prev[field] ? { ...prev, [field]: '' } : prev));
+    markChanged(field);
     updateField(field, value);
   };
 
   const handleToggle = (field, value) => {
-    setErrors((prev) => (prev[field] ? { ...prev, [field]: '' } : prev));
+    markChanged(field);
     toggleArrayField(field, value);
+  };
+
+  const fieldStillNeedsConfirm = (field) => {
+    if (!saved || !hasSavedValue(saved[field])) return false;
+    if (!valuesMatch(saved[field], formData[field])) return false;
+    return !confirmed[field];
   };
 
   const handleSubmit = async () => {
     const fieldErrors = parseStep(additionalProfileSchema, formData);
     if (Object.keys(fieldErrors).length) {
       setErrors(fieldErrors);
+      Object.keys(fieldErrors).forEach((field) => trackOnboardingError('pc2', field));
       setSubmitError(
         isRefresh
           ? 'Please answer every question.'
           : 'Please answer every question before claiming your credits.'
       );
+      return;
+    }
+    const pending = QUESTIONS.map((question) => question.id).filter(fieldStillNeedsConfirm);
+    if (pending.length) {
+      setSubmitError('Confirm same or update each answer before you submit.');
       return;
     }
 
@@ -100,9 +152,15 @@ const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
         { skipErrorToast: true }
       );
       if (response.data.success) {
+        const awarded = Number(response.data.creditsAwarded) || 0;
         toast.success(
-          isRefresh ? 'Profile updated.' : `${PROFILE_COMPLETION_2_CREDITS} Ruchi Credits added.`
+          awarded
+            ? `${awarded} Ruchi Credits added.`
+            : isRefresh
+              ? 'Profile updated.'
+              : `${PROFILE_COMPLETION_2_CREDITS} Ruchi Credits added.`
         );
+        trackOnboardingSubmit('pc2');
         onComplete?.();
       } else {
         setSubmitError(response.data.message || 'Failed to save your answers');
@@ -119,6 +177,10 @@ const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
       setSubmitting(false);
     }
   };
+
+  if (seedState === 'loading') {
+    return <p className="onboard-copy">Loading your current answers...</p>;
+  }
 
   return (
     <div className="w-full max-w-3xl mx-auto">
@@ -153,6 +215,15 @@ const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
               })}
             </div>
             {errors[question.id] && <p className="onboard-error">{errors[question.id]}</p>}
+            <ConfirmSame
+              saved={saved?.[question.id]}
+              value={formData[question.id]}
+              confirmed={confirmed[question.id]}
+              onConfirm={() => {
+                setSubmitError('');
+                setConfirmed((prev) => ({ ...prev, [question.id]: true }));
+              }}
+            />
           </div>
         ))}
       </div>
@@ -168,7 +239,7 @@ const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
           disabled={submitting}
           className="home-pill home-pill-lg home-pill-lime"
         >
-          {submitting ? 'Saving...' : isRefresh ? 'Save answers' : 'Claim your credits'}
+          {submitting ? 'Saving...' : isRefresh ? 'Submit' : 'Claim your credits'}
         </button>
       </div>
     </div>

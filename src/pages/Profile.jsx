@@ -14,6 +14,7 @@ import mks1kBadge from "../assets/mks-1k-badge.jpg";
 import "../components/homepage/homepage.css";
 import "../components/profile/profile.css";
 import { adminHomePath, isStaffAdmin } from "../utils/adminRoles";
+import { PROFILE_REFRESH_BLOCKED, PROFILE_REFRESH_BODY, PROFILE_REFRESH_TITLE } from "../utils/profileRefreshCopy";
 
 const WEEK_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const VOUCHER_COLORS = ["#16365c", "#e91e63", "#f5a623", "#16365c"];
@@ -357,9 +358,9 @@ export default function Profile() {
           >
             <AlertCircle size={20} aria-hidden="true" />
             <span>
-              <strong>Update your profile</strong>
-              You last updated your profile more than 6 months ago. Update your profile to stay up to date, and earn some extra Ruchi Credits!
-              {user.profileSurveyBlocked ? " Surveys stay closed until you update it." : ""}
+              <strong>{PROFILE_REFRESH_TITLE}</strong>
+              {PROFILE_REFRESH_BODY}
+              {user.profileSurveyBlocked ? ` ${PROFILE_REFRESH_BLOCKED}` : ""}
             </span>
           </button>
         )}

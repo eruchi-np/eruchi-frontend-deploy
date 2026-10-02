@@ -1,10 +1,12 @@
 import React,  { useState, useEffect } from 'react';
+import { trackHealthEvent, useSurveyVisit } from '../utils/healthEvents';
 import { useParams, useNavigate } from 'react-router-dom';
 import { surveyAPI, userAPI } from '../services/api';
 import { ArrowLeft, Star, Loader2, Package, Clock, Type, FileText, CheckSquare, Sliders, Table2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { completionFromSubmitResponse, goToSurveyComplete } from '../utils/surveyComplete';
 import SurveySubmitConfirm from '../components/survey/SurveySubmitConfirm';
+import { PROFILE_REFRESH_BLOCKED, PROFILE_REFRESH_BODY, PROFILE_REFRESH_TITLE } from '../utils/profileRefreshCopy';
 import MatrixQuestion, {
   emptyMatrixValue,
   isMatrixComplete,
@@ -20,6 +22,14 @@ const Survey = () => {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [responses, setResponses] = useState({});
   const [error, setError] = useState(null);
+  const markSurveySaved = useSurveyVisit(campaignId, ({ sessionId }) => {
+    trackHealthEvent('survey_abandoned', {
+      refId: campaignId,
+      eventId: `abandon:${campaignId}:${sessionId}`,
+      detail: { sessionId },
+    });
+  });
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -28,7 +38,7 @@ const Survey = () => {
         setUser(userResponse.data.data.user);
 
         if (userResponse.data.data.user.profileSurveyBlocked) {
-          setError('You last updated your profile more than 6 months ago. Update your profile to stay up to date, and earn some extra Ruchi Credits! Surveys stay closed until you update it.');
+          setError(`${PROFILE_REFRESH_BODY} ${PROFILE_REFRESH_BLOCKED}`);
           setLoading(false);
           return;
         }
@@ -186,6 +196,7 @@ const Survey = () => {
       const creditsEarned = survey.creditsToAward || 100;
       const res = await surveyAPI.submitSurvey({ responses });
       setConfirmOpen(false);
+      markSurveySaved();
       window.dispatchEvent(new Event('authChange'));
       goToSurveyComplete(
         navigate,
@@ -445,7 +456,9 @@ const Survey = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-4">
           <Package className="h-16 w-16 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Survey Unavailable</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            {user?.profileSurveyBlocked ? PROFILE_REFRESH_TITLE : 'Survey Unavailable'}
+          </h3>
           <p className="text-gray-600 mb-4">{error}</p>
           <div className="space-y-2">
             <button 

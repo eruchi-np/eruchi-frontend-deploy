@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import useDemographics, { clearDemographicsDraft } from "../../hooks/useDemographics";
 import Stepper, { Step } from "../layout/Stepper";
 import AboutYou from "./steps/SamplerProfile";
@@ -7,18 +7,63 @@ import HouseholdDurables from "./steps/HouseholdDurables";
 import { userAPI } from "../../services/api";
 import toast from "react-hot-toast";
 import { demographicsStepSchema, parseStep } from "../../utils/onboardingSchemas";
-import { REFRESH_STORAGE_KEY } from "../../utils/demographicsDraft";
+import { REFRESH_STORAGE_KEY, loadDraft } from "../../utils/demographicsDraft";
+import { hasSavedValue, valuesMatch } from "./ConfirmSame";
 import "../onboarding/onboarding.css";
+import { trackOnboardingError, trackOnboardingSubmit, trackOnboardingView } from "../../utils/healthEvents";
 
 const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
   const isRefresh = mode === "refresh";
   const storageKey = isRefresh ? REFRESH_STORAGE_KEY : undefined;
-  const { formData, updateFormData, errors: hookErrors, currentStep, goToStep } =
+  const { formData, updateFormData, replaceFormData, errors: hookErrors, currentStep, goToStep } =
     useDemographics({ storageKey });
   const [localErrors, setLocalErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [saved, setSaved] = useState(null);
+  const [confirmed, setConfirmed] = useState({});
+  const [seedState, setSeedState] = useState(isRefresh ? "loading" : "ready");
+  const submittingRef = useRef(false);
+
+  const fieldsByStep = {
+    1: ["firstLanguage", "education", "maritalStatus", "occupation"],
+    2: ["municipality", "wardNumber"],
+    3: ["durableGoods", "mainHouseholdEarner", "earnerEducation"],
+  };
 
   const stepLabels = ["About You", "Address", "Household & Durables"];
+
+  useEffect(() => {
+    trackOnboardingView("pc1");
+  }, []);
+
+  useEffect(() => {
+    if (!isRefresh) return undefined;
+    let cancel = false;
+    userAPI.getProfile({ skipErrorToast: true }).then((res) => {
+      if (cancel) return;
+      const profile = res.data?.data?.user || {};
+      const seeded = {
+        firstLanguage: profile.firstLanguage === undefined ? "" : profile.firstLanguage,
+        education: profile.educationLevel || "",
+        maritalStatus: profile.maritalStatus || "",
+        occupation: profile.occupation || "",
+        municipality: profile.address?.municipality || "",
+        wardNumber: profile.address?.wardNumber ? String(profile.address.wardNumber) : "",
+        durableGoods: profile.householdDurables || [],
+        mainHouseholdEarner: profile.mainIncomeSource || "",
+        earnerEducation: profile.mainIncomeSourceEducation || "",
+      };
+      setSaved(seeded);
+      if (!loadDraft(storageKey)) replaceFormData(seeded);
+      setSeedState("ready");
+    }).catch(() => {
+      if (!cancel) setSeedState("ready");
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [isRefresh]);
 
   const checkStepValidation = (step) => {
     const schema = demographicsStepSchema[step];
@@ -29,6 +74,7 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
       durableGoods: formData.durableGoods || [],
     });
     setLocalErrors(nextErrors);
+    Object.keys(nextErrors).forEach((field) => trackOnboardingError("pc1", field));
     return Object.keys(nextErrors).length === 0;
   };
 
@@ -36,13 +82,40 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
     setLocalErrors((prev) => (prev[field] ? { ...prev, [field]: "" } : prev));
   };
 
+  const fieldStillNeedsConfirm = (field) => {
+    if (field === "earnerEducation" && (!formData.mainHouseholdEarner || formData.mainHouseholdEarner === "Me")) {
+      return false;
+    }
+    if (!saved || !hasSavedValue(saved[field])) return false;
+    if (!valuesMatch(saved[field], formData[field])) return false;
+    return !confirmed[field];
+  };
+
+  const unconfirmedOnStep = (step) =>
+    (fieldsByStep[step] || []).filter(fieldStillNeedsConfirm);
+
   const handleFieldChange = (field, value) => {
     clearFieldError(field);
+    setSubmitError("");
+    setConfirmed((prev) => ({ ...prev, [field]: false }));
     updateFormData(field, value);
   };
 
+  const confirmField = (field) => {
+    setSubmitError("");
+    setConfirmed((prev) => ({ ...prev, [field]: true }));
+  };
+
   const handleComplete = async () => {
+    if (submittingRef.current) return;
     if (!checkStepValidation(3)) return;
+    const pending = [1, 2, 3].flatMap(unconfirmedOnStep);
+    if (pending.length) {
+      setSubmitError("Confirm same or update each answer before you submit.");
+      return;
+    }
+    submittingRef.current = true;
+    setSubmitting(true);
     setSubmitError("");
 
     const payload = {
@@ -67,17 +140,23 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
       ...(isRefresh ? { profileSurvey: true } : {}),
     };
 
+    let saved = false;
     try {
       const response = await userAPI.updateDemographics(payload, { skipErrorToast: true });
 
       if (response.data.success) {
+        const awarded = Number(response.data.creditsAwarded) || 0;
         toast.success(
           isRefresh
-            ? "Saved. One more short survey."
+            ? awarded
+              ? `${awarded} Ruchi Credits added. One more short survey.`
+              : "Saved. One more short survey."
             : "You're in. Your first survey is ready. Takes under 2 minutes."
         );
         clearDemographicsDraft(storageKey);
-        onComplete();
+        trackOnboardingSubmit("pc1");
+        saved = true;
+        onComplete(awarded);
       } else {
         setSubmitError(response.data.message || "Failed to save profile. Please try again.");
       }
@@ -92,6 +171,11 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
             ? "Network error. Check your connection."
             : "Failed to save profile. Please try again.")
       );
+    } finally {
+      if (!saved) {
+        submittingRef.current = false;
+        setSubmitting(false);
+      }
     }
   };
 
@@ -133,6 +217,15 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
   };
 
   const combinedErrors = { ...hookErrors, ...localErrors };
+  const confirmProps = {
+    saved: isRefresh ? saved : null,
+    confirmed,
+    onConfirm: confirmField,
+  };
+
+  if (seedState === "loading") {
+    return <p className="onboard-copy">Loading your current answers...</p>;
+  }
 
   return (
     <div className="w-full onboard-step">
@@ -142,14 +235,24 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
       <Stepper
         initialStep={currentStep}
         onStepChange={goToStep}
-        onBeforeNext={checkStepValidation}
+        onBeforeNext={(step) => {
+          if (!checkStepValidation(step)) return false;
+          if (unconfirmedOnStep(step).length) {
+            setSubmitError("Confirm same or update each answer on this step.");
+            return false;
+          }
+          setSubmitError("");
+          return true;
+        }}
         onFinalStepCompleted={handleComplete}
         renderStepIndicator={renderCustomIndicator}
         stepContainerClassName="max-w-3xl mx-auto px-4"
         contentClassName="mt-6"
         backButtonText="Back"
         nextButtonText="Next"
+        completeButtonText={isRefresh ? "Submit" : "Complete"}
         nextButtonProps={{
+          disabled: submitting,
           className: `home-pill home-pill-sm ${
             currentStep === 3 ? "home-pill-lime" : "home-pill-navy"
           }`,
@@ -159,13 +262,28 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
         }}
       >
         <Step>
-          <AboutYou formData={formData} updateFormData={handleFieldChange} errors={combinedErrors} />
+          <AboutYou
+            formData={formData}
+            updateFormData={handleFieldChange}
+            errors={combinedErrors}
+            {...confirmProps}
+          />
         </Step>
         <Step>
-          <AddressInfo formData={formData} updateFormData={handleFieldChange} errors={combinedErrors} />
+          <AddressInfo
+            formData={formData}
+            updateFormData={handleFieldChange}
+            errors={combinedErrors}
+            {...confirmProps}
+          />
         </Step>
         <Step>
-          <HouseholdDurables formData={formData} updateFormData={handleFieldChange} errors={combinedErrors} />
+          <HouseholdDurables
+            formData={formData}
+            updateFormData={handleFieldChange}
+            errors={combinedErrors}
+            {...confirmProps}
+          />
         </Step>
       </Stepper>
     </div>
