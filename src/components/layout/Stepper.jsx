@@ -17,6 +17,7 @@ export default function Stepper({
   backButtonText = 'Back',
   nextButtonText = 'Continue',
   completeButtonText = 'Complete',
+  footerNote = null,
   disableStepIndicators = false,
   renderStepIndicator,
   ...rest
@@ -107,6 +108,7 @@ export default function Stepper({
 
         {!isCompleted && (
           <div className={`footer-container ${footerClassName}`}>
+            {footerNote ? <div className="footer-note">{footerNote}</div> : null}
             <div className={`footer-nav ${currentStep !== 1 ? 'spread' : 'end'}`}>
               {currentStep !== 1 && (
                 <button

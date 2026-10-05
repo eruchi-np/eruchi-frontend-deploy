@@ -1,7 +1,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext'; 
-import axios from 'axios';
+import { useAuth } from '../../context/AuthContext';
+import { getPostLoginPath } from '../../utils/auth';
 
 const ProfileCompletionGuard = ({ children }) => {
   const { user, loading } = useAuth?.() || {};
@@ -12,7 +12,7 @@ const ProfileCompletionGuard = ({ children }) => {
 
   // If profile is already complete → BLOCK access
   if (user?.isProfileComplete) {
-    return <Navigate to="/" replace />;
+    return <Navigate to={getPostLoginPath(user)} replace />;
   }
 
   // Otherwise, allow access to CompleteProfile page

@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import React, { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { ChevronDown, SearchX } from "lucide-react";
 import toast from "react-hot-toast";
 import { sepSurveyAPI, fifteenDaySurveyAPI, userAPI } from "../services/api";
@@ -11,6 +11,7 @@ import { parsePage, writeSearchParams } from "../utils/searchParams";
 import { trackEvent } from "../utils/visitorEvents";
 import { trackSurveyCards } from "../utils/healthEvents";
 import { PROFILE_REFRESH_BLOCKED, PROFILE_REFRESH_BODY, PROFILE_REFRESH_TITLE } from "../utils/profileRefreshCopy";
+import { AnimationContext } from "../components/animations/AnimationContext";
 import skyBg from "../assets/home/sky.jpg";
 import "../components/homepage/homepage.css";
 import "../components/shop/shop.css";
@@ -88,19 +89,21 @@ function sortSurveys(items, sortOrder) {
     return [...items].sort((a, b) => (a.credits || 0) - (b.credits || 0));
   }
   return [...items].sort((a, b) =>
-    String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
+    String(a.createdAt || "").localeCompare(String(b.createdAt || ""))
   );
 }
 
 export default function StandaloneSurveys() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { setOverride, clearOverride } = useContext(AnimationContext);
   const pageRef = useRef(null);
   const listRef = useRef(null);
   const rectsRef = useRef(new Map());
   const lastCatalogPage = useRef(null);
   const [searchParams, setSearchParams] = useSearchParams();
-  const sortOrder = searchParams.get("sort") || "latest";
+  const sortOrder = searchParams.get("sort") || "oldest";
   const catalogPage = parsePage(searchParams.get("page"));
   const [surveys, setSurveys] = useState([]);
   const [sprintSurveys, setSprintSurveys] = useState([]);
@@ -112,7 +115,7 @@ export default function StandaloneSurveys() {
   const setListParams = useCallback(
     (patch) =>
       writeSearchParams(setSearchParams, patch, {
-        sort: "latest",
+        sort: "oldest",
         page: 1,
       }),
     [setSearchParams]
@@ -155,8 +158,14 @@ export default function StandaloneSurveys() {
     if (window.location.hash) {
       window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
     }
+    if (location.state?.scrollToCatalog) {
+      setOverride({ skip: true });
+      scrollShopToCatalog(pageRef.current, { behavior: "auto" });
+      return () => clearOverride();
+    }
     window.scrollTo(0, 0);
-  }, []);
+    return undefined;
+  }, [location.state]);
 
   useEffect(() => {
     let cancelled = false;
@@ -374,10 +383,10 @@ export default function StandaloneSurveys() {
               <label className="shop-sort">
                 <span>Sort by:</span>
                 <select
-                  value={sortOrder === "default" ? "latest" : sortOrder}
+                  value={sortOrder === "default" || sortOrder === "latest" ? "oldest" : sortOrder}
                   onChange={(event) => setListParams({ sort: event.target.value, page: 1 })}
                 >
-                  <option value="latest">Latest surveys</option>
+                  <option value="oldest">Oldest surveys</option>
                   <option value="credits-desc">Credits: High to Low</option>
                   <option value="credits-asc">Credits: Low to High</option>
                 </select>

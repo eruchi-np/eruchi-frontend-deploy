@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { Loader2, SearchX } from "lucide-react";
-import { userAPI, voucherAPI } from "../services/api";
+import { fifteenDaySurveyAPI, sepSurveyAPI, userAPI, voucherAPI } from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import VoucherCard from "../components/shop/VoucherCard";
 import VoucherRedeemModal from "../components/widgets/VoucherRedeemModal";
@@ -25,6 +25,25 @@ const headingStyle = {
 
 const SEARCH_LIMIT = 8;
 
+async function lookupMoreSurveys() {
+  const [surveysResult, sprintResult] = await Promise.allSettled([
+    sepSurveyAPI.getAvailable({ page: 1, limit: 1, skipErrorToast: true }),
+    fifteenDaySurveyAPI.getMine({ skipErrorToast: true }),
+  ]);
+
+  const total =
+    surveysResult.status === "fulfilled"
+      ? Number(surveysResult.value.data?.pagination?.totalSurveys) ||
+        (surveysResult.value.data?.data || []).length
+      : 0;
+  const sprints =
+    sprintResult.status === "fulfilled"
+      ? sprintResult.value.data?.data || []
+      : [];
+
+  return total > 0 || sprints.length > 0;
+}
+
 export default function SurveyComplete() {
   const location = useLocation();
   const { user, refreshUser } = useAuth();
@@ -37,11 +56,13 @@ export default function SurveyComplete() {
     completion?.streakCount ?? user?.streakCount ?? 0
   );
   const [offers, setOffers] = useState([]);
+  const [recommended, setRecommended] = useState([]);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
   const [search, setSearch] = useState("");
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [retryTick, setRetryTick] = useState(0);
+  const [hasMoreSurveys, setHasMoreSurveys] = useState(false);
   const searched = useRef(false);
 
   useEffect(() => {
@@ -69,9 +90,13 @@ export default function SurveyComplete() {
       setLoading(true);
       setFetchError("");
       try {
-        const [profileRes, offersRes] = await Promise.all([
+        const blocked =
+          user?.profileSurveyBlocked || user?.profileOutdated;
+        const [profileRes, offersRes, recommendedRes, moreSurveys] = await Promise.all([
           userAPI.getProfile({ skipErrorToast: true }),
           voucherAPI.getOffers({ all: 1, skipErrorToast: true }),
+          voucherAPI.getRecommended({ skipErrorToast: true }).catch(() => null),
+          blocked ? Promise.resolve(false) : lookupMoreSurveys(),
         ]);
         if (cancelled) return;
 
@@ -89,6 +114,9 @@ export default function SurveyComplete() {
 
         const responseData = offersRes.data?.data || offersRes.data;
         setOffers(Array.isArray(responseData) ? responseData : []);
+        const recommendedData = recommendedRes?.data?.data;
+        setRecommended(Array.isArray(recommendedData) ? recommendedData : []);
+        setHasMoreSurveys(moreSurveys);
       } catch (err) {
         if (cancelled) return;
         setFetchError(
@@ -105,10 +133,13 @@ export default function SurveyComplete() {
     };
   }, [retryTick]);
 
-  const suggested = useMemo(
-    () => pickSuggestedOffers(offers, credits, 2),
-    [offers, credits]
-  );
+  const suggested = useMemo(() => {
+    const fromRecommendations = recommended.slice(0, 2);
+    if (fromRecommendations.length > 0) {
+      return { mode: "recommended", offers: fromRecommendations };
+    }
+    return pickSuggestedOffers(offers, credits, 2);
+  }, [recommended, offers, credits]);
 
   const searchResults = useMemo(() => {
     if (!search.trim()) return [];
@@ -189,6 +220,19 @@ export default function SurveyComplete() {
             />
           )}
         </div>
+
+        {hasMoreSurveys ? (
+          <div className="mt-8 flex justify-center sm:justify-start">
+            <Link
+              to="/standalone-surveys"
+              state={{ scrollToCatalog: true }}
+              onClick={() => trackAction("next_survey")}
+              className="px-6 py-3 rounded-full text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50"
+            >
+              More surveys
+            </Link>
+          </div>
+        ) : null}
 
         <div className="mt-14 border-t border-gray-100 pt-10">
           <div className="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-10 mb-8">
@@ -298,13 +342,6 @@ export default function SurveyComplete() {
 
         <div className="mt-12 flex flex-wrap gap-3">
           <Link
-            to="/standalone-surveys"
-            onClick={() => trackAction("next_survey")}
-            className="px-6 py-3 rounded-full text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50"
-          >
-            More surveys
-          </Link>
-          <Link
             to="/"
             onClick={() => trackAction("home")}
             className="px-6 py-3 rounded-full text-sm font-medium text-gray-500 hover:text-gray-800"
@@ -333,6 +370,12 @@ export default function SurveyComplete() {
                   : offer
               )
             );
+            voucherAPI.getRecommended({ skipErrorToast: true })
+              .then((res) => {
+                const data = res.data?.data;
+                setRecommended(Array.isArray(data) ? data : []);
+              })
+              .catch(() => {});
             refreshUser();
           }}
           onSuccess={() => setSelectedOffer(null)}

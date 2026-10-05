@@ -145,6 +145,19 @@
   color: #e11d48;
 }
 
+.confirm-same {
+  margin-top: 12px;
+  width: auto;
+  align-self: flex-start;
+}
+
+.confirm-same-done {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
 .onboard-actions {
   display: flex;
   flex-wrap: wrap;
@@ -446,6 +459,13 @@
   color: var(--muted);
   font-size: 15px;
   line-height: 1.55;
+}
+
+.onboard-hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .onboard-card--auth .onboard-tabs {

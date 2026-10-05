@@ -2,7 +2,7 @@ import React,  { useState, useEffect } from 'react';
 import { trackHealthEvent, useSurveyVisit } from '../utils/healthEvents';
 import { useParams, useNavigate } from 'react-router-dom';
 import { surveyAPI, userAPI } from '../services/api';
-import { ArrowLeft, Star, Loader2, Package, Clock, Type, FileText, CheckSquare, Sliders, Table2 } from 'lucide-react';
+import { ArrowLeft, Star, Loader2, Package, Clock, Type, FileText, CheckSquare, ListOrdered, Sliders, Table2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { completionFromSubmitResponse, goToSurveyComplete } from '../utils/surveyComplete';
 import SurveySubmitConfirm from '../components/survey/SurveySubmitConfirm';
@@ -73,6 +73,8 @@ const Survey = () => {
               initialResponses[question.questionText] = '';
               break;
             case 'single_checkbox':
+            case 'attention_check':
+            case 'likert':
               initialResponses[question.questionText] = '';
               break;
             case 'multiple_checkbox':
@@ -146,10 +148,19 @@ const Survey = () => {
           break;
         case 'yes_no':
         case 'single_checkbox':
+        case 'attention_check':
           if (!value || value === '') {
             validationErrors.push(`Please select an option for: "${questionText}"`);
           }
           break;
+        case 'likert': {
+          const point = Number(value);
+          const count = (question.options || []).length;
+          if (!Number.isInteger(point) || point < 1 || point > count) {
+            validationErrors.push(`Please select an option for: "${questionText}"`);
+          }
+          break;
+        }
         case 'multiple_checkbox':
           if (!value || value.length === 0) {
             validationErrors.push(`Please select at least one option for: "${questionText}"`);
@@ -265,6 +276,8 @@ const Survey = () => {
       text_short: <Type className="h-4 w-4" />,
       text_long: <FileText className="h-4 w-4" />,
       single_checkbox: <CheckSquare className="h-4 w-4" />,
+      attention_check: <CheckSquare className="h-4 w-4" />,
+      likert: <ListOrdered className="h-4 w-4" />,
       multiple_checkbox: <CheckSquare className="h-4 w-4" />,
       matrix_radio: <Table2 className="h-4 w-4" />,
       slider: <Sliders className="h-4 w-4" />,
@@ -320,21 +333,26 @@ const Survey = () => {
         );
 
       case 'single_checkbox':
+      case 'attention_check':
+      case 'likert':
         return (
           <div className="space-y-3">
-            {question.options?.map((option, optionIndex) => (
-              <label key={optionIndex} className="flex items-center space-x-3 cursor-pointer">
-                <input
-                  type="radio"
-                  name={question.questionText}
-                  value={option}
-                  checked={responses[question.questionText] === option}
-                  onChange={(e) => handleResponseChange(question.questionText, e.target.value)}
-                  className="h-5 w-5 text-blue-600"
-                />
-                <span className="text-lg">{option}</span>
-              </label>
-            ))}
+            {question.options?.map((option, optionIndex) => {
+              const stored = question.questionType === 'likert' ? String(optionIndex + 1) : option;
+              return (
+                <label key={optionIndex} className="flex items-center space-x-3 cursor-pointer">
+                  <input
+                    type="radio"
+                    name={question.questionText}
+                    value={stored}
+                    checked={responses[question.questionText] === stored}
+                    onChange={() => handleResponseChange(question.questionText, stored)}
+                    className="h-5 w-5 text-blue-600"
+                  />
+                  <span className="text-lg">{option}</span>
+                </label>
+              );
+            })}
           </div>
         );
 
@@ -530,7 +548,7 @@ const Survey = () => {
                     <div className="flex items-center text-gray-500 text-sm ml-4">
                       {getQuestionTypeIcon(question.questionType)}
                       <span className="ml-1 capitalize">
-                        {question.questionType.replace('_', ' ')}
+                        {question.questionType === 'likert' ? 'Likert scale' : question.questionType.replace('_', ' ')}
                       </span>
                     </div>
                   </div>

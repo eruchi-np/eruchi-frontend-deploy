@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import AdditionalProfileSurvey from "../components/demographics/AdditionalProfileSurvey";
 import OnboardingShell from "../components/onboarding/OnboardingShell";
@@ -11,7 +11,7 @@ const CompleteAdditionalProfile = ({ mode = "registration" }) => {
   const isRefresh = mode === "refresh";
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout, user } = useAuth();
+  const { logout, user, refreshUser } = useAuth();
   const justSavedDemographics = location.state?.demographicsSaved === true;
   const refreshPays = isRefresh && (justSavedDemographics || user?.profileRefreshDemographicsDone === true);
   const sendToDemographics = isRefresh
@@ -19,18 +19,26 @@ const CompleteAdditionalProfile = ({ mode = "registration" }) => {
     && !!user?.profileOutdated
     && user?.profileRefreshDemographicsDone === false;
   const [loggingOut, setLoggingOut] = useState(false);
+  const leavingRef = useRef(false);
 
   useEffect(() => {
     if (sendToDemographics) navigate("/refresh-profile", { replace: true });
   }, [sendToDemographics, navigate]);
 
-  const handleComplete = () => {
+  useEffect(() => {
+    if (leavingRef.current || isRefresh || !user?.isAdditionalProfileComplete) return;
+    navigate("/", { replace: true });
+  }, [isRefresh, user?.isAdditionalProfileComplete, navigate]);
+
+  const handleComplete = async () => {
+    leavingRef.current = true;
+    window.dispatchEvent(new Event("profileComplete"));
     if (isRefresh) {
-      window.dispatchEvent(new Event("profileComplete"));
       navigate("/profile", { replace: true });
       return;
     }
-    navigate("/");
+    await refreshUser();
+    navigate("/standalone-surveys", { replace: true });
   };
 
   const handleLogout = async () => {
@@ -53,7 +61,7 @@ const CompleteAdditionalProfile = ({ mode = "registration" }) => {
             <CreditRewardBadge amount={PROFILE_COMPLETION_2_CREDITS} />
           </div>
         )}
-        <h1 className="onboard-title">{isRefresh ? "Update your profile" : "A few more questions"}</h1>
+        <h1 className="onboard-title">{isRefresh ? "Update your profile" : "Final few questions"}</h1>
         <p className="onboard-copy">
           {refreshPays
             ? `${PROFILE_REFRESH_BODY} Your current answers are filled in. Confirm same or change each one, then submit to earn ${PROFILE_COMPLETION_2_CREDITS} Ruchi Credits.`

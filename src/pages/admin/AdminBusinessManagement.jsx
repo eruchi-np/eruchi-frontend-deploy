@@ -1,6 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { adminAPI, sepSurveyAPI } from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { businessRedeemedVouchersPath, isFullAdminRole } from '../../utils/adminRoles';
+import VoucherManagement from './components/VoucherManagement.jsx';
 import {
   ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2, Calendar,
   ShieldAlert, Eye, EyeOff, RefreshCw, Building2, KeyRound, Upload,
@@ -11,6 +14,7 @@ import Pagination from '../../components/ui/Pagination';
 import StatsGrid from './components/StatsGrid.jsx';
 import BusinessDashboardModal from './components/BusinessDashboardModal.jsx';
 import AddressInfo from '../../components/demographics/steps/AddressInfo';
+import SearchKeywordsField from '../../components/business/SearchKeywordsField';
 import { getMaxWards } from '../../utils/municipalityData';
 
 const NAVY = "#1B2A4A";
@@ -76,6 +80,40 @@ const EMPTY_VOUCHER_FORM = {
   publicSurveys: [],
 };
 
+const toDateInput = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return nepalYmd(date);
+};
+
+const idOf = (value) => {
+  if (!value) return '';
+  if (typeof value === 'object') return String(value._id || '');
+  return String(value);
+};
+
+const formFromOffer = (offer) => ({
+  title: offer.title || '',
+  description: offer.description || '',
+  discountType: offer.discountType || 'percentage',
+  discountValue: offer.discountValue ?? '',
+  creditsRequired: offer.creditsRequired ?? '',
+  approxValue: offer.approxValue ?? '',
+  expiryDays: offer.expiryDays ?? '',
+  perUserMonthlyLimit: offer.perUserMonthlyLimit ?? '',
+  totalStock: offer.totalStock ?? '',
+  validUntil: toDateInput(offer.validUntil),
+  imageUrl: offer.imageUrl || '',
+  feedbackSurveys: (offer.feedbackSurveys || []).map((row) => ({
+    survey: idOf(row.survey),
+    trigger: row.trigger || 'every_redemption',
+    triggerValue: row.triggerValue ?? '',
+    active: row.active !== false,
+  })),
+  publicSurveys: (offer.publicSurveys || []).map(idOf),
+});
+
 const EMPTY_BUSINESS_FORM = {
   name: '',
   brandName: '',
@@ -97,6 +135,7 @@ const EMPTY_BUSINESS_FORM = {
   municipality: '',
   wardNumber: '',
   isVerified: false,
+  searchKeywords: [],
 };
 
 const placeError = (municipality, wardNumber) => {
@@ -112,11 +151,21 @@ const placeError = (municipality, wardNumber) => {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+const VOUCHER_STATUSES = ['active', 'used', 'expired', 'cancelled'];
+
 export default function AdminBusinessManagement() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const fullAdmin = isFullAdminRole(user?.role);
   const [searchParams, setSearchParams] = useSearchParams();
   const verifiedParam = searchParams.get('verified');
   const verifiedFilter = verifiedParam === 'pending' ? 'pending' : 'all';
+  const showingRedeemed = searchParams.get('view') === 'redeemed' && !fullAdmin;
+  const voucherStatusParam = VOUCHER_STATUSES.includes(searchParams.get('status'))
+    ? searchParams.get('status')
+    : 'used';
+  const voucherFromParam = searchParams.get('from') || '';
+  const voucherToParam = searchParams.get('to') || '';
 
   // Business list
   const [businesses, setBusinesses]               = useState([]);
@@ -133,6 +182,7 @@ export default function AdminBusinessManagement() {
 
   // Voucher offer modal
   const [selectedBusinessForModal, setSelectedBusinessForModal] = useState(null);
+  const [editingOffer, setEditingOffer]           = useState(null);
   const [voucherForm, setVoucherForm]             = useState(EMPTY_VOUCHER_FORM);
   const [voucherModalError, setVoucherModalError] = useState('');
   const [voucherSubmitLoading, setVoucherSubmitLoading] = useState(false);
@@ -158,6 +208,17 @@ export default function AdminBusinessManagement() {
   const [showNewPassword, setShowNewPassword]                         = useState(false);
   const [dashboardBusiness, setDashboardBusiness]                     = useState(null);
   const [repeatVisitSaving, setRepeatVisitSaving]                   = useState({});
+  const [vouchers, setVouchers] = useState([]);
+  const [voucherLoading, setVoucherLoading] = useState(false);
+  const [voucherPage, setVoucherPage] = useState(1);
+  const [voucherPagination, setVoucherPagination] = useState(null);
+  const [voucherStatusCounts, setVoucherStatusCounts] = useState({
+    active: 0,
+    used: 0,
+    expired: 0,
+    cancelled: 0,
+  });
+  const [voucherRedeemedInRange, setVoucherRedeemedInRange] = useState(null);
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
 
@@ -165,6 +226,101 @@ export default function AdminBusinessManagement() {
   useEffect(() => {
     fetchBusinesses(currentPage);
   }, [currentPage, verifiedFilter]);
+
+  useEffect(() => {
+    if (searchParams.get('view') !== 'redeemed' || !fullAdmin) return;
+    const from = searchParams.get('from') || '';
+    const to = searchParams.get('to') || '';
+    const status = VOUCHER_STATUSES.includes(searchParams.get('status'))
+      ? searchParams.get('status')
+      : 'used';
+    const params = new URLSearchParams({ tab: 'vouchers', status });
+    if (from) params.set('from', from);
+    if (to) params.set('to', to);
+    navigate(`/admin?${params.toString()}`, { replace: true });
+  }, [fullAdmin, navigate, searchParams]);
+
+  const loadRedeemedVouchers = useCallback(async (status, page, from, to) => {
+    setVoucherLoading(true);
+    try {
+      const [listRes, statsRes] = await Promise.all([
+        adminAPI.getVouchers({
+          status,
+          page,
+          limit: 20,
+          ...(from && { from }),
+          ...(to && { to }),
+          skipErrorToast: true,
+        }),
+        adminAPI.getVoucherStats({
+          ...(from && { from }),
+          ...(to && { to }),
+          skipErrorToast: true,
+        }),
+      ]);
+      setVouchers(listRes.data.data || []);
+      setVoucherPagination(listRes.data.pagination || null);
+      const data = statsRes.data.data || {};
+      if (from || to) {
+        setVoucherStatusCounts(data.inRangeByStatus || { active: 0, used: 0, expired: 0, cancelled: 0 });
+        setVoucherRedeemedInRange(data.redeemedInRange ?? 0);
+      } else {
+        setVoucherStatusCounts(data.byStatus || { active: 0, used: 0, expired: 0, cancelled: 0 });
+        setVoucherRedeemedInRange(null);
+      }
+    } catch {
+      toast.error('Failed to load vouchers');
+    } finally {
+      setVoucherLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showingRedeemed) return;
+    loadRedeemedVouchers(voucherStatusParam, voucherPage, voucherFromParam, voucherToParam);
+  }, [
+    showingRedeemed,
+    voucherStatusParam,
+    voucherPage,
+    voucherFromParam,
+    voucherToParam,
+    loadRedeemedVouchers,
+  ]);
+
+  const handleVoucherStatusFilter = (status) => {
+    setVoucherPage(1);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('view', 'redeemed');
+      next.set('status', status);
+      return next;
+    });
+  };
+
+  const handleVoucherDateRangeChange = ({ from, to }) => {
+    setVoucherPage(1);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.set('view', 'redeemed');
+      if (from) next.set('from', from);
+      else next.delete('from');
+      if (to) next.set('to', to);
+      else next.delete('to');
+      return next;
+    });
+  };
+
+  const leaveRedeemedView = () => {
+    setVoucherPage(1);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('view');
+      next.delete('status');
+      next.delete('from');
+      next.delete('to');
+      return next;
+    });
+  };
 
   const setVerifiedFilter = (next) => {
     setCurrentPage(1);
@@ -310,12 +466,24 @@ export default function AdminBusinessManagement() {
 
   const openVoucherModal = (business) => {
     setSelectedBusinessForModal(business);
+    setEditingOffer(null);
     setVoucherForm(EMPTY_VOUCHER_FORM);
     setVoucherModalError('');
     if (!surveysLoaded) fetchAvailableSurveys();
   };
 
-  const closeVoucherModal = () => setSelectedBusinessForModal(null);
+  const openEditVoucherModal = (business, offer) => {
+    setSelectedBusinessForModal(business);
+    setEditingOffer(offer);
+    setVoucherForm(formFromOffer(offer));
+    setVoucherModalError('');
+    if (!surveysLoaded) fetchAvailableSurveys();
+  };
+
+  const closeVoucherModal = () => {
+    setSelectedBusinessForModal(null);
+    setEditingOffer(null);
+  };
 
   const handleDeleteOffer = async (offerId, businessId) => {
     if (!window.confirm('Are you sure you want to permanently delete this voucher offer?')) return;
@@ -360,11 +528,12 @@ export default function AdminBusinessManagement() {
   const handleVoucherSubmit = async (e) => {
     e.preventDefault();
     if (!selectedBusinessForModal) return;
+    const isEdit = Boolean(editingOffer);
     if (!voucherForm.validUntil) {
       setVoucherModalError('A calendar deadline date is mandatory.');
       return;
     }
-    if (new Date(voucherForm.validUntil) <= new Date()) {
+    if (!isEdit && new Date(voucherForm.validUntil) <= new Date()) {
       setVoucherModalError('The calendar deadline must be set to a future date.');
       return;
     }
@@ -398,7 +567,7 @@ export default function AdminBusinessManagement() {
         discountType:        voucherForm.discountType,
         discountValue:       (voucherForm.discountType === 'percentage' || voucherForm.discountType === 'flat')
           ? Number(voucherForm.discountValue)
-          : (voucherForm.discountType === 'free_item' ? (voucherForm.discountValue || undefined) : undefined),
+          : (voucherForm.discountType === 'free_item' ? (voucherForm.discountValue || null) : null),
         approxValue:         voucherForm.approxValue !== '' ? Number(voucherForm.approxValue) : null,
         creditsRequired:     Number(voucherForm.creditsRequired),
         expiryDays:          Number(voucherForm.expiryDays),
@@ -416,21 +585,26 @@ export default function AdminBusinessManagement() {
         })),
         publicSurveys: (voucherForm.publicSurveys || []).filter(Boolean),
       };
-      const res = await adminAPI.createVoucherOffer(payload);
-      toast.success('Voucher offer created successfully');
-      const newOffer = res.data.data;
-      if (newOffer) {
-        setBusinessOffers(prev => ({
-          ...prev,
-          [selectedBusinessForModal._id]: [newOffer, ...(prev[selectedBusinessForModal._id] || [])],
-        }));
+      const res = isEdit
+        ? await adminAPI.updateVoucherOffer(editingOffer._id, payload)
+        : await adminAPI.createVoucherOffer(payload);
+      toast.success(isEdit ? 'Voucher offer updated' : 'Voucher offer created successfully');
+      const savedOffer = res.data.data;
+      if (savedOffer) {
+        setBusinessOffers(prev => {
+          const current = prev[selectedBusinessForModal._id] || [];
+          const next = isEdit
+            ? current.map((offer) => (offer._id === editingOffer._id ? savedOffer : offer))
+            : [savedOffer, ...current];
+          return { ...prev, [selectedBusinessForModal._id]: next };
+        });
       } else {
         fetchOffers(selectedBusinessForModal._id);
       }
       closeVoucherModal();
     } catch (err) {
       console.error(err);
-      setVoucherModalError(err.response?.data?.message || 'Failed to create voucher offer');
+      setVoucherModalError(err.response?.data?.message || (isEdit ? 'Failed to update voucher offer' : 'Failed to create voucher offer'));
     } finally {
       setVoucherSubmitLoading(false);
     }
@@ -473,6 +647,7 @@ export default function AdminBusinessManagement() {
     municipality: business.municipality || '',
     wardNumber: business.wardNumber || '',
     isVerified: !!business.isVerified,
+    searchKeywords: Array.isArray(business.searchKeywords) ? business.searchKeywords : [],
   });
 
   const openEditBusinessModal = (business) => {
@@ -511,6 +686,7 @@ export default function AdminBusinessManagement() {
     website:       businessForm.website,
     googleMapsUrl: businessForm.googleMapsUrl,
     isVerified:    businessForm.isVerified,
+    searchKeywords: businessForm.searchKeywords,
   });
 
   const handleSaveBusiness = async (e) => {
@@ -678,7 +854,9 @@ export default function AdminBusinessManagement() {
       label: 'Redeemed (7d)',
       value: dashboardStats?.vouchersRedeemedWeek ?? 0,
       icon: Ticket,
-      to: `/admin?tab=vouchers&status=used&from=${redeemedRange.from}&to=${redeemedRange.to}`,
+      to: fullAdmin
+        ? `/admin?tab=vouchers&status=used&from=${redeemedRange.from}&to=${redeemedRange.to}`
+        : businessRedeemedVouchersPath(redeemedRange.from, redeemedRange.to),
     },
   ];
 
@@ -692,8 +870,15 @@ export default function AdminBusinessManagement() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
-              onClick={() => navigate('/admin')}
+              onClick={() => {
+                if (showingRedeemed) {
+                  leaveRedeemedView();
+                  return;
+                }
+                navigate(fullAdmin ? '/admin' : '/profile');
+              }}
               className="p-2 bg-white border border-gray-200 rounded-xl shadow-sm hover:bg-gray-50 transition-colors shrink-0"
+              aria-label={showingRedeemed ? 'Back to businesses' : 'Back'}
             >
               <ArrowLeft className="h-5 w-5 text-gray-600" />
             </button>
@@ -711,6 +896,29 @@ export default function AdminBusinessManagement() {
 
         <StatsGrid stats={stats} NAVY={NAVY} />
 
+        {showingRedeemed ? (
+          <VoucherManagement
+            vouchers={vouchers}
+            voucherLoading={voucherLoading}
+            voucherStatusFilter={voucherStatusParam}
+            handleVoucherStatusFilter={handleVoucherStatusFilter}
+            pagination={voucherPagination}
+            onPageChange={(page) => {
+              if (page === voucherPage) {
+                loadRedeemedVouchers(voucherStatusParam, page, voucherFromParam, voucherToParam);
+                return;
+              }
+              setVoucherPage(page);
+            }}
+            dateFrom={voucherFromParam}
+            dateTo={voucherToParam}
+            onDateRangeChange={handleVoucherDateRangeChange}
+            statusCounts={voucherStatusCounts}
+            redeemedInRange={voucherRedeemedInRange}
+            NAVY={NAVY}
+          />
+        ) : (
+        <>
         <div className="flex flex-wrap gap-2 mb-4" id="business-list">
           {[
             { id: 'all', label: 'All businesses' },
@@ -954,6 +1162,13 @@ export default function AdminBusinessManagement() {
                                     {offer.status}
                                   </span>
                                   <button
+                                    onClick={() => openEditVoucherModal(business, offer)}
+                                    className="p-1.5 text-gray-400 hover:text-gray-900 rounded-lg hover:bg-gray-50 transition-colors"
+                                    title="Edit voucher offer"
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </button>
+                                  <button
                                     onClick={() => handleDeleteOffer(offer._id, business._id)}
                                     className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-gray-50 transition-colors"
                                     title="Delete Voucher Offer"
@@ -981,6 +1196,8 @@ export default function AdminBusinessManagement() {
           onChange={setCurrentPage}
           label="businesses"
         />
+        </>
+        )}
       </div>
 
       {/* ════════════════════════════════════════════════════════════════════
@@ -1101,6 +1318,12 @@ export default function AdminBusinessManagement() {
                       className={inputCls}
                     />
                   </div>
+
+                  <SearchKeywordsField
+                    keywords={businessForm.searchKeywords}
+                    onChange={(searchKeywords) => setBusinessForm((current) => ({ ...current, searchKeywords }))}
+                    inputClassName={inputCls}
+                  />
                 </div>
               </section>
 
@@ -1504,7 +1727,7 @@ export default function AdminBusinessManagement() {
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-5">
               <div>
-                <h3 className="text-lg font-bold text-gray-900">Add Voucher Offer</h3>
+                <h3 className="text-lg font-bold text-gray-900">{editingOffer ? 'Edit Voucher Offer' : 'Add Voucher Offer'}</h3>
                 <p className="text-xs text-gray-500 mt-0.5">for {selectedBusinessForModal.name}</p>
               </div>
               <button onClick={closeVoucherModal} className="text-gray-400 hover:text-gray-700 font-medium text-lg leading-none">✕</button>
@@ -1808,7 +2031,9 @@ export default function AdminBusinessManagement() {
                 className="w-full py-2.5 rounded-xl text-white text-sm font-medium transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed mt-2 shadow-sm"
                 style={{ backgroundColor: NAVY }}
               >
-                {voucherSubmitLoading ? 'Creating…' : 'Create Voucher Offer'}
+                {voucherSubmitLoading
+                  ? (editingOffer ? 'Saving…' : 'Creating…')
+                  : (editingOffer ? 'Save changes' : 'Create Voucher Offer')}
               </button>
             </form>
           </div>

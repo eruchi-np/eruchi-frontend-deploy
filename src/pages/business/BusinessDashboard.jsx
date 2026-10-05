@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { businessAPI } from "../../services/api";
 import { Wallet, Users, Receipt } from "lucide-react";
 import { discountLabel, formatRs } from "../../utils/billMath";
-import { emptyMerchantMetrics, GrowthLine } from "../../components/business/MerchantMetrics";
+import { emptyMerchantMetrics, formatPercent, GrowthLine } from "../../components/business/MerchantMetrics";
 
 const cardShadow = "shadow-[0_12px_30px_rgba(37,99,235,0.08)]";
 
@@ -106,9 +106,14 @@ export default function BusinessDashboard() {
         ) : null}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-5 mt-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 mt-5">
         <MiniStat label="Gross revenue" value={formatRs(metrics.totalGrossRevenue)} hint="After discount" />
         <MiniStat label="Discounts" value={formatRs(metrics.totalDiscounts)} hint="Sales minus gross revenue" />
+        <MiniStat
+          label="Effective discount rate"
+          value={formatPercent(metrics.effectiveDiscountRate)}
+          hint="Discounts ÷ sales before discount"
+        />
         <MiniStat label="Total scans" value={metrics.totalScans ?? 0} hint="All scan attempts" />
       </div>
 

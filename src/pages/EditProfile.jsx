@@ -150,6 +150,7 @@ const EditProfile = () => {
     householdDurables: [],
     address: { municipality: "", wardNumber: "" },
   });
+  const [nccsGrade, setNccsGrade] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -185,6 +186,7 @@ const EditProfile = () => {
             wardNumber: u.address?.wardNumber || "",
           },
         });
+        setNccsGrade(u.nccs_grade?.class ? u.nccs_grade : null);
       } catch {
         showToast("error", "Failed to load profile data.");
       } finally {
@@ -239,7 +241,9 @@ const EditProfile = () => {
               }
             : undefined,
       };
-      await userAPI.updateDemographics(payload);
+      const res = await userAPI.updateDemographics(payload);
+      const grade = res?.data?.data?.nccs_grade;
+      setNccsGrade(grade?.class ? grade : null);
       showToast("success", "Demographics updated successfully.");
     } catch (err) {
       showToast(
@@ -613,6 +617,26 @@ const EditProfile = () => {
                     {item}
                   </button>
                 ))}
+              </div>
+            </SectionCard>
+
+            <SectionCard title="NCCS grade">
+              <p className="text-[12px] text-[#6B7A8A] mb-3">
+                Calculated from durables and chief earner education. Updates when you save demographics.
+              </p>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Class</Label>
+                  <p className="text-sm font-semibold text-[#0F1A14]">
+                    {nccsGrade?.class || "—"}
+                  </p>
+                </div>
+                <div>
+                  <Label>Sub-class</Label>
+                  <p className="text-sm font-semibold text-[#0F1A14]">
+                    {nccsGrade?.subClass ?? "—"}
+                  </p>
+                </div>
               </div>
             </SectionCard>
 

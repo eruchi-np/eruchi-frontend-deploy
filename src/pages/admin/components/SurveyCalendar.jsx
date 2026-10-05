@@ -25,7 +25,7 @@ function monthCells(cursor) {
   return cells;
 }
 
-export default function SurveyCalendar({ surveys, refetchSurveys, NAVY }) {
+export default function SurveyCalendar({ surveys, surveysLoading, refetchSurveys, NAVY }) {
   const [cursor, setCursor] = useState(() => startOfMonth(new Date()));
   const [selected, setSelected] = useState(null);
   const todayKey = dateKey(new Date());
@@ -49,7 +49,9 @@ export default function SurveyCalendar({ surveys, refetchSurveys, NAVY }) {
       <div className="px-4 sm:px-6 py-4 border-b border-gray-200 flex items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Survey calendar</h2>
-          <p className="text-sm text-gray-500">Published dates — past and upcoming</p>
+          <p className="text-sm text-gray-500">
+            {surveysLoading && !(surveys || []).length ? "Loading surveys..." : "Published dates — past and upcoming"}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <button

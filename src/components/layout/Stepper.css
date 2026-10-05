@@ -30,6 +30,15 @@
   margin-top: 1rem;
 }
 
+.footer-note {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.footer-note .onboard-error {
+  margin: 0;
+}
+
 .footer-nav {
   display: flex;
   width: 100%;

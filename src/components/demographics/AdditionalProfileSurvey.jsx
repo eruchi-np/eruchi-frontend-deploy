@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
 import useAdditionalProfile from '../../hooks/useAdditionalProfile';
 import { userAPI } from '../../services/api';
@@ -69,7 +69,9 @@ const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
   const { formData, updateField, toggleArrayField, replaceForm } = useAdditionalProfile();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
+  const [errorTick, setErrorTick] = useState(0);
   const [errors, setErrors] = useState({});
+  const errorRef = useRef(null);
   const [saved, setSaved] = useState(null);
   const [confirmed, setConfirmed] = useState({});
   const [seedState, setSeedState] = useState(isRefresh ? 'loading' : 'ready');
@@ -77,6 +79,11 @@ const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
   useEffect(() => {
     trackOnboardingView('pc2');
   }, []);
+
+  useEffect(() => {
+    if (!submitError) return;
+    errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [submitError, errorTick]);
 
   useEffect(() => {
     if (!isRefresh) return undefined;
@@ -135,11 +142,18 @@ const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
           ? 'Please answer every question.'
           : 'Please answer every question before claiming your credits.'
       );
+      setErrorTick((tick) => tick + 1);
       return;
     }
     const pending = QUESTIONS.map((question) => question.id).filter(fieldStillNeedsConfirm);
     if (pending.length) {
+      const nextErrors = {};
+      pending.forEach((field) => {
+        nextErrors[field] = 'Confirm same or update this answer.';
+      });
+      setErrors(nextErrors);
       setSubmitError('Confirm same or update each answer before you submit.');
+      setErrorTick((tick) => tick + 1);
       return;
     }
 
@@ -164,6 +178,7 @@ const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
         onComplete?.();
       } else {
         setSubmitError(response.data.message || 'Failed to save your answers');
+        setErrorTick((tick) => tick + 1);
       }
     } catch (error) {
       console.error('Error:', error.response?.data);
@@ -173,6 +188,7 @@ const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
         data?.errors?.[0]?.msg ||
         'Failed to save your answers'
       );
+      setErrorTick((tick) => tick + 1);
     } finally {
       setSubmitting(false);
     }
@@ -221,6 +237,7 @@ const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
               confirmed={confirmed[question.id]}
               onConfirm={() => {
                 setSubmitError('');
+                setErrors((prev) => (prev[question.id] ? { ...prev, [question.id]: '' } : prev));
                 setConfirmed((prev) => ({ ...prev, [question.id]: true }));
               }}
             />
@@ -229,7 +246,7 @@ const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
       </div>
 
       {submitError && (
-        <p className="onboard-error mt-6">{submitError}</p>
+        <p ref={errorRef} className="onboard-error mt-6" role="alert">{submitError}</p>
       )}
 
       <div className="onboard-actions mt-10 pt-6 border-t border-[#eef1f4]">

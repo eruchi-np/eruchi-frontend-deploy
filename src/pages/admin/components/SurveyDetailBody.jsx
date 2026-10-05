@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import { Award, BarChart3, Clock, EyeOff, Pencil, Ticket, Trash2, User, Upload, X } from "lucide-react";
+import { Award, BarChart3, Clock, EyeOff, Pencil, ShieldAlert, Ticket, Trash2, User, Upload, X } from "lucide-react";
 import { sepSurveyAPI } from "../../../services/api";
 import toast from "react-hot-toast";
 import { formatCreatedAt, isScheduled } from "./surveyListUtils";
@@ -81,6 +81,11 @@ export default function SurveyDetailBody({ survey, NAVY, refetchSurveys, onDelet
           )}
           {typeof survey.responseCount === "number" && (
             <span className="flex items-center gap-1"><BarChart3 className="h-3.5 w-3.5" /> {survey.responseCount} response{survey.responseCount !== 1 ? "s" : ""}</span>
+          )}
+          {typeof survey.flaggedCount === "number" && survey.flaggedCount > 0 && (
+            <span className="flex items-center gap-1 text-amber-700">
+              <ShieldAlert className="h-3.5 w-3.5" /> {survey.flaggedCount} attention flag{survey.flaggedCount !== 1 ? "s" : ""}
+            </span>
           )}
           {survey.linkedVoucherTitles?.length > 0 && (
             <span className="flex items-center gap-1"><Ticket className="h-3.5 w-3.5" /> {survey.linkedVoucherTitles.join(", ")}</span>

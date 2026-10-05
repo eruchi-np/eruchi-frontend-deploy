@@ -111,6 +111,7 @@ const UserManagement = ({
   const [addressMenuOpen, setAddressMenuOpen] = useState(false);
   const [addressMunicipality, setAddressMunicipality] = useState("");
   const [addressWard, setAddressWard] = useState("");
+  const [listLoading, setListLoading] = useState(true);
 
   const buildFilters = (overrides = {}) => ({
     activity: activityFilter,
@@ -120,10 +121,20 @@ const UserManagement = ({
   });
 
   useEffect(() => {
-    const t = setTimeout(() => {
-      fetchUsers(buildFilters({ q: searchTerm }), 1);
-    }, 300);
-    return () => clearTimeout(t);
+    let cancelled = false;
+    const delay = searchTerm ? 300 : 0;
+    const t = setTimeout(async () => {
+      setListLoading(true);
+      try {
+        await fetchUsers(buildFilters({ q: searchTerm }), 1);
+      } finally {
+        if (!cancelled) setListLoading(false);
+      }
+    }, delay);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
     // Intentionally only react to search; other filters call fetchUsers directly.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm]);
@@ -601,7 +612,11 @@ const UserManagement = ({
         )}
 
         <div className="divide-y divide-gray-100">
-          {users.length === 0 ? (
+          {listLoading && users.length === 0 ? (
+            <div className="text-center py-16">
+              <p className="text-gray-500 text-sm">Loading users...</p>
+            </div>
+          ) : users.length === 0 ? (
             <div className="text-center py-16">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Users className="h-8 w-8 text-gray-400" />

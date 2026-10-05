@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import QRCode from "react-qr-code";
 import { ArrowLeft, Maximize2, Download } from "lucide-react";
 import { voucherAPI } from "../services/api";
@@ -33,6 +33,14 @@ const getBrandPalette = (brandName = "") => {
 export default function VoucherDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const goToVoucherList = () => {
+    if (location.state?.fromList) {
+      navigate(-1);
+      return;
+    }
+    navigate("/vouchers", { replace: true });
+  };
   const [voucher, setVoucher] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -354,7 +362,7 @@ export default function VoucherDetail() {
         <div className="text-center">
           <p className="text-red-500 mb-4">{error || "Voucher not found"}</p>
           <button
-            onClick={() => navigate("/vouchers")}
+            onClick={goToVoucherList}
             className="px-6 py-2.5 rounded-full bg-[#3399FF] text-white text-sm hover:opacity-90 transition-opacity"
           >
             Back to Vouchers
@@ -388,7 +396,7 @@ export default function VoucherDetail() {
       <div className="max-w-md mx-auto px-4 pt-8">
         {/* Back */}
         <button
-          onClick={() => navigate("/vouchers")}
+          onClick={goToVoucherList}
           className="flex items-center gap-2 text-sm text-[#3399FF] hover:opacity-75 transition-opacity mb-6 font-medium"
         >
           <ArrowLeft size={16} />

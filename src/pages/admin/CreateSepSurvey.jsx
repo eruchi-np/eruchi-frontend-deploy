@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { sepSurveyAPI, fifteenDaySurveyAPI, clusterAPI } from '../../services/api';
-import { ArrowLeft, Plus, Trash2, Save, Type, FileText, CheckSquare, Loader2, Sliders, AlertCircle, Eye, Settings as SettingsIcon, Clock, Calendar, Award, Users, Target, Table2, ChevronUp, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, Type, FileText, CheckSquare, ListOrdered, Loader2, Sliders, AlertCircle, Eye, Settings as SettingsIcon, Clock, Calendar, Award, Users, Target, Table2, ChevronUp, ChevronDown, ShieldAlert } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MatrixQuestion from '../../components/survey/MatrixQuestion';
 
@@ -95,7 +95,10 @@ const CreateSepSurvey = () => {
       try {
         const res = isSprint
           ? await fifteenDaySurveyAPI.getById(surveyId, { skipErrorToast: true })
-          : await sepSurveyAPI.getById(surveyId, { skipErrorToast: true });
+          : await sepSurveyAPI.getById(surveyId, {
+              params: { manage: 1 },
+              skipErrorToast: true,
+            });
         const survey = res.data.data;
 
         const startDate = survey.startDate ? new Date(survey.startDate) : new Date();
@@ -143,6 +146,8 @@ const CreateSepSurvey = () => {
     { value: 'text_short', label: 'Short Text', icon: Type, description: 'Brief text response' },
     { value: 'text_long', label: 'Long Text', icon: FileText, description: 'Detailed paragraph' },
     { value: 'single_checkbox', label: 'Single Choice', icon: CheckSquare, description: 'Pick one option' },
+    { value: 'attention_check', label: 'Attention Check', icon: ShieldAlert, description: 'Pick one, with a correct answer' },
+    { value: 'likert', label: 'Likert Scale', icon: ListOrdered, description: 'Pick one on a scale' },
     { value: 'multiple_checkbox', label: 'Multiple Choice', icon: CheckSquare, description: 'Pick multiple' },
     { value: 'slider', label: 'Slider', icon: Sliders, description: 'Range selection' },
     { value: 'matrix_radio', label: 'Matrix', icon: Table2, description: 'One choice per row' }
@@ -213,13 +218,20 @@ const CreateSepSurvey = () => {
 
   const handleQuestionChange = (index, field, value) => {
     const updated = [...formData.questions];
+    const previousType = updated[index].questionType;
     updated[index][field] = value;
 
     if (field === 'questionType') {
-      if (value === 'single_checkbox' || value === 'multiple_checkbox') {
+      if (value === 'single_checkbox' || value === 'multiple_checkbox' || value === 'attention_check') {
         updated[index].options = updated[index].options.length ? updated[index].options : ['Option 1', 'Option 2'];
         updated[index].rows = [];
-        updated[index].maxSelections = value === 'single_checkbox' ? 1 : 2;
+        updated[index].maxSelections = value === 'multiple_checkbox' ? 2 : 1;
+      } else if (value === 'likert') {
+        if (previousType !== 'likert') {
+          updated[index].options = ['1', '2', '3', '4', '5'];
+          updated[index].rows = [];
+          updated[index].maxSelections = 1;
+        }
       } else if (value === 'matrix_radio') {
         updated[index].options = updated[index].options?.length
           ? updated[index].options
@@ -240,7 +252,12 @@ const CreateSepSurvey = () => {
         updated[index].minValue = 0;
         updated[index].maxValue = 5;
       }
-      if (value !== 'single_checkbox') {
+      if (value === 'attention_check') {
+        updated[index].attentionCheck = true;
+      } else if (value === 'single_checkbox' && previousType === 'attention_check') {
+        updated[index].attentionCheck = false;
+        updated[index].attentionAnswer = '';
+      } else if (value !== 'single_checkbox') {
         updated[index].attentionCheck = false;
         updated[index].attentionAnswer = '';
       }
@@ -251,20 +268,30 @@ const CreateSepSurvey = () => {
 
   const handleOptionChange = (qIndex, optIndex, value) => {
     const updated = [...formData.questions];
+    const previous = updated[qIndex].options[optIndex];
     updated[qIndex].options[optIndex] = value;
+    if (updated[qIndex].attentionAnswer === previous) {
+      updated[qIndex].attentionAnswer = value;
+    }
     setFormData(prev => ({ ...prev, questions: updated }));
   };
 
   const addOption = (qIndex) => {
     const updated = [...formData.questions];
-    updated[qIndex].options.push(`Option ${updated[qIndex].options.length + 1}`);
+    const next = updated[qIndex].options.length + 1;
+    const label = updated[qIndex].questionType === 'likert' ? String(next) : `Option ${next}`;
+    updated[qIndex].options.push(label);
     setFormData(prev => ({ ...prev, questions: updated }));
   };
 
   const removeOption = (qIndex, optIndex) => {
     const updated = [...formData.questions];
     if (updated[qIndex].options.length > 1) {
+      const removed = updated[qIndex].options[optIndex];
       updated[qIndex].options.splice(optIndex, 1);
+      if (updated[qIndex].attentionAnswer === removed) {
+        updated[qIndex].attentionAnswer = '';
+      }
       setFormData(prev => ({ ...prev, questions: updated }));
     }
   };
@@ -393,10 +420,16 @@ const CreateSepSurvey = () => {
     }
 
     const invalidCheckboxes = formData.questions.filter(q =>
-      (q.questionType === 'single_checkbox' || q.questionType === 'multiple_checkbox') &&
+      (q.questionType === 'single_checkbox' || q.questionType === 'multiple_checkbox' || q.questionType === 'attention_check') &&
       !(q.options || []).map((option) => option.trim()).filter(Boolean).length
     );
     if (invalidCheckboxes.length) return toast.error('Checkbox questions need at least one option');
+
+    const blankLikert = formData.questions.some((q) =>
+      q.questionType === 'likert' &&
+      (!(q.options || []).length || (q.options || []).some((option) => !String(option).trim()))
+    );
+    if (blankLikert) return toast.error('Each Likert option needs text');
 
     const invalidMatrices = formData.questions.filter(q =>
       q.questionType === 'matrix_radio' &&
@@ -408,7 +441,7 @@ const CreateSepSurvey = () => {
     }
 
     const duplicateLabels = formData.questions.some((q) => {
-      if (!['single_checkbox', 'multiple_checkbox', 'matrix_radio'].includes(q.questionType)) return false;
+      if (!['single_checkbox', 'multiple_checkbox', 'attention_check', 'likert', 'matrix_radio'].includes(q.questionType)) return false;
       const options = (q.options || []).map((option) => option.trim()).filter(Boolean);
       if (new Set(options).size !== options.length) return true;
       if (q.questionType !== 'matrix_radio') return false;
@@ -426,7 +459,8 @@ const CreateSepSurvey = () => {
     if (invalidSliders.length) return toast.error('Slider max must be greater than min');
 
     const badAttention = formData.questions.some((q) => {
-      if (q.questionType !== 'single_checkbox' || !q.attentionCheck) return false;
+      const marked = q.questionType === 'attention_check' || (q.questionType === 'single_checkbox' && q.attentionCheck);
+      if (!marked) return false;
       const options = (q.options || []).map((option) => option.trim()).filter(Boolean);
       return !options.includes(String(q.attentionAnswer || '').trim());
     });
@@ -449,9 +483,17 @@ const CreateSepSurvey = () => {
             isRequired: q.isRequired !== false,
             metricTag: q.metricTag === 'cep' || q.metricTag === 'nps' ? q.metricTag : 'none'
           };
-          if (['single_checkbox', 'multiple_checkbox'].includes(q.questionType)) {
+          if (['single_checkbox', 'multiple_checkbox', 'attention_check'].includes(q.questionType)) {
             base.options = q.options.map(o => o.trim()).filter(Boolean);
-            base.maxSelections = q.maxSelections;
+            base.maxSelections = q.questionType === 'multiple_checkbox' ? q.maxSelections : 1;
+          }
+          if (q.questionType === 'attention_check') {
+            base.attentionCheck = true;
+            base.attentionAnswer = String(q.attentionAnswer || '').trim();
+          }
+          if (q.questionType === 'likert') {
+            base.options = q.options.map(o => o.trim());
+            base.maxSelections = 1;
           }
           if (q.questionType === 'single_checkbox' && q.attentionCheck) {
             base.attentionCheck = true;
@@ -1075,8 +1117,8 @@ const CreateSepSurvey = () => {
                         </div>
                       </div>
 
-                      {/* Options for checkbox questions */}
-                      {(q.questionType === 'single_checkbox' || q.questionType === 'multiple_checkbox') && (
+                      {/* Options for checkbox, Likert, and attention-check questions */}
+                      {(q.questionType === 'single_checkbox' || q.questionType === 'multiple_checkbox' || q.questionType === 'likert' || q.questionType === 'attention_check') && (
                         <div className="p-5 bg-green-50 rounded-xl border border-green-100">
                           <div className="flex justify-between items-center mb-4">
                             <label className="text-sm font-semibold text-gray-900">
@@ -1102,6 +1144,9 @@ const CreateSepSurvey = () => {
                                   className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                                   placeholder={`Option ${optIdx + 1}`}
                                 />
+                                {q.questionType === 'attention_check' && q.attentionAnswer === opt && (
+                                  <span className="text-xs font-semibold text-green-700">Correct</span>
+                                )}
                                 {q.options.length > 1 && (
                                   <button
                                     type="button"
@@ -1114,6 +1159,27 @@ const CreateSepSurvey = () => {
                               </div>
                             ))}
                           </div>
+
+                          {q.questionType === 'attention_check' && (
+                            <div className="mt-4 pt-4 border-t border-green-100 space-y-3">
+                              <label className="block text-sm font-semibold text-gray-900">
+                                Correct answer
+                              </label>
+                              <p className="text-xs text-gray-500">
+                                Respondents see these options in a random order. A wrong answer flags that response.
+                              </p>
+                              <select
+                                value={q.attentionAnswer || ''}
+                                onChange={(e) => handleQuestionChange(idx, 'attentionAnswer', e.target.value)}
+                                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-white"
+                              >
+                                <option value="">Correct answer</option>
+                                {q.options.map((opt, optIdx) => (
+                                  <option key={optIdx} value={opt}>{opt || `Option ${optIdx + 1}`}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
 
                           {q.questionType === 'single_checkbox' && (
                             <div className="mt-4 pt-4 border-t border-green-100 space-y-3">
@@ -1349,18 +1415,24 @@ const CreateSepSurvey = () => {
                           />
                         )}
 
-                        {(q.questionType === 'single_checkbox' || q.questionType === 'multiple_checkbox') && (
+                        {(q.questionType === 'single_checkbox' || q.questionType === 'multiple_checkbox' || q.questionType === 'likert' || q.questionType === 'attention_check') && (
                           <div className="space-y-3">
                             {q.options.map((opt, i) => (
                               <label key={i} className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg">
                                 <input
-                                  type={q.questionType === 'single_checkbox' ? 'radio' : 'checkbox'}
+                                  type={q.questionType === 'multiple_checkbox' ? 'checkbox' : 'radio'}
                                   disabled
                                   className="h-5 w-5"
                                 />
                                 <span className="text-sm">{opt}</span>
+                                {q.questionType === 'attention_check' && q.attentionAnswer === opt && (
+                                  <span className="text-xs font-semibold text-green-700">Correct</span>
+                                )}
                               </label>
                             ))}
+                            {q.questionType === 'attention_check' && (
+                              <p className="text-xs text-gray-500">Respondents see these options in a random order.</p>
+                            )}
                           </div>
                         )}
 

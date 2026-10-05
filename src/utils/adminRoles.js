@@ -23,6 +23,7 @@ export const PERMISSIONS = {
   clusters: ['admin', 'business_admin', 'customer_admin'],
   businesses: ['admin', 'business_admin'],
   vouchers: ['admin', 'business_admin'],
+  voucher_recommendations: ['admin'],
   scans: ['admin', 'business_admin'],
   faqs: ['admin'],
   analytics: ['admin'],
@@ -37,11 +38,24 @@ export const TAB_PERMISSIONS = {
   metrics: 'surveys',
   calendar: 'surveys',
   vouchers: 'vouchers',
+  recommendations: 'voucher_recommendations',
   scans: 'scans',
   survey_exports: 'surveys',
 };
 
 export const isStaffAdmin = (role) => STAFF_ROLES.includes(role);
+
+/** Full admin, including the legacy superadmin alias. */
+export const isFullAdminRole = (role) =>
+  role === 'admin' || role === 'superadmin';
+
+/** Used-voucher list on Business Management, not the main admin dashboard. */
+export const businessRedeemedVouchersPath = (from, to) => {
+  const params = new URLSearchParams({ view: 'redeemed', status: 'used' });
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  return `/admin/businesses?${params.toString()}`;
+};
 
 /** Owner admins who may adjust credits / manage full-admin roles. */
 export const PROTECTED_ADMIN_EMAILS = [

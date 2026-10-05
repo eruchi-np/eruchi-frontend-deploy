@@ -1,7 +1,15 @@
 import React from "react";
 import { Download, FileSpreadsheet } from "lucide-react";
 
-const SurveyExports = ({ surveys, handleExportTimings }) => {
+const SurveyExports = ({ surveys, surveysLoading, handleExportTimings }) => {
+  if (surveysLoading && (!surveys || surveys.length === 0)) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-8 shadow-sm">
+        <p className="text-sm text-gray-500">Loading surveys...</p>
+      </div>
+    );
+  }
+
   if (!surveys || surveys.length === 0) return null;
 
   return (

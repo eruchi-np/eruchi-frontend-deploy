@@ -1205,9 +1205,9 @@ button.streak-badge {
 
 .home-credit-ring {
   position: relative;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
   width: auto;
-  max-width: min(240px, 48%);
+  margin-left: auto;
   height: auto;
   padding: 10px 14px 10px 10px;
   border-radius: 22px;
@@ -1242,7 +1242,7 @@ button.streak-badge {
   font-size: 14px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  white-space: normal;
+  white-space: nowrap;
 }
 
 .home-credit-ring .home-credit-label small {

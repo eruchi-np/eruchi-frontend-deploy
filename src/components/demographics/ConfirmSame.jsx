@@ -18,14 +18,16 @@ const ConfirmSame = ({ saved, value, confirmed, onConfirm }) => {
   if (!valuesMatch(saved, value)) {
     return <p className="text-sm text-[var(--muted)] mt-2">Updated</p>;
   }
+  if (confirmed) {
+    return <p className="confirm-same-done">Same confirmed</p>;
+  }
   return (
     <button
       type="button"
       onClick={onConfirm}
-      disabled={confirmed}
-      className="mt-2 text-sm font-medium text-[var(--navy)] underline disabled:no-underline disabled:text-[var(--muted)]"
+      className="home-pill home-pill-sm home-pill-blue confirm-same"
     >
-      {confirmed ? 'Same confirmed' : 'Confirm same'}
+      Confirm same
     </button>
   );
 };

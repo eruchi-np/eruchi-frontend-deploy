@@ -13,10 +13,12 @@ import toast from 'react-hot-toast';
 const TYPE_META = {
   survey_completed: { label: 'Survey', Icon: FileText, tone: 'blue' },
   voucher_purchased: { label: 'Voucher bought', Icon: Ticket, tone: 'amber' },
+  voucher_gifted: { label: 'Gift', Icon: Gift, tone: 'rose' },
   voucher_redeemed: { label: 'Voucher redeemed', Icon: Package, tone: 'green' },
   streak_reward: { label: 'Streak reward', Icon: Gift, tone: 'orange' },
   streak_lost: { label: 'Streak lost', Icon: Flame, tone: 'red' },
   streak_guard: { label: 'Streak Guard', Icon: Shield, tone: 'navy' },
+  referral: { label: 'Referral', Icon: Gift, tone: 'green' },
 };
 
 const toneClass = {
@@ -24,6 +26,7 @@ const toneClass = {
   amber: 'bg-amber-50 text-amber-700',
   green: 'bg-emerald-50 text-emerald-700',
   orange: 'bg-orange-50 text-orange-600',
+  rose: 'bg-rose-50 text-rose-700',
   red: 'bg-red-50 text-red-600',
   navy: 'bg-slate-100 text-slate-700',
 };
@@ -150,13 +153,13 @@ const SurveyHistory = () => {
 
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-gray-800 truncate">{entry.title}</p>
-                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <div className="flex items-center gap-1.5 mt-0.5">
                         <Calendar className="w-3 h-3 text-gray-300" />
                         <p className="text-[11px] text-gray-400">{date}</p>
-                        {entry.description ? (
-                          <p className="text-[11px] text-gray-400 truncate">· {entry.description}</p>
-                        ) : null}
                       </div>
+                      {entry.description ? (
+                        <p className="text-[11px] text-gray-500 mt-1 leading-relaxed">{entry.description}</p>
+                      ) : null}
                     </div>
 
                     <div className="flex flex-col items-end gap-1.5 shrink-0">

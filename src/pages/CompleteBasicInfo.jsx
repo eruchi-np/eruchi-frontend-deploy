@@ -12,6 +12,7 @@ import CreditRewardBadge from "../components/onboarding/CreditRewardBadge";
 import { BASIC_DETAILS_CREDITS } from "../utils/onboardingCredits";
 import { formatNepalPhone, phoneFormatError } from "../utils/phoneFormat";
 import { trackOnboardingError, trackOnboardingSubmit, trackOnboardingView } from "../utils/healthEvents";
+import { getPostLoginPath } from "../utils/auth";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -81,11 +82,7 @@ const CompleteBasicInfo = () => {
     }
 
     if (user?.isRegistrationComplete) {
-      if (user.isProfileComplete) {
-        navigate("/", { replace: true });
-      } else {
-        navigate("/complete-profile", { replace: true });
-      }
+      navigate(getPostLoginPath(user), { replace: true });
     }
 
     reset({

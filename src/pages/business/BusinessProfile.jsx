@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { businessAPI } from '../../services/api';
 import { BUSINESS_CATEGORIES, DAYS_OF_WEEK, inputCls } from './businessFormConstants';
 import AddressInfo from '../../components/demographics/steps/AddressInfo';
+import SearchKeywordsField from '../../components/business/SearchKeywordsField';
 
 const emptyForm = {
   name: '',
@@ -21,6 +22,7 @@ const emptyForm = {
   operatingDays: [],
   openingTime: '',
   closingTime: '',
+  searchKeywords: [],
 };
 
 export default function BusinessProfile() {
@@ -52,6 +54,7 @@ export default function BusinessProfile() {
           operatingDays: biz.operatingDays || [],
           openingTime: biz.operatingHours?.open || '',
           closingTime: biz.operatingHours?.close || '',
+          searchKeywords: Array.isArray(biz.searchKeywords) ? biz.searchKeywords : [],
         });
       } catch (err) {
         toast.error(err.response?.data?.message || 'Failed to load profile');
@@ -107,6 +110,7 @@ export default function BusinessProfile() {
         googleMapsUrl: form.googleMapsUrl,
         operatingDays: form.operatingDays,
         operatingHours: { open: form.openingTime, close: form.closingTime },
+        searchKeywords: form.searchKeywords,
       });
       setProfile(data.data);
       localStorage.setItem('business_name', data.data.brandName || data.data.name);
@@ -209,6 +213,11 @@ export default function BusinessProfile() {
               className={`${inputCls} resize-none`}
             />
           </div>
+          <SearchKeywordsField
+            keywords={form.searchKeywords}
+            onChange={(searchKeywords) => setForm((current) => ({ ...current, searchKeywords }))}
+            inputClassName={inputCls}
+          />
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Street address</label>
             <input value={form.address} onChange={setField('address')} className={inputCls} />

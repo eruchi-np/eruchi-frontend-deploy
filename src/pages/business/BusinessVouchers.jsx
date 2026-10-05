@@ -70,6 +70,7 @@ export default function BusinessVouchers() {
                 <tr className="text-left text-gray-400">
                   <th className="px-6 py-3 font-medium">Voucher</th>
                   <th className="px-4 py-3 font-medium">Discount</th>
+                  <th className="px-4 py-3 font-medium">Ruchi Credits</th>
                   <th className="px-4 py-3 font-medium">Issued</th>
                   <th className="px-4 py-3 font-medium">Redeemed</th>
                   <th className="px-4 py-3 font-medium">Conversion</th>
@@ -81,6 +82,7 @@ export default function BusinessVouchers() {
                   <tr key={offer.offerId} className="border-t border-gray-100">
                     <td className="px-6 py-4 font-medium text-gray-900">{offer.title}</td>
                     <td className="px-4 py-4 text-gray-600">{discountLabel(offer)}</td>
+                    <td className="px-4 py-4 text-gray-900">{offer.creditsRequired ?? 0}</td>
                     <td className="px-4 py-4">{offer.issued ?? 0}</td>
                     <td className="px-4 py-4">{offer.redeemed ?? 0}</td>
                     <td className="px-4 py-4">{formatPercent(offer.conversion)}</td>

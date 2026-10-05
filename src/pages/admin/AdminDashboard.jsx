@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { adminAPI, sepSurveyAPI } from "../../services/api";
 import {
-  Users, Plus, ArrowLeft, Award, Clock, X, Building2, FileText,
-  HelpCircle, CalendarDays, Ticket, ScanLine, Layers, Shield, BarChart3, Activity,
+  Users, Plus, ArrowLeft, Award, Clock, Building2, FileText,
+  HelpCircle, CalendarDays, Ticket, Sparkles, ScanLine, Layers, Shield, BarChart3, Activity,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "../../context/AuthContext";
 import {
+  businessRedeemedVouchersPath,
   defaultAdminTab,
   hasPermission,
   roleLabel,
@@ -15,16 +16,24 @@ import {
 } from "../../utils/adminRoles";
 
 import StatsGrid from "./components/StatsGrid.jsx";
-import SurveyExports from "./components/SurveyExports.jsx";
-import UserManagement from "./components/UserManagement.jsx";
-import UserDetailDrawer from "./components/UserDetailDrawer.jsx";
-import SurveyManagement from "./components/SurveyManagement.jsx";
-import SurveyCalendar from "./components/SurveyCalendar.jsx";
-import VoucherManagement from "./components/VoucherManagement.jsx";
-import ScanLogView from "./components/ScanLogView.jsx";
-import ClusterManagement from "./components/ClusterManagement.jsx";
-import StaffManagement from "./components/StaffManagement.jsx";
-import MetricInsights from "./components/MetricInsights.jsx";
+
+const UserManagement = lazy(() => import("./components/UserManagement.jsx"));
+const UserDetailDrawer = lazy(() => import("./components/UserDetailDrawer.jsx"));
+const StaffManagement = lazy(() => import("./components/StaffManagement.jsx"));
+const ClusterManagement = lazy(() => import("./components/ClusterManagement.jsx"));
+const SurveyManagement = lazy(() => import("./components/SurveyManagement.jsx"));
+const MetricInsights = lazy(() => import("./components/MetricInsights.jsx"));
+const SurveyCalendar = lazy(() => import("./components/SurveyCalendar.jsx"));
+const VoucherManagement = lazy(() => import("./components/VoucherManagement.jsx"));
+const RecommendationManagement = lazy(() => import("./components/RecommendationManagement.jsx"));
+const ScanLogView = lazy(() => import("./components/ScanLogView.jsx"));
+const SurveyExports = lazy(() => import("./components/SurveyExports.jsx"));
+
+const TabFallback = () => (
+  <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+    <p className="text-sm text-gray-500">Loading...</p>
+  </div>
+);
 
 const NAVY = "#1B2A4A";
 const TABS = [
@@ -35,6 +44,7 @@ const TABS = [
   { id: "metrics", label: "CEP / NPS", icon: BarChart3 },
   { id: "calendar", label: "Calendar", icon: CalendarDays },
   { id: "vouchers", label: "Vouchers", icon: Ticket },
+  { id: "recommendations", label: "Recommendations", icon: Sparkles },
   { id: "scans", label: "Scan log", icon: ScanLine },
   { id: "survey_exports", label: "Timer export", icon: Clock },
 ];
@@ -69,7 +79,22 @@ const AdminDashboard = () => {
     });
   };
 
+  const redeemedDeepLink =
+    role === "business_admin" &&
+    requestedTab === "vouchers" &&
+    searchParams.get("status") === "used" &&
+    Boolean(searchParams.get("from") || searchParams.get("to"));
+
   useEffect(() => {
+    if (!redeemedDeepLink) return;
+    navigate(
+      businessRedeemedVouchersPath(searchParams.get("from") || "", searchParams.get("to") || ""),
+      { replace: true }
+    );
+  }, [redeemedDeepLink, navigate, searchParams]);
+
+  useEffect(() => {
+    if (redeemedDeepLink) return;
     if (requestedTab !== activeTab) {
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
@@ -77,16 +102,16 @@ const AdminDashboard = () => {
         return next;
       }, { replace: true });
     }
-  }, [requestedTab, activeTab, setSearchParams]);
+  }, [requestedTab, activeTab, setSearchParams, redeemedDeepLink]);
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
   const [dashboardStats, setDashboardStats] = useState(null);
   const [surveys, setSurveys] = useState([]);
+  const [surveysLoading, setSurveysLoading] = useState(false);
+  const surveysLoadedRef = useRef(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [userQuery, setUserQuery] = useState({});
   const pageSize = 50;
@@ -113,7 +138,7 @@ const AdminDashboard = () => {
   const [scanOutcome, setScanOutcome] = useState("");
   const [scanPagination, setScanPagination] = useState(null);
 
-  const fetchStats = async () => {
+  const fetchStats = useCallback(async () => {
     if (!can("stats")) return;
     try {
       const res = await adminAPI.getStats({ skipErrorToast: true });
@@ -121,9 +146,9 @@ const AdminDashboard = () => {
     } catch (err) {
       console.error("Failed to fetch admin stats", err);
     }
-  };
+  }, [can]);
 
-  const fetchSurveys = async () => {
+  const fetchSurveys = useCallback(async () => {
     try {
       const res = await sepSurveyAPI.getAvailable({
         limit: 500,
@@ -131,10 +156,12 @@ const AdminDashboard = () => {
         skipErrorToast: true,
       });
       setSurveys(res.data.data || []);
+      return true;
     } catch (err) {
       console.error("Failed to fetch surveys", err);
+      return false;
     }
-  };
+  }, []);
 
   const buildUserListParams = (filters = {}) => {
     const params = {};
@@ -302,21 +329,25 @@ const AdminDashboard = () => {
   };
 
   useEffect(() => {
-    const boot = async () => {
-      try {
-        const tasks = [];
-        if (can("stats")) tasks.push(fetchStats());
-        if (can("users")) tasks.push(fetchUsers({}, 1));
-        if (can("surveys")) tasks.push(fetchSurveys());
-        await Promise.all(tasks);
-      } catch (err) {
-        setError("Failed to load admin dashboard");
-      } finally {
-        setLoading(false);
-      }
+    fetchStats();
+  }, [fetchStats]);
+
+  const needsSurveyCatalog =
+    activeTab === "surveys" || activeTab === "calendar" || activeTab === "survey_exports";
+
+  useEffect(() => {
+    if (!needsSurveyCatalog || !can("surveys") || surveysLoadedRef.current) return;
+    let cancelled = false;
+    setSurveysLoading(true);
+    fetchSurveys().then((ok) => {
+      if (cancelled) return;
+      if (ok) surveysLoadedRef.current = true;
+      setSurveysLoading(false);
+    });
+    return () => {
+      cancelled = true;
     };
-    boot();
-  }, [fetchUsers, can]);
+  }, [needsSurveyCatalog, can, fetchSurveys]);
 
   const voucherFromParam = searchParams.get("from") || "";
   const voucherToParam = searchParams.get("to") || "";
@@ -372,51 +403,27 @@ const AdminDashboard = () => {
   const redeemedFrom = nepalYmd(new Date(Date.now() - 6 * 24 * 60 * 60 * 1000));
   const redeemedTo = nepalYmd();
 
+  const statValue = (value) => (dashboardStats ? value : "—");
+
   const stats = [
-    can("stats") && { label: "Total Users", value: dashboardStats?.totalUsers ?? totalUsers, icon: Users },
-    can("surveys") && { label: "Live surveys", value: dashboardStats?.liveSurveys ?? 0, icon: FileText, to: "/admin?tab=surveys" },
-    can("users") && { label: "Avg. Credits", value: dashboardStats?.avgCredits ?? 0, icon: Award },
+    can("stats") && { label: "Total Users", value: statValue(dashboardStats?.totalUsers ?? 0), icon: Users },
+    can("surveys") && { label: "Live surveys", value: statValue(dashboardStats?.liveSurveys ?? 0), icon: FileText, to: "/admin?tab=surveys" },
+    can("users") && { label: "Avg. Credits", value: statValue(dashboardStats?.avgCredits ?? 0), icon: Award },
     can("businesses") && {
       label: "Pending businesses",
-      value: dashboardStats?.pendingBusinesses ?? 0,
+      value: statValue(dashboardStats?.pendingBusinesses ?? 0),
       icon: Building2,
       to: "/admin/businesses?verified=pending",
     },
     can("vouchers") && {
       label: "Redeemed (7d)",
-      value: dashboardStats?.vouchersRedeemedWeek ?? 0,
+      value: statValue(dashboardStats?.vouchersRedeemedWeek ?? 0),
       icon: Ticket,
-      to: `/admin?tab=vouchers&status=used&from=${redeemedFrom}&to=${redeemedTo}`,
+      to: role === "business_admin"
+        ? businessRedeemedVouchersPath(redeemedFrom, redeemedTo)
+        : `/admin?tab=vouchers&status=used&from=${redeemedFrom}&to=${redeemedTo}`,
     },
   ].filter(Boolean);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-14 h-14 border-4 border-gray-200 rounded-full animate-spin mx-auto" style={{ borderTopColor: NAVY }}></div>
-          <p className="mt-4 text-gray-500 font-medium">Loading dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center p-4">
-        <div className="text-center bg-white rounded-2xl shadow-sm border border-gray-200 p-12 max-w-md">
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <X className="w-8 h-8 text-red-500" />
-          </div>
-          <h3 className="text-xl font-bold text-gray-900 mb-2">Something went wrong</h3>
-          <p className="text-gray-500 mb-8">{error}</p>
-          <button onClick={() => navigate("/profile")} className="text-white px-8 py-3 rounded-xl font-medium transition-colors" style={{ backgroundColor: NAVY }}>
-            Back to Profile
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -481,76 +488,81 @@ const AdminDashboard = () => {
           ))}
         </div>
 
-        {activeTab === "users" && (
-          <UserManagement
-            users={users}
-            fetchUsers={fetchUsers}
-            exportUserEmails={exportUserEmails}
-            currentPage={currentPage}
-            totalPages={totalPages}
-            totalUsers={totalUsers}
-            pageSize={pageSize}
-            handlePageChange={handlePageChange}
-            NAVY={NAVY}
-            onSelectUser={setSelectedUserId}
-          />
-        )}
-        {activeTab === "staff" && (
-          <StaffManagement NAVY={NAVY} currentUserId={user?.id || user?._id} />
-        )}
-        {activeTab === "clusters" && <ClusterManagement NAVY={NAVY} />}
-        {activeTab === "surveys" && (
-          <SurveyManagement surveys={surveys} refetchSurveys={fetchSurveys} NAVY={NAVY} />
-        )}
-        {activeTab === "metrics" && <MetricInsights NAVY={NAVY} />}
-        {activeTab === "calendar" && (
-          <SurveyCalendar surveys={surveys} refetchSurveys={fetchSurveys} NAVY={NAVY} />
-        )}
-        {activeTab === "vouchers" && (
-          <VoucherManagement
-            vouchers={vouchers}
-            voucherLoading={voucherLoading}
-            voucherStatusFilter={voucherStatusFilter}
-            handleVoucherStatusFilter={handleVoucherStatusFilter}
-            pagination={voucherPagination}
-            onPageChange={(page) => fetchVouchers(voucherStatusFilter, page)}
-            dateFrom={voucherDateFrom}
-            dateTo={voucherDateTo}
-            onDateRangeChange={handleVoucherDateRangeChange}
-            statusCounts={voucherStatusCounts}
-            redeemedInRange={voucherRedeemedInRange}
-            NAVY={NAVY}
-          />
-        )}
-        {activeTab === "scans" && (
-          <ScanLogView
-            logs={scanLogs}
-            loading={scanLoading}
-            outcomeFilter={scanOutcome}
-            onOutcomeFilter={(outcome) => {
-              setScanOutcome(outcome);
-              fetchScans(outcome, 1);
-            }}
-            pagination={scanPagination}
-            onPageChange={(page) => fetchScans(scanOutcome, page)}
-            NAVY={NAVY}
-          />
-        )}
-        {activeTab === "survey_exports" && (
-          <SurveyExports surveys={surveys} handleExportTimings={handleExportTimings} />
-        )}
+        <Suspense fallback={<TabFallback />}>
+          {activeTab === "users" && (
+            <UserManagement
+              users={users}
+              fetchUsers={fetchUsers}
+              exportUserEmails={exportUserEmails}
+              currentPage={currentPage}
+              totalPages={totalPages}
+              totalUsers={totalUsers}
+              pageSize={pageSize}
+              handlePageChange={handlePageChange}
+              NAVY={NAVY}
+              onSelectUser={setSelectedUserId}
+            />
+          )}
+          {activeTab === "staff" && (
+            <StaffManagement NAVY={NAVY} currentUserId={user?.id || user?._id} />
+          )}
+          {activeTab === "clusters" && <ClusterManagement NAVY={NAVY} />}
+          {activeTab === "surveys" && (
+            <SurveyManagement surveys={surveys} surveysLoading={surveysLoading} refetchSurveys={fetchSurveys} NAVY={NAVY} />
+          )}
+          {activeTab === "metrics" && <MetricInsights NAVY={NAVY} />}
+          {activeTab === "calendar" && (
+            <SurveyCalendar surveys={surveys} surveysLoading={surveysLoading} refetchSurveys={fetchSurveys} NAVY={NAVY} />
+          )}
+          {activeTab === "vouchers" && (
+            <VoucherManagement
+              vouchers={vouchers}
+              voucherLoading={voucherLoading}
+              voucherStatusFilter={voucherStatusFilter}
+              handleVoucherStatusFilter={handleVoucherStatusFilter}
+              pagination={voucherPagination}
+              onPageChange={(page) => fetchVouchers(voucherStatusFilter, page)}
+              dateFrom={voucherDateFrom}
+              dateTo={voucherDateTo}
+              onDateRangeChange={handleVoucherDateRangeChange}
+              statusCounts={voucherStatusCounts}
+              redeemedInRange={voucherRedeemedInRange}
+              NAVY={NAVY}
+            />
+          )}
+          {activeTab === "recommendations" && <RecommendationManagement NAVY={NAVY} />}
+          {activeTab === "scans" && (
+            <ScanLogView
+              logs={scanLogs}
+              loading={scanLoading}
+              outcomeFilter={scanOutcome}
+              onOutcomeFilter={(outcome) => {
+                setScanOutcome(outcome);
+                fetchScans(outcome, 1);
+              }}
+              pagination={scanPagination}
+              onPageChange={(page) => fetchScans(scanOutcome, page)}
+              NAVY={NAVY}
+            />
+          )}
+          {activeTab === "survey_exports" && (
+            <SurveyExports surveys={surveys} surveysLoading={surveysLoading} handleExportTimings={handleExportTimings} />
+          )}
+        </Suspense>
       </div>
 
       {selectedUserId && (
-        <UserDetailDrawer
-          userId={selectedUserId}
-          onClose={() => setSelectedUserId(null)}
-          NAVY={NAVY}
-          onCreditsChanged={() => {
-            fetchUsers(userQuery.activity, currentPage, userQuery.q);
-            fetchStats();
-          }}
-        />
+        <Suspense fallback={null}>
+          <UserDetailDrawer
+            userId={selectedUserId}
+            onClose={() => setSelectedUserId(null)}
+            NAVY={NAVY}
+            onCreditsChanged={() => {
+              fetchUsers(userQuery, currentPage);
+              fetchStats();
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

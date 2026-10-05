@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { isStaffAdmin } from './adminRoles';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -23,6 +24,7 @@ export const getPostLoginPath = (user) => {
   if (!user) return '/';
   if (!user.isRegistrationComplete) return '/complete-basic-info';
   if (!user.isProfileComplete) return '/complete-profile';
+  if (!isStaffAdmin(user.role) && !user.isAdditionalProfileComplete) return '/additional-profile';
   return '/';
 };
 

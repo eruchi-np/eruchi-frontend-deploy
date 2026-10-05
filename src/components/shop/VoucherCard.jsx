@@ -157,7 +157,7 @@ export default function VoucherCard({
             className="bg-white text-[10px] xs:text-xs sm:text-sm font-semibold px-3 xs:px-4 sm:px-6 py-1 sm:py-1.5 rounded-full shadow-sm max-w-full transition-transform duration-300 group-hover:scale-105"
             style={{ color: palette.accent }}
           >
-            {unaffordable ? "Almost there" : "Redeem"}
+            {unaffordable ? "Almost there" : "Buy"}
           </span>
         </div>
 

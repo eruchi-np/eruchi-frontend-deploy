@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { AlertCircle, Check, Loader2, Shield, ShieldCheck } from "lucide-react";
+import { AlertCircle, Check, Copy, Loader2, Shield, ShieldCheck } from "lucide-react";
+import toast from "react-hot-toast";
 import { userAPI, voucherAPI } from "../services/api";
 import { getNextStreakBonus } from "../utils/streakBonus";
 import { useAuth } from "../context/AuthContext";
@@ -204,10 +205,6 @@ export default function Profile() {
           navigate("/complete-profile", { replace: true });
           return;
         }
-        if (!userData.isAdditionalProfileComplete) {
-          navigate("/additional-profile", { replace: true });
-          return;
-        }
 
         setUser(userData);
 
@@ -288,10 +285,6 @@ export default function Profile() {
       navigate("/complete-profile", { replace: true });
       return;
     }
-    if (authUser && !authUser.isAdditionalProfileComplete) {
-      navigate("/additional-profile", { replace: true });
-      return;
-    }
     window.location.reload();
   };
 
@@ -333,6 +326,18 @@ export default function Profile() {
   const nextBonus = getNextStreakBonus(streak);
   const streakGoal = nextBonus.rewardCounter + nextBonus.remaining;
   const previewActivities = activities.slice(0, 4);
+
+  const copyReferral = async () => {
+    const code = user?.referralCode;
+    if (!code) return;
+    const link = `${window.location.origin}/signup?ref=${code}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success("Invite link copied");
+    } catch {
+      toast.error("Could not copy the invite link");
+    }
+  };
 
   const handleGuardPurchased = (data) => {
     setUser((prev) => ({
@@ -438,6 +443,31 @@ export default function Profile() {
           </div>
         </section>
 
+        {user.referralCode && (
+          <section className="profile-referral">
+            <div>
+              <p className="profile-referral-kicker">Your referral code</p>
+              <p className="profile-referral-code">{user.referralCode}</p>
+              <p className="profile-referral-note">
+                {`${user.referralsCompleted || 0} of ${user.referralsMax || 5} people referred.`}
+                {user.nextReferralCredits
+                  ? ` Next referral pays ${user.nextReferralCredits} credits.`
+                  : " You've used all 5 referrals."}
+                {user.referralsReserved > 0
+                  ? ` ${user.referralsReserved} waiting to verify their email.`
+                  : ""}
+                {user.acceptingReferrals === false && user.nextReferralCredits
+                  ? " This code is full until one of those signups verifies or expires."
+                  : ""}
+              </p>
+            </div>
+            <button type="button" className="profile-btn profile-btn-outline" onClick={copyReferral}>
+              <Copy size={14} />
+              Copy invite link
+            </button>
+          </section>
+        )}
+
         <section className="profile-section">
           <div className="profile-section-head">
             <div className="profile-section-title">
@@ -476,7 +506,9 @@ export default function Profile() {
                           <span className="profile-voucher-initial">{brand.charAt(0).toUpperCase()}</span>
                         )}
                       </div>
-                      <p className="profile-voucher-credits">{voucher.creditsSpent ?? 0} CREDITS</p>
+                      <p className="profile-voucher-credits">
+                        {voucher.giftedBy ? "GIFT" : `${voucher.creditsSpent ?? 0} CREDITS`}
+                      </p>
                       <p className="profile-voucher-title">{snap.title || brand}</p>
                     </button>
                   );

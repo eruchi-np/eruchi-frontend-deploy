@@ -108,6 +108,7 @@ export const adminAPI = {
   getUser: (userId, options = {}) => getRequest(`/admin/users/${userId}`, options),
   getUserCredits: (userId, options = {}) => getRequest(`/admin/users/${userId}/credits`, options),
   adjustUserCredits: (userId, data, config = {}) => api.post(`/admin/users/${userId}/credits`, data, config),
+  giftUserVoucher: (userId, data, config = {}) => api.post(`/admin/users/${userId}/gift-voucher`, data, config),
   restoreUserStreak: (userId, data, config = {}) =>
     api.post(`/admin/users/${userId}/restore-streak`, data, config),
   getStats: (options = {}) => getRequest('/admin/stats', options),
@@ -129,6 +130,10 @@ export const adminAPI = {
   deleteBusinessPoster: (id, index, config = {}) => api.delete(`/admin/businesses/${id}/posters/${index}`, config),
   refreshBusinessGoogleRating: (id, config = {}) => api.post(`/admin/businesses/${id}/google-rating/refresh`, {}, config),
   getVoucherOffers: (options = {}) => getRequest('/admin/voucher-offers', options),
+  getVoucherRecommendations: (options = {}) => getRequest('/admin/voucher-recommendations', options),
+  createVoucherRecommendation: (data, config = {}) => api.post('/admin/voucher-recommendations', data, config),
+  updateVoucherRecommendation: (id, data, config = {}) => api.put(`/admin/voucher-recommendations/${id}`, data, config),
+  deleteVoucherRecommendation: (id, config = {}) => api.delete(`/admin/voucher-recommendations/${id}`, config),
   createVoucherOffer: (data, config = {}) => api.post('/admin/voucher-offers', data, config),
   updateVoucherOffer: (id, data, config = {}) => api.put(`/admin/voucher-offers/${id}`, data, config),
   getVouchers: (options = {}) => getRequest('/admin/vouchers', options),
@@ -236,6 +241,7 @@ export const fifteenDaySurveyAPI = {
 export const voucherAPI = {
   // ALL PATHS PERFECTLY ALIGNED TO BACKEND BASE PATH
   getOffers: (options = {}) => getRequest('/vouchers/voucher-offers', options),
+  getRecommended: (options = {}) => getRequest('/vouchers/recommended', options),
   redeem: (offerId, config = {}) => api.post('/vouchers/redeem', { offerId }, config),
   getMyVouchers: (options = {}) => getRequest('/vouchers', options),
   getVoucherById: (id, config = {}) => api.get(`/vouchers/${id}`, config),

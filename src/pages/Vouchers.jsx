@@ -297,7 +297,7 @@ export default function Vouchers() {
               <div key={v._id} className="w-full">
                 <VoucherTicketCard
                   voucher={v}
-                  onClick={() => navigate(`/vouchers/${v._id}`)}
+                  onClick={() => navigate(`/vouchers/${v._id}`, { state: { fromList: true } })}
                 />
               </div>
             ))}

@@ -139,8 +139,12 @@ const StandaloneSurvey = () => {
         return true;
       }
       if (q.questionType === "multiple_checkbox") return Array.isArray(val) && val.length > 0;
-      if (q.questionType === "single_checkbox") {
+      if (q.questionType === "single_checkbox" || q.questionType === "attention_check") {
         return typeof val === "string" && (q.options || []).includes(val);
+      }
+      if (q.questionType === "likert") {
+        const point = Number(val);
+        return Number.isInteger(point) && point >= 1 && point <= (q.options || []).length;
       }
       if (q.questionType === "slider") return true;
       if (q.questionType === "matrix_radio") {
@@ -272,20 +276,23 @@ const StandaloneSurvey = () => {
                 />
               )}
 
-              {q.questionType === "single_checkbox" && (
+              {(q.questionType === "single_checkbox" || q.questionType === "likert" || q.questionType === "attention_check") && (
                 <div className="space-y-3">
-                  {q.options.map((opt) => (
-                    <label key={opt} className="flex items-center gap-3 cursor-pointer group">
-                      <input
-                        type="radio"
-                        name={q.questionText}
-                        checked={responses[q.questionText] === opt}
-                        onChange={() => handleChange(q.questionText, opt)}
-                        className="h-4 w-4 text-neutral-900 border-neutral-300 focus:ring-0"
-                      />
-                      <span className="text-neutral-600 group-hover:text-neutral-900 transition-colors">{opt}</span>
-                    </label>
-                  ))}
+                  {q.options.map((opt, optionIndex) => {
+                    const stored = q.questionType === "likert" ? String(optionIndex + 1) : opt;
+                    return (
+                      <label key={optionIndex} className="flex items-center gap-3 cursor-pointer group">
+                        <input
+                          type="radio"
+                          name={q.questionText}
+                          checked={responses[q.questionText] === stored}
+                          onChange={() => handleChange(q.questionText, stored)}
+                          className="h-4 w-4 text-neutral-900 border-neutral-300 focus:ring-0"
+                        />
+                        <span className="text-neutral-600 group-hover:text-neutral-900 transition-colors">{opt}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               )}
 

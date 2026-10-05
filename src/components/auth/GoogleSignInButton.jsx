@@ -3,6 +3,7 @@ import axios from "axios";
 import { persistAuthSession } from "../../utils/auth";
 import { readAcquisition } from "../../utils/acquisition";
 import { readVisitorId } from "../../utils/healthEvents";
+import { clearStoredReferralCode, readStoredReferralCode } from "../../utils/referral";
 import { fetchGoogleClientId, renderGoogleButton } from "../../utils/googleGis";
 
 const API_BASE_URL =
@@ -66,15 +67,18 @@ const GoogleSignInButton = ({
             try {
               const acquisition = readAcquisition();
               const visitorId = readVisitorId();
+              const referralCode = readStoredReferralCode();
               const result = await axios.post(
                 `${API_BASE_URL}/auth/google`,
                 {
                   credential,
                   ...(acquisition ? { acquisition } : {}),
                   ...(visitorId ? { visitorId } : {}),
+                  ...(referralCode ? { referralCode } : {}),
                 },
                 { withCredentials: true }
               );
+              clearStoredReferralCode();
               const userData = result?.data?.data?.user;
               persistAuthSession(userData);
               onSuccessRef.current?.(userData);

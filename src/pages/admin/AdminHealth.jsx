@@ -1,21 +1,41 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { adminAPI } from '../../services/api';
 import { clarityDashboardUrl, clarityProjectId } from '../../utils/clarity';
+import {
+  formatActivationDuration,
+  registrationsByWeek,
+  shareOf,
+  sumWaterfallBars,
+} from '../../utils/healthActivationView';
+import { afterRetentionCutoff, displayName } from '../../utils/healthChartMath';
+import { standardizedImpactWeights } from '../../utils/healthRegression';
+import {
+  BackToTop,
+  HybridPeopleShareChart,
+  HorizontalRateChart,
+  ImpactWeightChart,
+  MultiSeriesHybridChart,
+  SimpleBarChart,
+  StackedRegistrationsChart,
+  WeekChecklist,
+  useDefaultWeekSelection,
+} from '../../components/admin/health/HealthChartKit.jsx';
 import UserDetailDrawer from './components/UserDetailDrawer.jsx';
 
 const OpenUserContext = React.createContext(null);
 
 const latestFirst = (rows) => [...(rows || [])].reverse();
 
-function UserIdButton({ id }) {
+function UserIdButton({ id, name }) {
   const openUser = React.useContext(OpenUserContext);
   if (!id) return null;
-  if (!openUser) return <span className="break-all">{id}</span>;
+  const label = name || id;
+  if (!openUser) return <span className="break-all">{label}</span>;
   return (
-    <button type="button" onClick={() => openUser(String(id))} className="text-sky-800 underline break-all text-left">
-      {id}
+    <button type="button" onClick={() => openUser(String(id))} className="text-sky-800 underline break-all text-left" title={String(id)}>
+      {label}
     </button>
   );
 }
@@ -42,6 +62,7 @@ const BAR_LABELS = {
 
 const STAGE_LABELS = {
   eligible: 'Eligible',
+  eligibleOnline: 'Ever eligible, online',
   shop: 'Shop visit',
   voucher: 'Voucher viewed',
   buyTap: 'Buy tapped',
@@ -151,11 +172,12 @@ const rateTone = (rate, worse) => {
   return 'bad';
 };
 
-function Share({ share, worse = false, large = false }) {
+function Share({ share, worse = false, large = false, of = '' }) {
   if (!share || share.denominator == null || !share.denominator) {
     return <span className="text-gray-400 font-normal">–</span>;
   }
-  const counts = `${int(share.numerator)} of ${int(share.denominator)}`;
+  const unit = of || share.of || '';
+  const counts = `${int(share.numerator)} of ${int(share.denominator)}${unit ? ` ${unit}` : ''}`;
   if (share.countsOnly || share.rate == null) {
     return <span className="text-gray-700 font-normal">{counts}</span>;
   }
@@ -175,7 +197,7 @@ function Pct({ rate, worse = false, plain = false }) {
   return <span className={`font-semibold ${tone.text}`}>{Math.round(Number(rate) * 1000) / 10}%</span>;
 }
 
-const shareText = (share, worse = false) => <Share share={share} worse={worse} />;
+const shareText = (share, worse = false, of = '') => <Share share={share} worse={worse} of={of} />;
 
 const when = (iso) => {
   if (!iso) return '';
@@ -189,17 +211,27 @@ const when = (iso) => {
   }).format(new Date(iso));
 };
 
-const duration = (ms) => {
-  if (ms == null || Number.isNaN(Number(ms))) return '–';
-  const hours = Number(ms) / 3600000;
-  if (hours < 48) return `${num(hours)} hours`;
-  return `${num(hours / 24)} days`;
-};
+const duration = formatActivationDuration;
 
-const cellText = (cell) => {
-  if (!cell?.ready) return '–';
-  if (cell.medianSurveys == null) return shareText(cell.survey);
-  return <span>{shareText(cell.survey)} · {num(cell.medianSurveys)}</span>;
+/** Compact matrix cell: percent + median surveys. Full counts sit in the title. */
+const matrixCell = (cell) => {
+  if (!cell?.ready) return <span className="text-gray-400">–</span>;
+  const rate = cell.survey?.rate;
+  const pct = rate == null || Number.isNaN(Number(rate))
+    ? '–'
+    : `${Math.round(Number(rate) * 1000) / 10}%`;
+  const median = cell.medianSurveys == null ? null : num(cell.medianSurveys);
+  const title = cell.survey?.denominator
+    ? `${int(cell.survey.numerator)} of ${int(cell.survey.denominator)} signups answered${
+      median == null ? '' : ` · median ${median} surveys among those who did`
+    }`
+    : undefined;
+  return (
+    <span className="block tabular-nums leading-tight" title={title}>
+      <span className="font-medium text-gray-900">{pct}</span>
+      {median == null ? null : <span className="text-gray-400"> · {median}</span>}
+    </span>
+  );
 };
 
 function Bar({ label, count, max, share, worse = false, labelWidth = '7rem' }) {
@@ -221,10 +253,13 @@ function Bar({ label, count, max, share, worse = false, labelWidth = '7rem' }) {
 const windowShare = (window) => (window?.ready ? shareText(window.activated) : 'Not ready');
 const windowSurvey = (window) => (window?.ready ? shareText(window.surveyActivated) : 'Not ready');
 
-function Card({ title, children, note, summary }) {
+function Card({ title, children, note, summary, metricId }) {
   return (
     <section className="bg-white border border-gray-200 rounded-2xl p-4 sm:p-5">
-      <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+        {metricId ? <span className="text-[11px] font-semibold tracking-wide text-gray-400 shrink-0">{metricId}</span> : null}
+      </div>
       {summary ? <p className="text-sm text-gray-600 mt-1">{summary}</p> : null}
       <div className="mt-3">{children}</div>
       {note ? (
@@ -280,7 +315,7 @@ function IdList({ count, userIds, truncated }) {
 function LandingConversion({ metric }) {
   if (!metric || metric.available === false) return <Missing metric={metric} />;
   return (
-    <Card title={metric.title} summary="Of the people who opened a tagged landing page, how many registered within 24 hours." note={metric.note}>
+    <Card metricId={metric.id} title={metric.title} summary="Of the people who opened a tagged landing page, how many registered within 24 hours." note={metric.note}>
       {!metric.visitors ? (
         <p className="text-sm text-gray-500">No landing visits stored yet.</p>
       ) : (
@@ -327,7 +362,7 @@ const CHANNEL_LABELS = {
 function EmailPerformance({ metric }) {
   if (!metric || metric.available === false) return <Missing metric={metric} />;
   return (
-    <Card title={metric.title} summary="For each kind of reminder, how many were delivered and how many reached that reminder's goal." note={metric.note}>
+    <Card metricId={metric.id} title={metric.title} summary="For each kind of reminder, how many were delivered and how many reached that reminder's goal." note={metric.note}>
       {!metric.sends ? (
         <p className="text-sm text-gray-500">No tracked sends yet.</p>
       ) : (
@@ -375,7 +410,7 @@ function EmailPerformance({ metric }) {
 function ReturnTriggers({ metric }) {
   if (!metric || metric.available === false) return <Missing metric={metric} />;
   return (
-    <Card title={metric.title} summary="Signed-in visits that arrived from a channel, and how many of those people finished a survey." note={metric.note}>
+    <Card metricId={metric.id} title={metric.title} summary="Signed-in visits that arrived from a channel, and how many of those people finished a survey." note={metric.note}>
       {!metric.sessions ? (
         <p className="text-sm text-gray-500">No tagged sessions stored yet.</p>
       ) : (
@@ -411,13 +446,13 @@ function EmailLoad({ metric }) {
   if (!metric || metric.available === false) return <Missing metric={metric} />;
   if (!metric.delivered) {
     return (
-      <Card title={metric.title} summary="How much tracked mail one person receives in a week." note={metric.note}>
+      <Card metricId={metric.id} title={metric.title} summary="How much tracked mail one person receives in a week." note={metric.note}>
         <p className="text-sm text-gray-500">No delivered mail stored yet.</p>
       </Card>
     );
   }
   return (
-    <Card title={metric.title} summary="How much tracked mail one person receives in a week." note={metric.note}>
+    <Card metricId={metric.id} title={metric.title} summary="How much tracked mail one person receives in a week." note={metric.note}>
       <div className="grid sm:grid-cols-3 gap-3">
         <Mini label="Delivered" value={int(metric.delivered)} />
         <Mini label="Per person, per week" value={num(metric.perUserWeek)} sub={`${int(metric.userWeeks)} person-weeks`} />
@@ -433,7 +468,7 @@ function Deliverability({ metric }) {
   if (!metric || metric.available === false) return <Missing metric={metric} />;
   if (!metric.sends) {
     return (
-      <Card title={metric.title} summary="Delivery, permanent bounces, and complaints over the last 7 and 30 days." note={metric.note}>
+      <Card metricId={metric.id} title={metric.title} summary="Delivery, permanent bounces, and complaints over the last 7 and 30 days." note={metric.note}>
         <p className="text-sm text-gray-500">No tracked sends yet.</p>
       </Card>
     );
@@ -450,7 +485,7 @@ function Deliverability({ metric }) {
     </div>
   );
   return (
-    <Card title={metric.title} summary="Delivery, permanent bounces, and complaints over the last 7 and 30 days." note={metric.note}>
+    <Card metricId={metric.id} title={metric.title} summary="Delivery, permanent bounces, and complaints over the last 7 and 30 days." note={metric.note}>
       <div className="space-y-4">
         {windowLine('Last 7 days', metric.days7)}
         {windowLine('Last 30 days', metric.days30)}
@@ -462,7 +497,7 @@ function Deliverability({ metric }) {
 function ClarityCard({ metric }) {
   const ready = Boolean(clarityProjectId());
   return (
-    <Card title={metric.title} summary={metric.note}>
+    <Card metricId={metric?.id} title={metric.title} summary={metric.note}>
       <a href={clarityDashboardUrl()} target="_blank" rel="noreferrer" className="text-sm font-medium text-sky-800 hover:underline">
         Open Clarity
       </a>
@@ -478,7 +513,7 @@ function ClarityCard({ metric }) {
 function Missing({ metric }) {
   if (!metric || metric.available !== false) return null;
   return (
-    <Card title={metric.title} summary={metric.note}>
+    <Card metricId={metric.id} title={metric.title} summary={metric.note}>
       <p className="text-sm text-gray-500">Not available yet.</p>
     </Card>
   );
@@ -510,28 +545,110 @@ function Legend() {
 }
 
 function Activation({ data }) {
-  const max = Math.max(data.A2.cohortSize, 1);
-  const activatedBar = data.A2.bars.find((bar) => bar.id === 'activated');
+  const weeks = data.A2.weeks || [];
+  const defaultWeek = data.A2.selectedWeek;
+  const [selectedWeeks, setSelectedWeeks] = useState(() => new Set(defaultWeek ? [defaultWeek] : []));
+
+  useEffect(() => {
+    setSelectedWeeks(new Set(defaultWeek ? [defaultWeek] : []));
+  }, [defaultWeek]);
+
+  const picked = weeks.filter((week) => selectedWeeks.has(week.week));
+  const waterfall = sumWaterfallBars(picked);
+  const max = Math.max(waterfall.cohortSize, 1);
+  const activatedBar = waterfall.bars.find((bar) => bar.id === 'activated');
   const activated = data.A5?.milestones?.find((row) => row.id === 'activated');
+  const weekLabel = picked.length === 1
+    ? `week of ${picked[0].week}`
+    : picked.length
+      ? `${picked.length} signup weeks`
+      : 'no weeks selected';
+
+  const toggleWeek = (week) => {
+    setSelectedWeeks((current) => {
+      const next = new Set(current);
+      if (next.has(week)) next.delete(week);
+      else next.add(week);
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">How many people finish the path from signup to a first survey.</p>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Mini label="Effective acquired" value={int(data.A4.total)} sub={`As of ${when(data.A4.asOf)}`} tone="info" />
-        <Mini label="Activated this signup week" value={shareText(activatedBar?.pctOfCohort)} sub={data.A2.selectedWeek || ''} />
+        <Mini
+          label="Activated in selected weeks"
+          value={shareText(activatedBar?.pctOfCohort, false, 'signups')}
+          sub={picked.length ? weekLabel : 'Select a week'}
+        />
         {data.A1 ? <Mini label="Registrations, last 7 days" value={int(data.A1.last7)} sub={`Previous 7 days: ${int(data.A1.previous7)}`} tone="info" /> : null}
         {activated ? <Mini label="Median time to activate" value={duration(activated.median)} sub={activated.n ? `${int(activated.n)} people` : 'Nobody activated'} tone="info" /> : null}
       </div>
-      <Card title={`Waterfall · week of ${data.A2.selectedWeek || '–'}`} summary="How far people from this signup week got, from registration through a first survey." note={data.A2.note}>
-        <p className="text-xs text-gray-500 mb-3">{int(data.A2.cohortSize)} people in this signup week</p>
-        <div className="space-y-2">
-          {data.A2.bars.map((bar) => (
-            <Bar key={bar.id} label={BAR_LABELS[bar.id]} count={bar.count} max={max} share={bar.pctOfCohort} />
-          ))}
+      <Card metricId="A2" title={`Waterfall · ${weekLabel}`} summary="How far people from the selected signup weeks got, from registration through a first survey." note={data.A2.note}>
+        <div className="mb-4">
+          <p className="text-xs font-medium text-gray-600 mb-2">Signup weeks</p>
+          <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto">
+            {latestFirst(weeks).map((week) => {
+              const checked = selectedWeeks.has(week.week);
+              return (
+                <label
+                  key={week.week}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs border cursor-pointer ${
+                    checked ? 'bg-sky-50 border-sky-200 text-sky-900' : 'bg-white border-gray-200 text-gray-600'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleWeek(week.week)}
+                    className="rounded border-gray-300"
+                  />
+                  {week.week}
+                  {week.inProgress ? ' · in progress' : ''}
+                  <span className="text-gray-400">({int(week.cohortSize)})</span>
+                </label>
+              );
+            })}
+          </div>
+          <div className="mt-2 flex flex-wrap gap-3 text-xs">
+            <button
+              type="button"
+              className="text-sky-800 hover:underline"
+              onClick={() => setSelectedWeeks(new Set(defaultWeek ? [defaultWeek] : []))}
+            >
+              Latest finished week
+            </button>
+            <button
+              type="button"
+              className="text-sky-800 hover:underline"
+              onClick={() => setSelectedWeeks(new Set(weeks.map((week) => week.week)))}
+            >
+              All weeks
+            </button>
+            <button
+              type="button"
+              className="text-sky-800 hover:underline"
+              onClick={() => setSelectedWeeks(new Set())}
+            >
+              Clear
+            </button>
+          </div>
         </div>
+        <p className="text-xs text-gray-500 mb-3">{int(waterfall.cohortSize)} people in the selected week{picked.length === 1 ? '' : 's'}</p>
+        {picked.length === 0 ? (
+          <p className="text-sm text-gray-500">Select one or more signup weeks to see the waterfall.</p>
+        ) : (
+          <div className="space-y-2">
+            {waterfall.bars.map((bar) => (
+              <Bar key={bar.id} label={BAR_LABELS[bar.id]} count={bar.count} max={max} share={{ ...bar.pctOfCohort, of: 'signups' }} />
+            ))}
+          </div>
+        )}
         <Notes items={data.A2.gaps} />
       </Card>
-      <Card title="Every signup week" summary="The same steps, counted separately for each signup week.">
+      <Card metricId="A2" title="Every signup week" summary="The same steps, counted separately for each signup week.">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -551,7 +668,7 @@ function Activation({ data }) {
           </table>
         </div>
       </Card>
-      <Card title="Activation within 1, 7, 14, and 30 days" summary="How many of each signup week activated, or finished a survey, inside each window.">
+      <Card metricId="A3" title="Activation within 1, 7, 14, and 30 days" summary="How many of each signup week activated, or finished a survey, inside each window.">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -578,11 +695,11 @@ function Activation({ data }) {
         </div>
         <Notes items={data.A3.gaps} />
       </Card>
-      <Card title="Effective acquired" summary="People who verified their email and finished the profile." note={data.A4.footnote}>
+      <Card metricId="A4" title="Effective acquired" summary="People who verified their email and finished the profile." note={data.A4.footnote}>
         <p className="text-3xl font-semibold text-sky-900">{int(data.A4.total)}</p>
         <p className="text-xs text-gray-500 mt-1">As of {when(data.A4.asOf)}</p>
       </Card>
-      <Card title="Reconciliation" summary="Checks that the activation counts still match the stored records." note="This check ignores date filters.">
+      <Card metricId="A12" title="Reconciliation" summary="Checks that the activation counts still match the stored records." note="This check ignores date filters.">
           <div className="space-y-3">
             {data.A12.checks.map((row) => (
               <div key={row.id}>
@@ -604,74 +721,124 @@ function Activation({ data }) {
 
 function Surveys({ data }) {
   const recentDays = data.S4.days.slice(-14);
-  const bucketMax = Math.max(...Object.values(data.S5.buckets), 1);
+  const denomLabel = data.denominator === 'effective' ? 'acquired' : 'survey-activated';
+  const s5Weeks = data.S5.weeks || [];
+  const s5Select = useDefaultWeekSelection(s5Weeks);
+  const s5Picked = s5Weeks.filter((week) => s5Select.selected.has(week.week));
+  const s5Merged = useMemo(() => {
+    if (!s5Picked.length) return null;
+    const buckets = { '0': 0, '1': 0, '2-4': 0, '5-9': 0, '10+': 0 };
+    let topNum = 0;
+    let topDen = 0;
+    let zero = 0;
+    let activated = 0;
+    for (const week of s5Picked) {
+      for (const [key, count] of Object.entries(week.buckets || {})) buckets[key] = (buckets[key] || 0) + (count || 0);
+      topNum += week.top10?.numerator || 0;
+      topDen += week.top10?.denominator || 0;
+      zero += week.zeroInPeriod || 0;
+      activated += week.surveyActivated || 0;
+    }
+    return {
+      buckets,
+      zeroInPeriod: zero,
+      surveyActivated: activated,
+      top10: { ...shareOf(topNum, topDen), people: s5Picked.reduce((sum, week) => sum + (week.top10?.people || 0), 0), of: s5Picked.reduce((sum, week) => sum + (week.top10?.of || 0), 0) },
+    };
+  }, [s5Picked]);
+  const s7Weeks = data.S7.starvedWeeks || data.S7.publishedWeeks || [];
+  const s7Select = useDefaultWeekSelection(s7Weeks);
+  const s7Starved = (data.S7.starvedWeeks || []).filter((week) => s7Select.selected.has(week.week));
+  const s7StarvedShare = useMemo(() => {
+    const numerator = s7Starved.reduce((sum, week) => sum + (week.numerator || 0), 0);
+    const denominator = s7Starved.reduce((sum, week) => sum + (week.denominator || 0), 0);
+    return shareOf(numerator, denominator);
+  }, [s7Starved]);
+  const bucketMax = Math.max(...Object.values(s5Merged?.buckets || data.S5.buckets || { x: 1 }), 1);
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">Who is answering surveys, how often, and where people stop.</p>
       <div className="grid sm:grid-cols-3 gap-4">
-        <Mini label="Unique responders, last 28 days" value={shareText(data.S4.rolling28)} sub={`${data.S4.rolling28.from} to ${data.S4.rolling28.to}`} />
+        <Mini label="Unique responders, last 28 days" value={shareText(data.S4.rolling28, false, denomLabel)} sub={`${data.S4.rolling28.from} to ${data.S4.rolling28.to}`} />
         <Mini label="Average per complete day" value={num(data.S4.dailyAverage)} sub="Today is left out" tone="info" />
         <Mini label="This week so far" value={int(data.S4.inProgressWeek.users)} sub="In progress, not in the average" tone="info" />
       </div>
-      <Card title="Last 14 complete days" summary="People who finished a survey on each of the last 14 complete days." note={data.S4.gaps?.[0]}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-gray-500">
-                <th className="py-2 pr-3 font-medium">Day</th>
-                <th className="py-2 pr-3 font-medium">People</th>
-                <th className="py-2 font-medium">Share of {data.denominator === 'effective' ? 'acquired' : 'survey-activated'}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {latestFirst(recentDays).map((day) => (
-                <tr key={day.day} className="border-t border-gray-100">
-                  <td className="py-2 pr-3">{day.day}</td>
-                  <td className="py-2 pr-3">{int(day.users)}</td>
-                  <td className="py-2">{shareText(day)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <Card metricId="S4" title="Last 14 complete days" summary="People who finished a survey on each of the last 14 complete days." note={data.S4.gaps?.[0]}>
+        <HybridPeopleShareChart
+          rows={recentDays}
+          xKey="day"
+          peopleKey="users"
+          rateKey="rate"
+          rateLabel={`Share of ${denomLabel}`}
+        />
       </Card>
       {data.S4.weeks?.length ? (
-        <Card title="Complete weeks" summary="People who finished a survey in each complete Nepal week. The current week is left out.">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <tbody>
-                {latestFirst(data.S4.weeks).map((week) => (
-                  <tr key={week.week} className="border-t border-gray-100">
-                    <td className="py-2 pr-3">{week.week}</td>
-                    <td className="py-2 pr-3">{int(week.users)}</td>
-                    <td className="py-2">{shareText(week)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        <Card metricId="S4" title="Complete weeks" summary="People who finished a survey in each complete Nepal week. The current week is left out.">
+          <HybridPeopleShareChart
+            rows={data.S4.weeks}
+            xKey="week"
+            peopleKey="users"
+            rateKey="rate"
+            rateLabel={`Share of ${denomLabel}`}
+          />
         </Card>
       ) : null}
-      <Card title="How answers are spread" summary="Whether a few people answer most of the surveys." note={`${data.S5.from} to ${data.S5.to}. ${data.S5.top10.note}`}>
-        <div className="grid sm:grid-cols-3 gap-3 mb-4">
-          <Mini label="Top 10% share" value={shareText(data.S5.top10)} sub={`${int(data.S5.top10.people)} of ${int(data.S5.top10.of)} people`} />
-          <Mini label="Survey-activated with none in this period" value={int(data.S5.zeroInPeriod)} />
-          <Mini label="Never survey-activated" value={int(data.S5.neverSurveyActivated)} sub={`of ${int(data.S5.effectiveAcquired)} acquired`} />
-        </div>
-        <div className="space-y-2">
-          {Object.entries(data.S5.buckets).map(([label, count]) => (
-            <Bar key={label} label={label} count={count} max={bucketMax} labelWidth="4rem" />
-          ))}
-        </div>
+      <Card metricId="S5" title="How answers are spread" summary="Whether a few people answer most of the surveys." note={`${data.S5.from} to ${data.S5.to}. ${data.S5.top10.note}`}>
+        {s5Weeks.length ? (
+          <WeekChecklist
+            weeks={latestFirst(s5Weeks)}
+            selected={s5Select.selected}
+            onChange={s5Select.setSelected}
+            defaultWeek={s5Select.defaultWeek}
+            label="Answer weeks"
+          />
+        ) : null}
+        {s5Merged ? (
+          <>
+            <div className="grid sm:grid-cols-3 gap-3 mb-4">
+              <Mini label="Top 10% share" value={shareText(s5Merged.top10, false, 'completions')} sub={`${int(s5Merged.top10.people)} of ${int(s5Merged.top10.of)} people`} />
+              <Mini label="Survey-activated with none in selected weeks" value={int(s5Merged.zeroInPeriod)} />
+              <Mini label="Never survey-activated" value={int(data.S5.neverSurveyActivated)} sub={`of ${int(data.S5.effectiveAcquired)} acquired`} />
+            </div>
+            <SimpleBarChart
+              rows={Object.entries(s5Merged.buckets).map(([label, count]) => ({ label, count }))}
+              xKey="label"
+              yKey="count"
+              label="People"
+              percentOnTop
+            />
+          </>
+        ) : (
+          <p className="text-sm text-gray-500">Select one or more weeks.</p>
+        )}
       </Card>
-      <Card title="Survey supply" summary="Surveys that are live now, and people who have nothing left they can answer.">
-        <div className="grid sm:grid-cols-3 gap-3">
+      <Card metricId="S7" title="Survey supply" summary="Surveys that are live now, and people who have nothing left they can answer." note={data.S7.gaps?.join(' ')}>
+        <div className="grid sm:grid-cols-3 gap-3 mb-4">
           <Mini label="Live public surveys" value={int(data.S7.liveNow.public)} />
           <Mini label="Live targeted surveys" value={int(data.S7.liveNow.targeted)} />
           <Mini label="Published 15-day surveys" value={int(data.S7.liveNow.fifteenDayPublished)} />
         </div>
-        <p className="text-sm text-gray-700 mt-4">Nothing left to answer: {data.S7.starved.users ? shareText(data.S7.starved) : data.S7.starved.note}</p>
-        <Notes items={data.S7.gaps} />
+        <MultiSeriesHybridChart
+          rows={data.S7.publishedWeeks || []}
+          xKey="week"
+          bars={[{ key: 'count', label: 'Surveys published', axis: 'left', opacity: 0.85 }]}
+          showWmaFor="count"
+        />
+        {s7Weeks.length ? (
+          <div className="mt-4">
+            <WeekChecklist
+              weeks={latestFirst(data.S7.starvedWeeks || [])}
+              selected={s7Select.selected}
+              onChange={s7Select.setSelected}
+              defaultWeek={s7Select.defaultWeek}
+              label="Nothing-left weeks"
+            />
+            <p className="text-sm text-gray-700">Nothing left to answer: {s7Starved.length ? shareText(s7StarvedShare, false, 'recent responders') : (data.S7.starved.users ? shareText(data.S7.starved, false, 'recent responders') : data.S7.starved.note)}</p>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-700 mt-4">Nothing left to answer: {data.S7.starved.users ? shareText(data.S7.starved, false, 'recent responders') : data.S7.starved.note}</p>
+        )}
       </Card>
       <SurveysPhase2 data={data} />
       <SurveysPhase3 data={data} />
@@ -681,18 +848,52 @@ function Surveys({ data }) {
 
 function Rewards({ data }) {
   const bucketMax = data.R2.available ? Math.max(...Object.values(data.R2.buckets), 1) : 1;
+  const r4Weeks = data.R4.weeks || [];
+  const r4Select = useDefaultWeekSelection(r4Weeks);
+  const r4Picked = r4Weeks.filter((week) => r4Select.selected.has(week.week));
+  const r4Stages = useMemo(() => {
+    if (!r4Picked.length) return data.R4.stages || [];
+    const ids = ['eligible', 'eligibleOnline', 'shop', 'voucher', 'buyTap', 'purchased', 'redeemed'];
+    const counts = Object.fromEntries(ids.map((id) => [id, 0]));
+    for (const week of r4Picked) {
+      for (const stage of week.stages || []) counts[stage.id] = (counts[stage.id] || 0) + (stage.count || 0);
+    }
+    // Eligible should not be summed across weeks; use max/end-of-range style: take last selected week's eligible, sum activity stages.
+    const last = r4Picked[r4Picked.length - 1];
+    const eligible = last?.stages?.find((stage) => stage.id === 'eligible')?.count ?? counts.eligible;
+    const online = counts.eligibleOnline;
+    const ordered = [
+      ['eligible', eligible],
+      ['eligibleOnline', online],
+      ['shop', counts.shop],
+      ['voucher', counts.voucher],
+      ['buyTap', counts.buyTap],
+      ['purchased', counts.purchased],
+      ['redeemed', counts.redeemed],
+    ];
+    return ordered.map(([id, count], index, all) => ({
+      id,
+      count,
+      ofPrevious: index === 0 ? null : shareOf(count, all[index - 1][1]),
+    }));
+  }, [r4Picked, data.R4.stages]);
+  const priceLabel = data.R2.available
+    ? `${int(data.R2.price)} credits${data.R2.priceTitle ? ` · ${data.R2.priceTitle}` : ''}${data.R2.priceBusiness ? ` (${data.R2.priceBusiness})` : ''}`
+    : null;
+
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">Credits, vouchers, and whether people redeem what they buy.</p>
       {data.R2.available ? (
         <>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Mini label="Median balance" value={num(data.R2.median)} sub={`Mean ${num(data.R2.mean)} · price ${int(data.R2.price)}`} tone="info" />
-        <Mini label="Eligible now" value={shareText(data.R2.eligibleNow)} />
-        <Mini label="Ever eligible" value={shareText(data.R2.everEligible)} />
-        <Mini label="Reached eligibility" value={int(data.R3.eligible)} sub={data.R3.approximate ? 'Approximate' : ''} />
+        <Mini label="Median balance" value={num(data.R2.median)} sub={`Mean ${num(data.R2.mean)}`} tone="info" />
+        <Mini label="Eligible now" value={shareText(data.R2.eligibleNow, false, 'survey-activated')} />
+        <Mini label="Ever eligible" value={shareText(data.R2.everEligible, false, 'survey-activated')} />
+        <Mini label="Reached eligibility" value={int(data.R3.eligible)} sub={`${data.R3.approximate ? 'Approximate · ' : ''}stamped accounts`} />
       </div>
-      <Card title="Balance versus the cheapest voucher" summary="How people's credit balances compare with the cheapest voucher.">
+      <Card metricId="R2" title="Balance versus the cheapest voucher" summary="How people's credit balances compare with the cheapest voucher.">
+        <p className="text-sm text-gray-700 mb-3">Cheapest price now: {priceLabel}</p>
         <div className="space-y-2">
           {Object.entries(data.R2.buckets).map(([key, count]) => (
             <Bar key={key} label={BALANCE_LABELS[key]} count={count} max={bucketMax} labelWidth="11rem" />
@@ -700,7 +901,7 @@ function Rewards({ data }) {
         </div>
         <Notes items={data.R2.gaps} />
       </Card>
-      <Card title="Surveys finished when someone could first afford a voucher" summary="How many surveys someone had finished at the moment a voucher first became affordable." note={data.R3.note}>
+      <Card metricId="R3" title="Surveys finished when someone could first afford a voucher" summary="How many surveys someone had finished at the moment a voucher first became affordable." note={data.R3.note}>
         <div className="flex flex-wrap gap-2">
           {Object.keys(data.R3.histogram).length === 0 ? <p className="text-sm text-gray-500">Nobody has been stamped yet.</p> : null}
           {Object.entries(data.R3.histogram).map(([surveys, count]) => (
@@ -711,21 +912,29 @@ function Rewards({ data }) {
       </Card>
         </>
       ) : (
-        <Card title="Balance and eligibility" summary="Credit balances compared with the cheapest voucher."><p className="text-sm text-gray-600">{data.R2.note}</p></Card>
+        <Card metricId="R2" title="Balance and eligibility" summary="Credit balances compared with the cheapest voucher."><p className="text-sm text-gray-600">{data.R2.note}</p></Card>
       )}
-      <Card title="Reward funnel" summary="From being able to afford a voucher, through the shop and a purchase, to redeeming it. Each share is of the previous step.">
+      <Card metricId="R4" title="Reward funnel" summary="From being able to afford a voucher, through the shop and a purchase, to redeeming it. Each share is of the previous step." note={data.R4.gaps?.join(' ')}>
+        {r4Weeks.length ? (
+          <WeekChecklist
+            weeks={latestFirst(r4Weeks)}
+            selected={r4Select.selected}
+            onChange={r4Select.setSelected}
+            defaultWeek={r4Select.defaultWeek}
+            label="Activity weeks"
+          />
+        ) : null}
         <div className="space-y-2">
-          {data.R4.stages.map((stage) => (
+          {r4Stages.map((stage) => (
             <Bar
               key={stage.id}
-              label={STAGE_LABELS[stage.id]}
+              label={STAGE_LABELS[stage.id] || stage.id}
               count={stage.count}
-              max={Math.max(...data.R4.stages.map((row) => row.count), 1)}
-              share={stage.ofPrevious?.denominator ? stage.ofPrevious : null}
+              max={Math.max(...r4Stages.map((row) => row.count), 1)}
+              share={stage.ofPrevious?.denominator ? { ...stage.ofPrevious, of: 'previous step' } : null}
             />
           ))}
         </div>
-        <Notes items={data.R4.gaps} />
         {data.R4.months?.length ? (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
@@ -743,9 +952,9 @@ function Rewards({ data }) {
                   <tr key={month.month} className="border-t border-gray-100">
                     <td className="py-2 pr-3">{month.month}</td>
                     <td className="py-2 pr-3">{int(month.stillInsideWindow)}</td>
-                    <td className="py-2 pr-3">{shareText(month.shop)}</td>
-                    <td className="py-2 pr-3">{shareText(month.purchased)}</td>
-                    <td className="py-2">{shareText(month.redeemed)}</td>
+                    <td className="py-2 pr-3">{shareText(month.shop, false, 'closed cohort')}</td>
+                    <td className="py-2 pr-3">{shareText(month.purchased, false, 'closed cohort')}</td>
+                    <td className="py-2">{shareText(month.redeemed, false, 'closed cohort')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -754,7 +963,7 @@ function Rewards({ data }) {
         ) : null}
       </Card>
       <div className="grid sm:grid-cols-2 gap-4">
-        <Card title="Voucher pipeline" summary="Vouchers that are still active, already redeemed, expired, or cancelled.">
+        <Card metricId="R7" title="Voucher pipeline" summary="Vouchers that are still active, already redeemed, expired, or cancelled.">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <Mini label="Active" value={int(data.R7.counts.active)} tone="info" />
             <Mini label="Redeemed" value={int(data.R7.counts.redeemed)} tone="good" />
@@ -775,7 +984,7 @@ function Rewards({ data }) {
                 <tbody>
                   {data.R7.active.slice(0, 20).map((row) => (
                     <tr key={row.voucherId} className="border-t border-gray-100">
-                      <td className="py-2 pr-3"><UserIdButton id={row.userId} /></td>
+                      <td className="py-2 pr-3"><UserIdButton id={row.userId} name={row.name} /></td>
                       <td className="py-2 pr-3">{int(row.daysToExpiry)}</td>
                       <td className="py-2">{int(row.ageDays)}</td>
                     </tr>
@@ -785,8 +994,18 @@ function Rewards({ data }) {
             </div>
           ) : null}
         </Card>
-        <Card title="Redemption" summary="How soon a purchased voucher was redeemed, by the week it was bought.">
-          <div className="overflow-x-auto">
+        <Card metricId="R8" title="Redemption" summary="How soon a purchased voucher was redeemed, by the week it was bought.">
+          <HybridPeopleShareChart
+            rows={(data.R8.cohorts || []).map((row) => ({
+              week: row.cohort,
+              users: row.vouchers,
+              rate: row.day7?.rate ?? null,
+            }))}
+            xKey="week"
+            peopleLabel="Purchased"
+            rateLabel="Redeemed in 7 days"
+          />
+          <div className="overflow-x-auto mt-4">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-gray-500">
@@ -826,6 +1045,19 @@ function Retention({ data }) {
     ['week4', 'Week 4', 4],
     ['week8', 'Week 8', 8],
   ];
+  const l1Chart = useMemo(() => (data.L1.cohorts || [])
+    .filter((cohort) => afterRetentionCutoff(cohort.week))
+    .map((cohort) => {
+      const point = (weekN) => cohort.points.find((row) => row.week === weekN);
+      return {
+        week: cohort.week,
+        people: cohort.cohortSize,
+        week1: point(1)?.survey?.rate == null ? null : point(1).survey.rate * 100,
+        week2: point(2)?.survey?.rate == null ? null : point(2).survey.rate * 100,
+        week4: point(4)?.survey?.rate == null ? null : point(4).survey.rate * 100,
+        week8: point(8)?.survey?.rate == null ? null : point(8).survey.rate * 100,
+      };
+    }), [data.L1.cohorts]);
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">Who comes back to finish another survey, and who has gone quiet.</p>
@@ -837,17 +1069,29 @@ function Retention({ data }) {
             <Mini
               key={key}
               label={label}
-              value={point?.survey ? shareText(point.survey) : 'Not ready'}
+              value={point?.survey ? shareText(point.survey, false, 'signups') : 'Not ready'}
               sub={tile ? `Week of ${tile.week} · ${int(tile.cohortSize)} people` : 'No cohort is old enough'}
             />
           );
         })}
       </div>
-      <Card title="Survey retention by signup week" summary="Of each signup week, who finished a survey in week 1, week 2, week 4, and week 8." note={data.L1.gaps?.[0]}>
+      <Card metricId="L1" title="Survey retention by signup week" summary="Of each signup week, who finished a survey in week 1, week 2, week 4, and week 8." note={(data.L1.gaps || []).join(' ')}>
         <p className="text-xs text-gray-500 mb-3">
-          {int(data.L1.smallCohorts.users)} people are in signup weeks under 20. {data.L1.smallCohorts.draw ? 'Those weeks are drawn together.' : 'Those weeks are too small to draw as their own line.'}
+          Checkpoint view only. The cohort matrix below is the same rule for every later week 0–12. Signup weeks on or before 2026-06-18 are left out.
         </p>
-        <div className="overflow-x-auto">
+        <MultiSeriesHybridChart
+          rows={l1Chart}
+          xKey="week"
+          bars={[{ key: 'people', label: 'People', axis: 'left', opacity: 0.75 }]}
+          lines={[
+            { key: 'week1', label: 'Week 1 %', axis: 'right', color: '#1B2A4A' },
+            { key: 'week2', label: 'Week 2 %', axis: 'right', color: '#0284C7' },
+            { key: 'week4', label: 'Week 4 %', axis: 'right', color: '#059669' },
+            { key: 'week8', label: 'Week 8 %', axis: 'right', color: '#7C3AED' },
+          ]}
+          showWmaFor="week1"
+        />
+        <div className="overflow-x-auto mt-4">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-gray-500">
@@ -857,13 +1101,13 @@ function Retention({ data }) {
               </tr>
             </thead>
             <tbody>
-              {latestFirst(data.L1.cohorts).map((cohort) => (
+              {latestFirst(data.L1.cohorts.filter((cohort) => afterRetentionCutoff(cohort.week))).map((cohort) => (
                 <tr key={cohort.week} className="border-t border-gray-100">
                   <td className="py-2 pr-3">{cohort.week}</td>
                   <td className="py-2 pr-3">{int(cohort.cohortSize)}</td>
                   {[1, 2, 4, 8].map((week) => {
                     const point = cohort.points.find((row) => row.week === week);
-                    return <td key={week} className="py-2 pr-3">{point?.ready ? shareText(point.survey) : '–'}</td>;
+                    return <td key={week} className="py-2 pr-3">{point?.ready ? shareText(point.survey, false, 'signups') : '–'}</td>;
                   })}
                 </tr>
               ))}
@@ -871,7 +1115,7 @@ function Retention({ data }) {
           </table>
         </div>
       </Card>
-      <Card title="Lifecycle" summary="How many people are onboarding, active, at risk, or dormant, and who changed since the earlier Sunday." note={`Change from ${data.L4.transition.from} to ${data.L4.transition.to}. ${data.L4.gaps?.[0] || ''}`}>
+      <Card metricId="L4" title="Lifecycle" summary="How many people are onboarding, active, at risk, or dormant, and who changed since the earlier Sunday." note={`Change from ${data.L4.transition.from} to ${data.L4.transition.to}. ${data.L4.gaps?.[0] || ''}`}>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {Object.entries(STATE_LABELS).map(([key, label]) => (
             <Mini key={key} label={label} value={int(data.L4.current.counts[key])} sub="Now" tone={STATE_TONE[key]} />
@@ -904,7 +1148,7 @@ function Trust({ data }) {
         <Mini label="Warnings" value={int(checkCounts.warning)} tone={checkCounts.warning ? 'mid' : 'neutral'} />
         <Mini label="Unavailable" value={int(checkCounts.unavailable)} />
       </div>
-      <Card title="Credit and purchase checks" summary="Whether credit balances and purchases still match the ledger.">
+      <Card metricId="Q2" title="Credit and purchase checks" summary="Whether credit balances and purchases still match the ledger.">
         <div className="space-y-3">
           {data.Q2.checks.map((row) => (
             <div key={row.id}>
@@ -919,7 +1163,7 @@ function Trust({ data }) {
           ))}
         </div>
       </Card>
-      <Card title="Freshness" summary="When these numbers were counted, and which feeds are still missing.">
+      <Card metricId="Q5" title="Freshness" summary="When these numbers were counted, and which feeds are still missing.">
         <p className="text-sm text-gray-700">Counted {when(data.Q5.computedAt)} Nepal time.</p>
         <ul className="mt-3 space-y-1 text-xs text-gray-500">
           <li>{data.Q5.snapshot.note}</li>
@@ -956,7 +1200,7 @@ function OnboardingChange({ metric }) {
     </div>
   );
   return (
-    <Card title={metric.title} summary="People who signed up before the interest list was removed, against people who signed up after, both at 7 days old." note={metric.note}>
+    <Card metricId={metric.id} title={metric.title} summary="People who signed up before the interest list was removed, against people who signed up after, both at 7 days old." note={metric.note}>
       <div className="grid sm:grid-cols-2 gap-4 mb-4">
         {column(metric.before)}
         {column(metric.after)}
@@ -1017,37 +1261,57 @@ function OnboardingChange({ metric }) {
   );
 }
 
+function RegistrationsByPeriod({ metric }) {
+  const [mode, setMode] = useState('day');
+  const days = metric.days || [];
+  const weeks = useMemo(() => registrationsByWeek(days), [days]);
+  const rows = mode === 'week' ? weeks : days;
+  const xKey = mode === 'week' ? 'week' : 'day';
+
+  return (
+    <Card
+      metricId="A1"
+      title="Registrations by day"
+      summary="New accounts each day, or rolled up by signup week, split by email signup and Google signup."
+      note={metric.note}
+    >
+      <div className="flex gap-2 mb-3">
+        {[
+          ['day', 'By day'],
+          ['week', 'By week'],
+        ].map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => setMode(value)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium border ${
+              mode === value
+                ? 'bg-sky-50 border-sky-200 text-sky-900'
+                : 'bg-white border-gray-200 text-gray-600'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <StackedRegistrationsChart rows={rows} xKey={xKey} />
+      {mode === 'day' ? (
+        <p className="text-xs text-gray-500 mt-2">Past month of complete Nepal days. Today is left out.</p>
+      ) : (
+        <p className="text-xs text-gray-500 mt-2">Same days, added into Monday-start Nepal signup weeks.</p>
+      )}
+    </Card>
+  );
+}
+
 function ActivationPhase2({ data }) {
   if (!data.A1) return null;
   const activated = data.A5.milestones.find((row) => row.id === 'activated');
   const bucketMax = Math.max(...Object.values(activated?.buckets || { x: 1 }), 1);
   return (
     <>
-      <Card title="Registrations by day" summary="New accounts each day, split by email signup and Google signup." note={data.A1.note}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-gray-500">
-                <th className="py-2 pr-3 font-medium">Day</th>
-                <th className="py-2 pr-3 font-medium">Total</th>
-                <th className="py-2 pr-3 font-medium">Email</th>
-                <th className="py-2 font-medium">Google</th>
-              </tr>
-            </thead>
-            <tbody>
-              {latestFirst(data.A1.days.slice(-14)).map((day) => (
-                <tr key={day.day} className="border-t border-gray-100">
-                  <td className="py-2 pr-3">{day.day}</td>
-                  <td className="py-2 pr-3">{int(day.total)}</td>
-                  <td className="py-2 pr-3">{int(day.email)}</td>
-                  <td className="py-2">{int(day.google)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-      <Card title="Time to activate" summary="How long people took to reach each step after they signed up." note={data.A5.note}>
+      <RegistrationsByPeriod metric={data.A1} />
+      <Card metricId="A5" title="Time to activate" summary="How long people took to reach each step after they signed up." note={data.A5.note}>
         <div className="space-y-2 mb-4">
           {Object.entries(TIME_LABELS).map(([key, label]) => (
             <Bar key={key} label={label} count={activated?.buckets?.[key] || 0} max={bucketMax} labelWidth="11rem" />
@@ -1100,7 +1364,7 @@ function ActivationPhase2({ data }) {
         ) : null}
         <p className="text-xs text-gray-500 mt-3">{data.A5.sessions?.note}</p>
       </Card>
-      <Card title="Onboarding share of credits earned" summary="How much of someone's earned credits came from the signup bonus and finishing the profile." note={data.A9.note}>
+      <Card metricId="A9" title="Onboarding share of credits earned" summary="How much of someone's earned credits came from the signup bonus and finishing the profile." note={data.A9.note}>
         <div className="grid sm:grid-cols-2 gap-3 mb-4">
           <Mini label="Median share" value={data.A9.share.n ? <Pct rate={data.A9.share.median / 100} plain /> : '–'} sub={data.A9.share.n ? <span>Mean <Pct rate={data.A9.share.mean / 100} plain /> · {int(data.A9.share.n)} people</span> : 'No earns yet'} />
           <Mini label="Profile only, 14 days or older" value={shareText(data.A9.profileOnly, true)} />
@@ -1111,7 +1375,7 @@ function ActivationPhase2({ data }) {
           ))}
         </div>
       </Card>
-      <Card title="Activation by source" summary="Whether people from each campaign finished a survey or activated within 7 days." note={data.A13.note}>
+      <Card metricId="A13" title="Activation by source" summary="Whether people from each campaign finished a survey or activated within 7 days." note={data.A13.note}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -1148,6 +1412,35 @@ function ActivationPhase2({ data }) {
 function SurveysPhase2({ data }) {
   if (!data.S1) return null;
   const latest = data.S6.weeks[data.S6.weeks.length - 1];
+  const streakRows = Object.entries(STREAK_LABELS).map(([key, label]) => ({
+    label,
+    count: data.S14.length.buckets[key] || 0,
+  }));
+  const s16Weeks = (data.S16.weeks || []).map((week) => ({ week }));
+  const s16Select = useDefaultWeekSelection(s16Weeks);
+  const s16Clusters = useMemo(() => {
+    const selected = s16Select.selected;
+    const pairs = (data.S16.pairs || []).filter((pair) => !selected.size || selected.has(pair.week));
+    const byCluster = new Map();
+    for (const pair of pairs) {
+      if (!byCluster.has(pair.clusterId)) {
+        byCluster.set(pair.clusterId, {
+          clusterId: pair.clusterId,
+          clusterName: pair.clusterName,
+          numerator: 0,
+          denominator: 0,
+        });
+      }
+      const row = byCluster.get(pair.clusterId);
+      row.numerator += pair.numerator || 0;
+      row.denominator += pair.denominator || 0;
+    }
+    return [...byCluster.values()].map((row) => ({
+      ...row,
+      rate: row.denominator ? row.numerator / row.denominator : null,
+    })).sort((a, b) => (b.rate || 0) - (a.rate || 0));
+  }, [data.S16.pairs, s16Select.selected]);
+
   return (
     <>
       <div className="grid sm:grid-cols-3 gap-4">
@@ -1155,71 +1448,57 @@ function SurveysPhase2({ data }) {
         <Mini label="Depth last complete week" value={num(latest?.median)} sub={latest ? `Mean ${num(latest.mean)} · ${int(latest.n)} people` : ''} />
         <Mini label="Active streaks now" value={int(data.S14.activeNow)} sub={data.S14.length.n ? `Median length ${num(data.S14.length.median)}` : ''} />
       </div>
-      <Card title="Responses per survey" summary="How many finishes each survey has in the first day, the first three days, and in total." note={data.S1.note}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-gray-500">
-                <th className="py-2 pr-3 font-medium">Survey</th>
-                <th className="py-2 pr-3 font-medium">First 24 hours</th>
-                <th className="py-2 pr-3 font-medium">First 72 hours</th>
-                <th className="py-2 font-medium">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.S1.surveys.slice(0, 20).map((survey) => (
-                <tr key={survey.id} className="border-t border-gray-100">
-                  <td className="py-2 pr-3">{survey.title}</td>
-                  <td className="py-2 pr-3">{int(survey.first24h)}</td>
-                  <td className="py-2 pr-3">{int(survey.first72h)}</td>
-                  <td className="py-2">{int(survey.final)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <Card metricId="S1" title="Responses per survey" summary="Weekly totals for surveys published that week, with first-day and first-three-day finishes." note={data.S1.note}>
+        <MultiSeriesHybridChart
+          rows={data.S1.weeks || []}
+          xKey="week"
+          bars={[{ key: 'total', label: 'All-time responses', axis: 'left', opacity: 0.8, color: '#7DD3FC' }]}
+          lines={[
+            { key: 'first24h', label: 'First 24 hours', axis: 'right', color: '#0284C7' },
+            { key: 'first72h', label: 'First 72 hours', axis: 'right', color: '#059669' },
+          ]}
+          showWmaFor="total"
+        />
       </Card>
-      <Card title="Surveys per person, by week" summary="How many surveys a person finished in each complete week." note={data.S6.note}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <tbody>
-              {latestFirst(data.S6.weeks).map((week) => (
-                <tr key={week.week} className="border-t border-gray-100">
-                  <td className="py-2 pr-3">{week.week}</td>
-                  <td className="py-2 pr-3">{int(week.n)} people</td>
-                  <td className="py-2">median {num(week.median)} · mean {num(week.mean)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <Card metricId="S6" title="Surveys per person, by week" summary="How many surveys a person finished in each complete week." note={data.S6.note}>
+        <MultiSeriesHybridChart
+          rows={data.S6.weeks || []}
+          xKey="week"
+          bars={[
+            { key: 'n', label: 'People', axis: 'left', opacity: 0.8, color: '#7DD3FC' },
+            { key: 'totalResponses', label: 'Total responses', axis: 'left', opacity: 0.75, color: '#0EA5E9' },
+          ]}
+          lines={[
+            { key: 'median', label: 'Median', axis: 'right', color: '#1B2A4A' },
+            { key: 'mean', label: 'Mean', axis: 'right', color: '#7C3AED' },
+          ]}
+          showWmaFor="totalResponses"
+        />
       </Card>
-      <Card title="Streaks" summary="How long current answer streaks are, and who reached 7, 14, and 30 days." note={data.S14.gaps?.[0]}>
-        <div className="flex flex-wrap gap-2 mb-3">
-          {Object.entries(STREAK_LABELS).map(([key, label]) => (
-            <span key={key} className="bg-gray-50 rounded-lg px-3 py-2 text-sm">{label} · {int(data.S14.length.buckets[key])}</span>
-          ))}
-        </div>
-        <p className="text-sm text-gray-700">Reached day 7: {shareText(data.S14.milestones.day7)}</p>
-        <p className="text-sm text-gray-700">Reached day 14: {shareText(data.S14.milestones.day14)}</p>
-        <p className="text-sm text-gray-700">Reached day 30: {shareText(data.S14.milestones.day30)}</p>
+      <Card metricId="S14" title="Streaks" summary="How long current answer streaks are, and who reached 7, 14, and 30 days." note={data.S14.gaps?.[0]}>
+        <SimpleBarChart rows={streakRows} xKey="label" yKey="count" label="People" percentOnTop totalForPercent={data.S14.activeNow || 0} />
+        <p className="text-sm text-gray-700 mt-3">Reached day 7: {shareText(data.S14.milestones.day7, false, 'people who ever streaked')}</p>
+        <p className="text-sm text-gray-700">Reached day 14: {shareText(data.S14.milestones.day14, false, 'people who ever streaked')}</p>
+        <p className="text-sm text-gray-700">Reached day 30: {shareText(data.S14.milestones.day30, false, 'people who ever streaked')}</p>
         <p className="text-sm text-gray-700">Streak Guard purchases: {int(data.S14.guards.purchases)} · buyers {int(data.S14.guards.buyers)}</p>
         <Notes items={data.S14.gaps.slice(1)} />
       </Card>
-      <Card title="Survey to the next survey" summary="Of the people who finished one survey, how many finished the next one." note={data.S16.note}>
+      <Card metricId="S16" title="Survey to the next survey" summary="Cluster-targeted survey K to survey K+1 in the same cluster." note={data.S16.note}>
+        {s16Weeks.length ? (
+          <WeekChecklist
+            weeks={latestFirst(s16Weeks)}
+            selected={s16Select.selected}
+            onChange={s16Select.setSelected}
+            defaultWeek={s16Select.defaultWeek}
+            label="Next-survey weeks"
+          />
+        ) : null}
         <p className="text-sm text-gray-700 mb-3">Median across pairs: {data.S16.median == null ? '–' : <Pct rate={data.S16.median} />}</p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <tbody>
-              {latestFirst(data.S16.pairs.slice(-12)).map((pair) => (
-                <tr key={`${pair.from}-${pair.to}`} className="border-t border-gray-100">
-                  <td className="py-2 pr-3">{pair.from} → {pair.to}</td>
-                  <td className="py-2">{shareText(pair)}{pair.lowConfidence ? ' · low' : ''}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {s16Clusters.length ? (
+          <HorizontalRateChart rows={s16Clusters} yKey="clusterName" rateKey="rate" label="Survey to next survey" />
+        ) : (
+          <p className="text-sm text-gray-500">No cluster survey pairs in the selected weeks yet.</p>
+        )}
       </Card>
       <SurveyPath data={data} />
     </>
@@ -1235,32 +1514,20 @@ function RewardsPhase2({ data }) {
         <Mini label="Buyers" value={int(data.R6.buyers)} sub={<span>{int(data.R6.purchases)} purchases · repeat {shareText(data.R6.repeatBuyers)}</span>} />
         <Mini label="Buyers among ever eligible" value={shareText(data.R6.amongEligible)} />
       </div>
-      <Card title="Credits issued and spent" summary="Credits added and credits spent in each week. Opening balances are not new earns." note={data.R1.note}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-gray-500">
-                <th className="py-2 pr-3 font-medium">Week</th>
-                <th className="py-2 pr-3 font-medium">Issued</th>
-                <th className="py-2 pr-3 font-medium">Spent</th>
-                <th className="py-2 font-medium">Net</th>
-              </tr>
-            </thead>
-            <tbody>
-              {latestFirst(data.R1.weeks).map((week) => (
-                <tr key={week.week} className="border-t border-gray-100">
-                  <td className="py-2 pr-3">{week.week}</td>
-                  <td className="py-2 pr-3">{int(week.issuedTotal)}</td>
-                  <td className="py-2 pr-3">{int(week.spentTotal)}</td>
-                  <td className="py-2">{int(week.net)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <Card metricId="R1" title="Credits issued and spent" summary="Credits added and credits spent in each week. Opening balances are not new earns." note={data.R1.note}>
+        <MultiSeriesHybridChart
+          rows={data.R1.weeks || []}
+          xKey="week"
+          bars={[
+            { key: 'issuedTotal', label: 'Issued', axis: 'left', opacity: 0.85, color: '#38BDF8' },
+            { key: 'spentTotal', label: 'Spent', axis: 'left', opacity: 0.85, color: '#1B2A4A' },
+          ]}
+          lines={[{ key: 'net', label: 'Net', axis: 'right', color: '#D97706' }]}
+          showWmaFor="net"
+        />
       </Card>
-      <Card title="Purchases" summary="Who bought a voucher, and how often the same person bought again." note={data.R6.note}>
-        <p className="text-sm text-gray-700 mb-2">Of the selected denominator: {shareText(data.R6.ofDenominator)}</p>
+      <Card metricId="R6" title="Purchases" summary="Who bought a voucher, and how often the same person bought again." note={data.R6.note}>
+        <p className="text-sm text-gray-700 mb-2">Of the selected denominator: {shareText(data.R6.ofDenominator, false, 'denominator')}</p>
         <p className="text-sm text-gray-700">Credits per purchase: median {num(data.R6.credits.median)} · mean {num(data.R6.credits.mean)}</p>
         <div className="flex flex-wrap gap-2 mt-3">
           {data.R6.byVoucher.map((row) => (
@@ -1268,20 +1535,30 @@ function RewardsPhase2({ data }) {
           ))}
         </div>
       </Card>
-      <Card title="After the first redemption" summary="Whether people finished more surveys, or bought again, after redeeming a voucher." note={data.R10.note}>
+      <Card metricId="R10" title="After the first redemption" summary="Whether people finished more surveys, or bought again, after redeeming a voucher." note={data.R10.note}>
         <p className="text-sm text-gray-700">People with a first redemption at least 30 days ago: {int(data.R10.redeemers)}</p>
         <p className="text-sm text-gray-700">Median change in surveys, 14 days after minus 14 days before: {num(data.R10.difference.median)}</p>
-        <p className="text-sm text-gray-700">Bought again within 30 days: {shareText(data.R10.repeatPurchase)}</p>
+        <p className="text-sm text-gray-700">Bought again within 30 days: {shareText(data.R10.repeatPurchase, false, 'redeemers with 30+ days')}</p>
+        <p className="text-sm text-gray-700">Survey-active in days 8–28 after first eligibility · redeemers: {shareText(data.R10.surveyActiveAfterEligibility?.redeemers, false, 'redeemers')}</p>
+        <p className="text-sm text-gray-700">Same window · non-redeemers: {shareText(data.R10.surveyActiveAfterEligibility?.others, false, 'non-redeemers')}</p>
         {data.R10.people?.length ? (
           <div className="overflow-x-auto mt-3">
             <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-gray-500">
+                  <th className="py-2 pr-3 font-medium">Person</th>
+                  <th className="py-2 pr-3 font-medium">14 days before</th>
+                  <th className="py-2 pr-3 font-medium">14 days after</th>
+                  <th className="py-2 font-medium">Bought again</th>
+                </tr>
+              </thead>
               <tbody>
                 {data.R10.people.map((person) => (
                   <tr key={person.userId} className="border-t border-gray-100">
-                    <td className="py-2 pr-3"><UserIdButton id={person.userId} /></td>
-                    <td className="py-2 pr-3">{int(person.before)} before</td>
-                    <td className="py-2 pr-3">{int(person.after)} after</td>
-                    <td className="py-2">{person.repeatPurchase ? 'Bought again' : 'No second purchase'}</td>
+                    <td className="py-2 pr-3"><UserIdButton id={person.userId} name={person.name || displayName(person)} /></td>
+                    <td className="py-2 pr-3">{int(person.before)}</td>
+                    <td className="py-2 pr-3">{int(person.after)}</td>
+                    <td className="py-2">{person.repeatPurchase ? 'Yes' : 'No'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1289,7 +1566,7 @@ function RewardsPhase2({ data }) {
           </div>
         ) : null}
       </Card>
-      <Card title="Merchants" summary="Vouchers listed, bought, and redeemed for each merchant." note={data.R11.note}>
+      <Card metricId="R11" title="Merchants" summary="Vouchers listed, bought, and redeemed for each merchant." note={data.R11.note}>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -1328,42 +1605,60 @@ function RetentionPhase2({ data }) {
         <Mini label="Still core from four weeks ago" value={shareText(data.L5.retained)} />
         <Mini label="Weekly stickiness" value={latest ? shareText(latest.weekly) : '–'} sub={latest ? <span>Daily ratio {latest.daily == null ? '–' : <Pct rate={latest.daily} />}</span> : ''} />
       </div>
-      <Card title="Cohort matrix" summary="For each signup week, the share who finished a survey in each later week." note={data.L2.note}>
+      <Card metricId="L2" title="Cohort matrix" summary="Full signup-week by later-week grid. Same retention rule as L1, for every week 0–12." note={data.L2.note}>
+        <p className="text-xs text-gray-500 mb-3">
+          Unlike L1, this shows every later week, not only 1/2/4/8. Each cell is <span className="font-medium text-gray-600">answer % · median surveys</span> among those who answered. Hover a cell for the exact counts. Signup weeks on or before 2026-06-18 are left out.
+        </p>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="text-sm border-separate border-spacing-0 min-w-max">
             <thead>
               <tr className="text-left text-xs text-gray-500">
-                <th className="py-2 pr-3 font-medium">Signup week</th>
-                <th className="py-2 pr-3 font-medium">People</th>
-                {Array.from({ length: 13 }, (_, week) => <th key={week} className="py-2 pr-3 font-medium">{week}</th>)}
+                <th className="py-2 pr-3 pl-0 font-medium sticky left-0 z-20 bg-white w-[7.5rem] min-w-[7.5rem]">Signup week</th>
+                <th className="py-2 pr-3 font-medium sticky left-[7.5rem] z-20 bg-white w-14 min-w-14 shadow-[2px_0_0_0_#e5e7eb]">People</th>
+                {Array.from({ length: 13 }, (_, week) => (
+                  <th key={week} className="py-2 px-2 font-medium min-w-[4.25rem] text-center">{week}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {latestFirst(data.L2.cohorts).map((cohort) => (
+              {latestFirst(data.L2.cohorts.filter((cohort) => afterRetentionCutoff(cohort.week))).map((cohort) => (
                 <tr key={cohort.week} className="border-t border-gray-100">
-                  <td className="py-2 pr-3 whitespace-nowrap">{cohort.week}</td>
-                  <td className="py-2 pr-3">{int(cohort.cohortSize)}</td>
-                  {cohort.cells.map((cell) => <td key={cell.week} className="py-2 pr-3 whitespace-nowrap">{cellText(cell)}</td>)}
+                  <td className="py-2 pr-3 pl-0 whitespace-nowrap sticky left-0 z-10 bg-white w-[7.5rem] min-w-[7.5rem]">{cohort.week}</td>
+                  <td className="py-2 pr-3 tabular-nums sticky left-[7.5rem] z-10 bg-white w-14 min-w-14 shadow-[2px_0_0_0_#e5e7eb]">{int(cohort.cohortSize)}</td>
+                  {cohort.cells.map((cell) => (
+                    <td key={cell.week} className="py-2 px-2 text-xs text-center align-middle">
+                      {matrixCell(cell)}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </Card>
-      <Card title="Core panel by week" summary="People who finished a survey in at least 3 of the last 4 complete weeks." note={data.L5.note}>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <tbody>
-              {latestFirst(data.L5.series).map((row) => (
-                <tr key={row.week} className="border-t border-gray-100">
-                  <td className="py-2 pr-3">{row.week}</td>
-                  <td className="py-2 pr-3">{int(row.count)}</td>
-                  <td className="py-2">{shareText(row.ofAcquired)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <Card metricId="L3" title="Survey stickiness" summary="Weekly survey-active people against the prior 28-day active set, with a daily-to-weekly ratio." note={data.L3.note}>
+        <HybridPeopleShareChart
+          rows={(data.L3.weeks || []).map((row) => ({
+            week: row.week,
+            users: row.weekUsers,
+            rate: row.weekly?.rate ?? null,
+          }))}
+          xKey="week"
+          peopleLabel="Weekly survey-active"
+          rateLabel="Weekly stickiness"
+        />
+      </Card>
+      <Card metricId="L5" title="Core panel by week" summary="People who finished a survey in at least 3 of the last 4 complete weeks." note={data.L5.note}>
+        <HybridPeopleShareChart
+          rows={(data.L5.series || []).map((row) => ({
+            week: row.week,
+            users: row.count,
+            rate: row.ofAcquired?.rate ?? null,
+          }))}
+          xKey="week"
+          peopleLabel="Core panel"
+          rateLabel="Share of acquired"
+        />
       </Card>
     </>
   );
@@ -1379,7 +1674,7 @@ function Channel({ data }) {
         <Mini label="Not unsubscribed" value={shareText(data.C4.notUnsubscribed)} />
         <Mini label="Phone captured" value={shareText(data.C4.phone)} />
       </div>
-      <Card title="Reachability" summary="Who can still be emailed." note={data.C4.note}>
+      <Card metricId="C4" title="Reachability" summary="Who can still be emailed." note={data.C4.note}>
         <div className="grid sm:grid-cols-2 gap-3">
           <Mini label="Hard bounce" value={shareText(data.C4.hardBounce, true)} />
           <Mini label="Reachable by email" value={shareText(data.C4.reachable)} />
@@ -1398,11 +1693,11 @@ function Channel({ data }) {
 function TrustPhase2({ data }) {
   if (!data.Q1) return null;
   return (
-    <Card title="Account integrity" summary="Staff accounts, possible duplicate people, and surveys finished unusually fast." note={data.Q1.note}>
+    <Card metricId="Q1" title="Account integrity" summary="Staff accounts, possible duplicate people, and surveys finished unusually fast." note={data.Q1.note}>
       <div className="grid sm:grid-cols-3 gap-3 mb-4">
         <Mini label="Internal accounts" value={int(data.Q1.internal)} />
         <Mini label="Suspected duplicates" value={int(data.Q1.duplicates)} />
-        <Mini label="Credits held by duplicates" value={shareText(data.Q1.credits, true)} sub={`${int(data.Q1.purchases)} purchases`} />
+        <Mini label="Credits held by duplicates" value={shareText(data.Q1.credits, true, 'outstanding credits')} sub={`${int(data.Q1.purchases)} purchases`} />
       </div>
       <p className="text-sm text-gray-600 mb-3">
         {data.Q1.farming.available ? `Suspected farming: ${int(data.Q1.farming.count)}. Credits held: ${int(data.Q1.farming.credits)}. ` : ''}
@@ -1422,7 +1717,7 @@ function TrustPhase2({ data }) {
             <tbody>
               {data.Q1.flagged.slice(0, 20).map((row) => (
                 <tr key={row.userId} className="border-t border-gray-100">
-                  <td className="py-2 pr-3"><UserIdButton id={row.userId} /></td>
+                  <td className="py-2 pr-3"><UserIdButton id={row.userId} name={row.name || displayName(row)} /></td>
                   <td className="py-2 pr-3">{row.reason}</td>
                   <td className="py-2 pr-3">{int(row.credits)}</td>
                   <td className="py-2">{int(row.surveys)}</td>
@@ -1451,7 +1746,7 @@ function StepList({ metric, title }) {
   if (!metric) return null;
   if (metric.available === false) return <Missing metric={metric} />;
   return (
-    <Card title={title} summary="People who opened an onboarding step and did not submit it within 7 days." note={metric.note}>
+    <Card metricId={metric.id} title={title} summary="People who opened an onboarding step and did not submit it within 7 days." note={metric.note}>
       {metric.steps.map((row) => (
         <p key={row.step} className="text-sm text-gray-700 mb-1">
           {ONBOARD_STEPS[row.step] || row.step}: {int(row.viewed)} viewed · {shareText(row.submitted)} submitted
@@ -1466,7 +1761,7 @@ function FieldErrors({ metric }) {
   if (!metric) return null;
   if (metric.available === false) return <Missing metric={metric} />;
   return (
-    <Card title="Field errors" summary="Fields that failed on an onboarding step, and people who left without submitting." note={metric.note}>
+    <Card metricId={metric.id || 'A8'} title="Field errors" summary="Fields that failed on an onboarding step, and people who left without submitting." note={metric.note}>
       {metric.rows.length ? metric.rows.slice(0, 12).map((row) => (
         <p key={`${row.step}:${row.field}`} className="text-sm text-gray-700 mb-1">
           {ONBOARD_STEPS[row.step] || row.step} · {row.field}: {shareText(row.errors, true)} · left {shareText(row.leftWithoutSubmit, true)}
@@ -1480,24 +1775,61 @@ function SurveyPath({ data }) {
   if (!data.S2 || !data.S3) return null;
   if (data.S2.available === false) return (<><Missing metric={data.S2} /><Missing metric={data.S3} /></>);
   const shown = (data.S2.surveys || []).filter((row) => !row.targeted).slice(0, 8);
+  const s3Weeks = data.S3.weeks || [];
+  const s3Select = useDefaultWeekSelection(s3Weeks);
+  const s3Picked = s3Weeks.filter((week) => s3Select.selected.has(week.week));
+  const s3Merged = useMemo(() => {
+    if (!s3Picked.length) {
+      return {
+        viewed: data.S3.viewed,
+        started: data.S3.started,
+        completed: data.S3.completed,
+        overall: data.S3.overall,
+        startedWithoutView: data.S3.startedWithoutView,
+      };
+    }
+    const viewed = s3Picked.reduce((sum, week) => sum + (week.viewed || 0), 0);
+    const startedNum = s3Picked.reduce((sum, week) => sum + (week.started?.numerator || 0), 0);
+    const startedDen = s3Picked.reduce((sum, week) => sum + (week.started?.denominator || 0), 0);
+    const completedNum = s3Picked.reduce((sum, week) => sum + (week.completed?.numerator || 0), 0);
+    const completedDen = s3Picked.reduce((sum, week) => sum + (week.completed?.denominator || 0), 0);
+    const overallNum = s3Picked.reduce((sum, week) => sum + (week.overall?.numerator || 0), 0);
+    const without = s3Picked.reduce((sum, week) => sum + (week.startedWithoutView || 0), 0);
+    return {
+      viewed,
+      started: shareOf(startedNum, startedDen || viewed),
+      completed: shareOf(completedNum, completedDen || startedNum),
+      overall: shareOf(overallNum, viewed),
+      startedWithoutView: without,
+    };
+  }, [s3Picked, data.S3]);
   return (
     <>
-      <Card title="Survey exposure" summary="How often a survey card was shown to someone who could answer it." note={data.S2.note}>
+      <Card metricId="S2" title="Survey exposure" summary="How often a survey card was shown to someone who could answer it." note={data.S2.note}>
         <Mini label="Median exposure" value={<Pct rate={data.S2.median} />} />
         <div className="mt-3 space-y-1">
           {shown.length ? shown.map((row) => (
-            <p key={row.id} className="text-sm text-gray-700">{row.title}: {shareText(row.exposure)} viewed · {int(row.reachable)} reached</p>
+            <p key={row.id} className="text-sm text-gray-700">{row.title}: {shareText(row.exposure, false, 'reachable')} viewed · {int(row.reachable)} reached</p>
           )) : <p className="text-sm text-gray-500">No card views stored yet.</p>}
         </div>
       </Card>
-      <Card title="Survey funnel" summary="From seeing a survey, to starting it, to finishing it." note={data.S3.note}>
+      <Card metricId="S3" title="Survey funnel" summary="From seeing a survey, to starting it, to finishing it." note={data.S3.note}>
+        {s3Weeks.length ? (
+          <WeekChecklist
+            weeks={latestFirst(s3Weeks)}
+            selected={s3Select.selected}
+            onChange={s3Select.setSelected}
+            defaultWeek={s3Select.defaultWeek}
+            label="Funnel weeks"
+          />
+        ) : null}
         <div className="grid sm:grid-cols-3 gap-3">
-          <Mini label="Viewed" value={int(data.S3.viewed)} />
-          <Mini label="Started" value={shareText(data.S3.started)} />
-          <Mini label="Completed" value={shareText(data.S3.completed)} />
+          <Mini label="Viewed" value={int(s3Merged.viewed)} />
+          <Mini label="Started" value={shareText(s3Merged.started, false, 'viewers')} />
+          <Mini label="Completed" value={shareText(s3Merged.completed, false, 'starters')} />
         </div>
-        <p className="text-sm text-gray-700 mt-3">Started without a card view: {int(data.S3.startedWithoutView)}</p>
-        <p className="text-sm text-gray-700">Finished of those who viewed: {shareText(data.S3.overall)}</p>
+        <p className="text-sm text-gray-700 mt-3">Started without a card view: {int(s3Merged.startedWithoutView)}</p>
+        <p className="text-sm text-gray-700">Finished of those who viewed: {shareText(s3Merged.overall, false, 'viewers')}</p>
       </Card>
     </>
   );
@@ -1508,7 +1840,7 @@ function QuestionDropoff({ metric }) {
   if (metric.available === false) return <Missing metric={metric} />;
   const shown = (metric.surveys || []).slice(0, 6);
   return (
-    <Card title="Question drop-off" summary="Where people stop inside a survey, question by question." note={metric.note}>
+    <Card metricId="S9" title="Question drop-off" summary="Where people stop inside a survey, question by question. Sparse until enough post-ship attempts exist." note={metric.note}>
       {shown.length ? shown.map((survey) => (
         <div key={survey.id} className="mb-3">
           <p className="text-sm font-medium text-gray-800">{int(survey.started)} started</p>
@@ -1526,7 +1858,7 @@ function ShopAndScans({ data }) {
   if (data.R5.available === false) return (<><Missing metric={data.R5} /><Missing metric={data.R9} /></>);
   return (
     <>
-      <Card title="Shop behaviour" summary="What people did on shop visits, including visits where nothing was affordable." note={data.R5.note}>
+      <Card metricId="R5" title="Shop behaviour" summary="What people did on shop visits, including visits where nothing was affordable." note={data.R5.note}>
         <div className="grid sm:grid-cols-2 gap-3">
           <Mini label="Visits per person" value={num(data.R5.visitsPerUser.median)} sub={`Mean ${num(data.R5.visitsPerUser.mean)}`} />
           <Mini label="Empty visits" value={shareText(data.R5.emptyVisits, true)} />
@@ -1534,7 +1866,7 @@ function ShopAndScans({ data }) {
           <Mini label="Median shortfall" value={num(data.R5.shortfall.median)} sub="credits" />
         </div>
       </Card>
-      <Card title="Redemption friction" summary="Scans that failed, and vouchers that were opened but not approved." note={data.R9.note}>
+      <Card metricId="R9" title="Redemption friction" summary="Scans that failed, and vouchers that were opened but not approved." note={data.R9.note}>
         <div className="grid sm:grid-cols-3 gap-3 mb-3">
           <Mini label="Opens" value={int(data.R9.opens)} />
           <Mini label="Scan attempts" value={int(data.R9.attempts)} />
@@ -1557,7 +1889,7 @@ function LastAction({ metric }) {
   if (!metric) return null;
   if (metric.available === false) return <Missing metric={metric} />;
   return (
-    <Card title="Last action" summary="The last thing recorded before someone churned." note={metric.note}>
+    <Card metricId="L6" title="Last action" summary="The last thing recorded before someone churned." note={metric.note}>
       {metric.groups.map((row) => (
         <p key={row.id} className="text-sm text-gray-700 mb-1">{row.id}: {shareText(row)}</p>
       ))}
@@ -1569,7 +1901,7 @@ function ActivationPhase3({ data }) {
   if (!data.A6) return null;
   return (
     <>
-      <Card title="First-survey speed" summary="How soon the first survey was finished after signup." note={data.A6.note}>
+      <Card metricId="A6" title="First-survey speed" summary="How soon the first survey was finished after signup." note={data.A6.note}>
         <div className="grid sm:grid-cols-4 gap-3">
           <Mini label="Within 30 minutes" value={shareText(data.A6.windows['30min'])} />
           <Mini label="Within 24 hours" value={shareText(data.A6.windows['24h'])} />
@@ -1586,9 +1918,23 @@ function SurveysPhase3({ data }) {
   if (!data.S8) return null;
   const shown = data.S8.surveys.slice(0, 12);
   const hourMax = Math.max(...data.S12.hours.map((row) => row.count), 1);
+  const impact = useMemo(() => {
+    const weights = standardizedImpactWeights(
+      data.S8.surveys,
+      ['questions', 'avgMinutes', 'credits'],
+      'ratePct'
+    );
+    if (!weights) return null;
+    const labels = {
+      questions: 'Questions',
+      avgMinutes: 'Avg. time taken',
+      credits: 'Credits',
+    };
+    return weights.map((row) => ({ ...row, variable: labels[row.variable] || row.variable }));
+  }, [data.S8.surveys]);
   return (
     <>
-      <Card title="Survey traits" summary="How long surveys are, and how many questions they ask." note={data.S8.note}>
+      <Card metricId="S8" title="Survey traits" summary="How response rate relates to questions, time, and credits." note={data.S8.note}>
         <div className="grid sm:grid-cols-3 gap-3 mb-4">
           {[
             ['Length', data.S8.byLength],
@@ -1598,32 +1944,42 @@ function SurveysPhase3({ data }) {
             <div key={label}>
               <p className="text-xs text-gray-500 mb-1">{label}</p>
               {rows.map((row) => (
-                <p key={row.id} className="text-sm text-gray-700">{row.id}: {int(row.surveys)} surveys · {num(row.median)} per 100</p>
+                <p key={row.id} className="text-sm text-gray-700">{row.id}: {int(row.surveys)} surveys · {num(row.median)}%</p>
               ))}
             </div>
           ))}
         </div>
+        {impact ? (
+          <div className="mb-4">
+            <p className="text-xs text-gray-500 mb-2">Relative Impact Weight on response rate</p>
+            <ImpactWeightChart rows={impact} />
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500 mb-3">Not enough surveys with complete questions, avg time, credits, and response rate for regression yet.</p>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-gray-500">
                 <th className="py-2 pr-3 font-medium">Survey</th>
                 <th className="py-2 pr-3 font-medium">Questions</th>
-                <th className="py-2 pr-3 font-medium">Minutes</th>
+                <th className="py-2 pr-3 font-medium">Avg time</th>
+                <th className="py-2 pr-3 font-medium">Reported min</th>
                 <th className="py-2 pr-3 font-medium">Credits</th>
                 <th className="py-2 pr-3 font-medium">Responses</th>
-                <th className="py-2 font-medium">Per 100</th>
+                <th className="py-2 font-medium">Response %</th>
               </tr>
             </thead>
             <tbody>
               {shown.map((row) => (
                 <tr key={row.id} className="border-t border-gray-100">
-                  <td className="py-2 pr-3">{row.title}</td>
+                  <td className="py-2 pr-3">{row.title}{row.targeted ? ' · targeted' : ''}</td>
                   <td className="py-2 pr-3">{int(row.questions)}</td>
-                  <td className="py-2 pr-3">{num(row.minutes)}{row.minutesSource === 'estimate' ? ' est.' : ''}</td>
+                  <td className="py-2 pr-3">{num(row.avgMinutes)}</td>
+                  <td className="py-2 pr-3">{num(row.reportedMinutes)}</td>
                   <td className="py-2 pr-3">{int(row.credits)}</td>
                   <td className="py-2 pr-3">{int(row.responses)}</td>
-                  <td className="py-2">{row.targeted ? 'Targeted' : num(row.per100)}</td>
+                  <td className="py-2">{row.ratePct == null ? '–' : `${num(row.ratePct)}%`}</td>
                 </tr>
               ))}
             </tbody>
@@ -1633,29 +1989,33 @@ function SurveysPhase3({ data }) {
           <p className="text-xs text-gray-500 mt-2">Showing {shown.length} of {int(data.S8.surveys.length)} surveys.</p>
         ) : null}
       </Card>
-      <Card title="Response quality" summary="Finishes that were much faster than the usual time for that survey." note={data.S10.note}>
+      <Card metricId="S10" title="Response quality" summary="Finishes that were much faster than the usual time for that survey." note={data.S10.note}>
         <div className="grid sm:grid-cols-2 gap-3">
-          <Mini label="Speeders" value={shareText(data.S10.speeders, true)} />
+          <Mini label="Speeders" value={shareText(data.S10.speeders, true, 'completions')} />
           <Mini label="Flagged on 3 or more surveys" value={int(data.S10.repeatSpeeders)} />
           {data.S10.straightLining?.available ? (
-            <Mini label="Same answer on every grid row" value={shareText(data.S10.straightLining, true)} />
+            <Mini label="Same answer on every grid row" value={shareText(data.S10.straightLining, true, 'completions')} />
           ) : null}
           {data.S10.attentionChecks?.available ? (
-            <Mini label="Wrong attention check" value={shareText(data.S10.attentionChecks, true)} />
+            <Mini label="Wrong attention check" value={shareText(data.S10.attentionChecks, true, 'completions')} />
           ) : null}
         </div>
         <p className="text-sm text-gray-600 mt-3">{data.S10.straightLining?.note}</p>
         <p className="text-sm text-gray-600 mt-1">{data.S10.attentionChecks?.note}</p>
       </Card>
-      <Card title="Reward yield" summary="Credits a survey pays, and how many surveys it takes to afford the cheapest voucher." note={data.S11.note}>
+      <Card metricId="S11" title="Reward yield" summary="Credits a survey pays, and how many surveys it takes to afford the cheapest voucher." note={data.S11.note}>
         <div className="grid sm:grid-cols-4 gap-3">
           <Mini label="Median credits" value={num(data.S11.credits.median)} sub={`Mean ${num(data.S11.credits.mean)}`} />
           <Mini label="Median credits per minute" value={num(data.S11.perMinute.median)} />
           <Mini label="Weighted credits per minute" value={num(data.S11.weightedPerMinute)} />
-          <Mini label="Surveys to first voucher" value={int(data.S11.surveysToFirstVoucher)} sub={data.S11.price == null ? '' : `Price ${int(data.S11.price)}`} />
+          <Mini
+            label="Surveys to first voucher"
+            value={int(data.S11.surveysToFirstVoucher)}
+            sub={data.S11.price == null ? '' : `Price ${int(data.S11.price)} · onboarding ${int(data.S11.onboardingCredits)}`}
+          />
         </div>
       </Card>
-      <Card title="Timing patterns" summary="Which weekdays and hours surveys are finished." note={data.S12.note}>
+      <Card metricId="S12" title="Timing patterns" summary="Which weekdays and hours surveys are finished." note={data.S12.note}>
         <div className="overflow-x-auto mb-4">
           <table className="w-full text-sm">
             <thead>
@@ -1700,7 +2060,7 @@ function RewardsPhase3({ data }) {
   if (!data.R14) return null;
   return (
     <>
-      <Card title="Credit sinks" summary="Where spent credits went: vouchers, streak guards, and other spends." note={data.R14.note}>
+      <Card metricId="R14" title="Credit sinks" summary="Where spent credits went: vouchers, streak guards, and other spends." note={data.R14.note}>
         <div className="grid sm:grid-cols-2 gap-3 mb-4">
           <Mini label="People who spent" value={int(data.R14.spenders)} />
           <Mini label="Bought a voucher and used a guard" value={shareText(data.R14.boughtBoth)} />
@@ -1729,7 +2089,7 @@ function RewardsPhase3({ data }) {
           </table>
         </div>
       </Card>
-      <Card title="Catalog fit" summary="Which voucher categories and prices people buy and open." note={data.R12.views.note}>
+      <Card metricId="R12" title="Catalog fit" summary="Which voucher categories and prices people buy and open." note={data.R12.views.note}>
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <p className="text-xs text-gray-500 mb-1">Purchases by category</p>
@@ -1763,7 +2123,7 @@ function RewardsPhase3({ data }) {
         <p className="text-sm text-gray-700 mt-3">Same municipality: {shareText(data.R12.locality)}</p>
         <p className="text-xs text-gray-500 mt-1">{data.R12.locality.note}</p>
       </Card>
-      <Card title={data.R13.title} summary="What people do on the page right after a survey: buy a voucher there, open the shop, or take another survey." note={data.R13.note}>
+      <Card metricId="R13" title={data.R13.title} summary="What people do on the page right after a survey: buy a voucher there, open the shop, or take another survey." note={data.R13.note}>
         {!data.R13.shown ? (
           <p className="text-sm text-gray-500">No survey-complete visits stored yet.</p>
         ) : (
@@ -1788,7 +2148,7 @@ function RetentionPhase3({ data }) {
   if (!data.L6) return null;
   return (
     <>
-      <Card title="Churn" summary="People who stopped, and how many days that took." note={data.L6.note}>
+      <Card metricId="L6" title="Churn" summary="People who stopped, and how many days that took." note={data.L6.note}>
         <div className="grid sm:grid-cols-2 gap-3">
           <Mini label="Churned" value={int(data.L6.churned)} />
           <Mini label="Median days to churn" value={num(data.L6.timeToChurn.median)} sub={`Mean ${num(data.L6.timeToChurn.mean)} · ${int(data.L6.timeToChurn.n)} people`} />
@@ -1796,7 +2156,7 @@ function RetentionPhase3({ data }) {
       </Card>
       <LastAction metric={data.L6.lastAction} />
       {data.L7 ? (
-        <Card title="Referral" summary="Invites sent, signups from those invites, and how many of those people activated within 7 days." note={data.L7.note}>
+        <Card metricId="L7" title="Referral" summary="Invites sent, signups from those invites, and how many of those people activated within 7 days." note={data.L7.note}>
           <div className="grid sm:grid-cols-3 gap-3 mb-4">
             <Mini label="Invites sent" value={int(data.L7.invites)} />
             <Mini label="Signups from invites" value={int(data.L7.signups)} />
@@ -1844,7 +2204,6 @@ export default function AdminHealth() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [section, setSection] = useState('activation');
   const [selectedUserId, setSelectedUserId] = useState(null);
@@ -1857,19 +2216,16 @@ export default function AdminHealth() {
       adminAPI.getPhase1Health({ skipErrorToast: true })
         .then((response) => {
           if (cancelled) return;
-          setData(response.data.data);
-          setError('');
-          hasData = true;
-          if (response.data.refreshing) {
-            setRefreshing(true);
-            timer = setTimeout(load, 2000);
-          } else {
-            setRefreshing(false);
+          if (response.data.data) {
+            setData(response.data.data);
+            setError('');
+            hasData = true;
+            return;
           }
+          timer = setTimeout(load, 5000);
         })
         .catch((err) => {
           if (cancelled) return;
-          setRefreshing(false);
           if (err.response?.status === 401 || err.response?.status === 403) {
             navigate('/admin');
             return;
@@ -1898,7 +2254,11 @@ export default function AdminHealth() {
             </button>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Platform health</h1>
-              <p className="text-sm text-gray-500">Separate from the operations dashboard. {data ? `Counted ${when(data.computedAt)}.` : 'Counts are read when this page opens.'}{refreshing ? ' Updating the count.' : ''}</p>
+              <p className="text-sm text-gray-500">
+                Separate from the operations dashboard.
+                {data ? ` Counted ${when(data.computedAt)}. Counts refresh about every 5 minutes.` : ''}
+                {!loading && !data && !error ? ' The first count is still running.' : ''}
+              </p>
               <div className="mt-2"><Legend /></div>
             </div>
           </div>
@@ -1924,6 +2284,9 @@ export default function AdminHealth() {
             <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
           </div>
         ) : null}
+        {!loading && !data && !error ? (
+          <p className="text-sm text-gray-500">The first count is still running.</p>
+        ) : null}
         {error ? <p className="text-sm text-red-600">{error}</p> : null}
         {data?.phaseBlocked ? (
           <p className="mb-4 rounded-xl bg-red-50 text-red-800 text-sm px-4 py-3">A credit ledger does not match the stored balance. That blocks this phase. Balances were not changed.</p>
@@ -1942,6 +2305,7 @@ export default function AdminHealth() {
           NAVY={NAVY}
         />
       ) : null}
+      <BackToTop />
     </div>
     </OpenUserContext.Provider>
   );

@@ -9,7 +9,7 @@ import HomeFooter from "../components/homepage/HomeFooter";
 import { flipShopCatalog, initShopCinema, scrollShopToCatalog } from "../components/shop/shopCinema";
 import { useAuth } from "../context/AuthContext";
 import { toast } from "react-hot-toast";
-import { isOfferAvailable } from "../utils/pickSurveyOffers";
+import { isOfferAvailable, matchesOfferSearch } from "../utils/pickSurveyOffers";
 import { parsePage, writeSearchParams } from "../utils/searchParams";
 import { trackEvent } from "../utils/visitorEvents";
 import { healthSessionId, trackHealthEvent } from "../utils/healthEvents";
@@ -34,6 +34,8 @@ export default function Shop() {
   const [selectedOffer, setSelectedOffer] = useState(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [voucherOffers, setVoucherOffers] = useState([]);
+  const [recommendedOffers, setRecommendedOffers] = useState([]);
+  const [recommendedTick, setRecommendedTick] = useState(0);
   const [userCredits, setUserCredits] = useState(Number(user?.credits) || 0);
   const [loadingOffers, setLoadingOffers] = useState(true);
   const [fetchError, setFetchError] = useState(null);
@@ -166,6 +168,26 @@ export default function Shop() {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (!user) {
+      setRecommendedOffers([]);
+      return undefined;
+    }
+    let cancelled = false;
+    voucherAPI.getRecommended({ skipErrorToast: true, skipAuthRedirect: true })
+      .then((res) => {
+        if (cancelled) return;
+        const data = res.data?.data;
+        setRecommendedOffers(Array.isArray(data) ? data : []);
+      })
+      .catch(() => {
+        if (!cancelled) setRecommendedOffers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user, recommendedTick]);
+
   const handleSelectOffer = (offer, index = 0) => {
     if (!user) {
       toast.error("Please log in to redeem vouchers.");
@@ -198,14 +220,7 @@ export default function Shop() {
     });
 
     if (q) {
-      vouchers = vouchers.filter((offer) =>
-        `${offer.title || ""} ${offer.description || ""} ${offer.business?.brandName || ""} ${
-          offer.business?.name || ""
-        } ${offer.creditsRequired || ""} ${offer.discountValue || ""}`
-          .toLowerCase()
-          .replace(/\s/g, "")
-          .includes(q)
-      );
+      vouchers = vouchers.filter((offer) => matchesOfferSearch(offer, searchDraft));
     }
 
     if (sortOrder === "asc") {
@@ -301,6 +316,31 @@ export default function Shop() {
 
         <div className="home-sheet shop-sheet">
         <div className="shop-catalog">
+          {recommendedOffers.length > 0 && (
+            <section className="shop-recommended" aria-label="Recommended for you">
+              <div className="shop-title-row">
+                <span className="shop-dots" aria-hidden="true">
+                  {Array.from({ length: 16 }, (_, i) => (
+                    <i key={i} style={{ "--i": i }} />
+                  ))}
+                </span>
+                <h2>Recommended for you</h2>
+              </div>
+              <p className="shop-head-copy shop-recommended-copy">A few rewards picked for you.</p>
+              <div className="shop-grid shop-recommended-grid">
+                {recommendedOffers.map((offer, idx) => (
+                  <div key={offer._id} className="shop-grid-item">
+                    <RewardCard
+                      offer={offer}
+                      index={idx}
+                      onRedeem={handleSelectOffer}
+                      onViewStore={(businessId) => navigate(`/shop/merchant/${businessId}`)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
           <div className="shop-head">
             <div>
               <div className="shop-title-row">
@@ -458,7 +498,10 @@ export default function Shop() {
           index={selectedIndex}
           userCredits={userCredits}
           onClose={() => setSelectedOffer(null)}
-          onSuccess={() => setSelectedOffer(null)}
+          onSuccess={() => {
+            setSelectedOffer(null);
+            setRecommendedTick((tick) => tick + 1);
+          }}
         />
       )}
     </div>

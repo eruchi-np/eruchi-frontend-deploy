@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getOfferStock } from "../../utils/pickSurveyOffers";
 
 export const CARD_COLORS = ["#003049", "#FF006E", "#F77F00", "#007F5F", "#E39B0E", "#7251B5"];
@@ -33,6 +33,63 @@ function offerBlurb(offer) {
   if (desc) return desc;
   const bits = [offer.title, discountLabel(offer)].filter(Boolean);
   return bits.join(" · ");
+}
+
+function FitTitle({ text }) {
+  const ref = useRef(null);
+
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const parent = el?.parentElement;
+    if (!el || !parent) return;
+
+    const fit = () => {
+      const style = getComputedStyle(parent);
+      const pad = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+      const gapSource = style.rowGap && style.rowGap !== "normal" ? style.rowGap : style.gap;
+      const gap = parseFloat(gapSource) || 0;
+      const others = [...parent.children].filter((node) => node !== el);
+      const used = others.reduce((sum, node) => sum + node.offsetHeight, 0);
+      const gaps = Math.max(0, parent.children.length - 1) * gap;
+      const available = Math.max(0, parent.clientHeight - pad - used - gaps);
+      const max = 30;
+      const min = 15;
+      let low = min;
+      let high = max;
+      let best = min;
+
+      while (low <= high) {
+        const mid = Math.floor((low + high) / 2);
+        el.style.fontSize = `${mid}px`;
+        if (el.scrollHeight <= available + 1) {
+          best = mid;
+          low = mid + 1;
+        } else {
+          high = mid - 1;
+        }
+      }
+
+      el.style.fontSize = `${best}px`;
+    };
+
+    fit();
+    let cancelled = false;
+    document.fonts?.ready.then(() => {
+      if (!cancelled) fit();
+    });
+    const observer = new ResizeObserver(fit);
+    observer.observe(parent);
+    return () => {
+      cancelled = true;
+      observer.disconnect();
+    };
+  }, [text]);
+
+  return (
+    <span ref={ref} className="shop-card-title">
+      {text}
+    </span>
+  );
 }
 
 function canHoverReveal() {
@@ -100,8 +157,8 @@ export default function RewardCard({ offer, index = 0, onRedeem, onViewStore }) 
 
         <div className="shop-card-body">
           <div className="shop-card-panel shop-card-front">
+            <FitTitle text={offer.title} />
             <span className="shop-card-credits">{offer.creditsRequired || 0} CREDITS</span>
-            <span className="shop-card-title">{offer.title}</span>
             {meta ? <span className="shop-card-meta">{meta}</span> : null}
           </div>
 
@@ -117,7 +174,7 @@ export default function RewardCard({ offer, index = 0, onRedeem, onViewStore }) 
                 onClick={redeem}
                 disabled={isOut}
               >
-                Redeem
+                Buy
               </button>
             </div>
           </div>

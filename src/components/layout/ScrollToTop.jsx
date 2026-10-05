@@ -2,14 +2,15 @@ import { useLayoutEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 const ScrollToTop = () => {
-  const { pathname } = useLocation();
+  const { pathname, state } = useLocation();
 
   useLayoutEffect(() => {
     if ('scrollRestoration' in window.history) {
       window.history.scrollRestoration = 'manual';
     }
+    if (state?.scrollToCatalog) return;
     window.scrollTo(0, 0);
-  }, [pathname]);
+  }, [pathname, state]);
 
   return null;
 };

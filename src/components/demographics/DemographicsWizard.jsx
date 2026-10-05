@@ -19,11 +19,13 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
     useDemographics({ storageKey });
   const [localErrors, setLocalErrors] = useState({});
   const [submitError, setSubmitError] = useState("");
+  const [errorTick, setErrorTick] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(null);
   const [confirmed, setConfirmed] = useState({});
   const [seedState, setSeedState] = useState(isRefresh ? "loading" : "ready");
   const submittingRef = useRef(false);
+  const errorRef = useRef(null);
 
   const fieldsByStep = {
     1: ["firstLanguage", "education", "maritalStatus", "occupation"],
@@ -103,15 +105,36 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
 
   const confirmField = (field) => {
     setSubmitError("");
+    clearFieldError(field);
     setConfirmed((prev) => ({ ...prev, [field]: true }));
   };
 
+  const revealError = (message) => {
+    setSubmitError(message);
+    setErrorTick((tick) => tick + 1);
+  };
+
+  useEffect(() => {
+    if (!submitError) return;
+    errorRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [submitError, errorTick]);
+
   const handleComplete = async () => {
     if (submittingRef.current) return;
-    if (!checkStepValidation(3)) return;
+    if (!checkStepValidation(3)) {
+      revealError("Update the answers marked on this step.");
+      return;
+    }
     const pending = [1, 2, 3].flatMap(unconfirmedOnStep);
     if (pending.length) {
-      setSubmitError("Confirm same or update each answer before you submit.");
+      setLocalErrors((prev) => {
+        const next = { ...prev };
+        pending.forEach((field) => {
+          next[field] = "Confirm same or update this answer.";
+        });
+        return next;
+      });
+      revealError("Confirm same or update each answer before you submit.");
       return;
     }
     submittingRef.current = true;
@@ -151,19 +174,19 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
             ? awarded
               ? `${awarded} Ruchi Credits added. One more short survey.`
               : "Saved. One more short survey."
-            : "You're in. Your first survey is ready. Takes under 2 minutes."
+            : "Saved. A few last questions."
         );
         clearDemographicsDraft(storageKey);
         trackOnboardingSubmit("pc1");
         saved = true;
         onComplete(awarded);
       } else {
-        setSubmitError(response.data.message || "Failed to save profile. Please try again.");
+        revealError(response.data.message || "Failed to save profile. Please try again.");
       }
     } catch (error) {
       console.error("Error:", error.response?.data);
       const data = error.response?.data;
-      setSubmitError(
+      revealError(
         data?.message ||
           data?.errors?.[0]?.msg ||
           data?.errors?.[0]?.message ||
@@ -229,21 +252,32 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
 
   return (
     <div className="w-full onboard-step">
-      {submitError && (
-        <p className="text-sm text-red-600 font-medium text-center mb-4">{submitError}</p>
-      )}
       <Stepper
         initialStep={currentStep}
         onStepChange={goToStep}
         onBeforeNext={(step) => {
-          if (!checkStepValidation(step)) return false;
-          if (unconfirmedOnStep(step).length) {
-            setSubmitError("Confirm same or update each answer on this step.");
+          if (!checkStepValidation(step)) {
+            revealError("Update the answers marked on this step.");
+            return false;
+          }
+          const pending = unconfirmedOnStep(step);
+          if (pending.length) {
+            setLocalErrors((prev) => {
+              const next = { ...prev };
+              pending.forEach((field) => {
+                next[field] = "Confirm same or update this answer.";
+              });
+              return next;
+            });
+            revealError("Confirm same or update each answer on this step.");
             return false;
           }
           setSubmitError("");
           return true;
         }}
+        footerNote={submitError ? (
+          <p ref={errorRef} className="onboard-error" role="alert">{submitError}</p>
+        ) : null}
         onFinalStepCompleted={handleComplete}
         renderStepIndicator={renderCustomIndicator}
         stepContainerClassName="max-w-3xl mx-auto px-4"

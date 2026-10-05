@@ -1,3 +1,5 @@
+import { matchesRelatedSearch } from "./searchGroups";
+
 export function getOfferStock(offer) {
   if (offer.totalStock !== null && offer.totalStock !== undefined) {
     return {
@@ -94,12 +96,27 @@ export function pickDifferentMerchants(offers, limit = 2) {
 
 export function matchesOfferSearch(offer, query) {
   if (!query) return true;
-  const haystack = `${offer.title || ""} ${offer.business?.brandName || ""} ${
-    offer.business?.name || ""
-  } ${offer.creditsRequired || ""} ${offer.discountValue || ""}`
+  const compact = String(query).toLowerCase().replace(/\s/g, "");
+  if (!compact) return true;
+
+  const keywords = Array.isArray(offer.business?.searchKeywords)
+    ? offer.business.searchKeywords
+    : [];
+  const fields = [
+    offer.title,
+    offer.description,
+    offer.business?.brandName,
+    offer.business?.name,
+    offer.business?.category,
+    ...keywords,
+  ];
+  const haystack = `${fields.filter(Boolean).join(" ")} ${offer.creditsRequired || ""} ${
+    offer.discountValue || ""
+  }`
     .toLowerCase()
     .replace(/\s/g, "");
-  return haystack.includes(query.toLowerCase().replace(/\s/g, ""));
+  if (haystack.includes(compact)) return true;
+  return matchesRelatedSearch(fields, keywords, query);
 }
 
 export function pickSuggestedOffers(offers, credits, limit = 2) {

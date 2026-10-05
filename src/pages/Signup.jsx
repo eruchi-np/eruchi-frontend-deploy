@@ -6,11 +6,12 @@ import axios from "axios";
 import toast from "react-hot-toast";
 import { getPostLoginPath } from "../utils/auth";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useSearchParams } from "react-router-dom";
 import { zodResolver } from "@hookform/resolvers/zod";
 import OnboardingShell from "../components/onboarding/OnboardingShell";
 import { readAcquisition } from "../utils/acquisition";
 import { readVisitorId } from "../utils/healthEvents";
+import { clearStoredReferralCode, digitsOnly, storeReferralCode } from "../utils/referral";
 import "../components/onboarding/onboarding.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
@@ -34,6 +35,7 @@ const formSchema = z
       errorMap: () => ({ message: "You must accept the terms, conditions, and privacy policy" }),
     }),
     promotionalEmails: z.boolean().optional(),
+    referralCode: z.string().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
@@ -42,10 +44,13 @@ const formSchema = z
 
 const Signup = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const codeFromUrl = digitsOnly(searchParams.get("ref"));
   const { user, loading: authLoading } = useAuth();
   const [signupError, setSignupError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [hasReferral, setHasReferral] = useState(codeFromUrl.length === 6 ? "yes" : "no");
 
   useEffect(() => {
     if (!authLoading && user) {
@@ -66,14 +71,35 @@ const Signup = () => {
     reValidateMode: "onBlur",
     defaultValues: {
       promotionalEmails: false,
+      referralCode: codeFromUrl.length === 6 ? codeFromUrl : "",
     },
   });
 
   const termsAcceptedValue = watch("termsAccepted");
+  const referralValue = watch("referralCode");
+
+  useEffect(() => {
+    if (codeFromUrl.length === 6) storeReferralCode(codeFromUrl);
+  }, [codeFromUrl]);
+
+  useEffect(() => {
+    if (hasReferral === "no") {
+      clearStoredReferralCode();
+      return;
+    }
+    if ((referralValue || "").length === 6) storeReferralCode(referralValue);
+  }, [hasReferral, referralValue]);
 
   const onSubmit = async (data) => {
     setIsLoading(true);
     setSignupError("");
+
+    const enteredCode = digitsOnly(data.referralCode);
+    if (hasReferral === "yes" && enteredCode.length !== 6) {
+      setSignupError("Enter the 6-digit referral code.");
+      setIsLoading(false);
+      return;
+    }
 
     const emailPrefix = data.email.split("@")[0];
     const safeUsername = emailPrefix.replace(/[^a-zA-Z0-9]/g, "").slice(0, 30).padEnd(3, "0");
@@ -91,9 +117,11 @@ const Signup = () => {
         promotionalEmails: data.promotionalEmails === true,
         ...(acquisition ? { acquisition } : {}),
         ...(visitorId ? { visitorId } : {}),
+        ...(hasReferral === "yes" ? { referralCode: enteredCode } : {}),
       };
 
       const response = await axios.post(`${API_BASE_URL}/auth/register`, payload);
+      clearStoredReferralCode();
       const userEmail = response.data.data.user.email;
       toast.success("Registration successful! Please verify your email.");
       navigate(`/email-verification?email=${encodeURIComponent(userEmail)}`);
@@ -195,6 +223,49 @@ const Signup = () => {
               <option value="Other">Other</option>
             </select>
           </div>
+
+          <div className="onboard-field">
+            <label>Do you have a referral code?</label>
+            <div className="onboard-tabs" role="group" aria-label="Do you have a referral code?">
+              <button
+                type="button"
+                className={`onboard-tab ${hasReferral === "no" ? "is-on" : ""}`}
+                onClick={() => {
+                  setHasReferral("no");
+                  clearStoredReferralCode();
+                }}
+              >
+                No
+              </button>
+              <button
+                type="button"
+                className={`onboard-tab ${hasReferral === "yes" ? "is-on" : ""}`}
+                onClick={() => setHasReferral("yes")}
+              >
+                Yes
+              </button>
+            </div>
+          </div>
+
+          {hasReferral === "yes" && (
+            <div className={`onboard-field ${signupError && digitsOnly(referralValue).length !== 6 ? "is-error" : ""}`}>
+              <label htmlFor="referralCode">Referral code</label>
+              <input
+                id="referralCode"
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={6}
+                placeholder="6-digit code"
+                {...register("referralCode")}
+                onChange={(event) => {
+                  event.target.value = digitsOnly(event.target.value);
+                  register("referralCode").onChange(event);
+                }}
+              />
+              <p className="onboard-hint">You get 5 extra credits after you verify your email.</p>
+            </div>
+          )}
 
           <div className="onboard-terms">
             <div className="onboard-terms-row">

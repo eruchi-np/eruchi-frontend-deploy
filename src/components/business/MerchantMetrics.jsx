@@ -6,6 +6,7 @@ export const emptyMerchantMetrics = () => ({
   totalSales: 0,
   totalGrossRevenue: 0,
   totalDiscounts: 0,
+  effectiveDiscountRate: null,
   averageOrderValue: null,
   conversion: null,
   redeemedThisMonth: 0,
@@ -122,6 +123,11 @@ export default function MerchantMetrics({ metrics, showRepeatVisits = true }) {
           hint="Total sales minus gross revenue"
         />
         <MetricCard
+          label="Effective discount rate"
+          value={formatPercent(metrics.effectiveDiscountRate)}
+          hint="Discounts ÷ sales before discount"
+        />
+        <MetricCard
           label="Total Scans"
           value={metrics.totalScans ?? 0}
           hint="All scan attempts"
@@ -179,6 +185,7 @@ export function OfferMetricsList({ offers = [] }) {
             <div className="min-w-0">
               <p className="font-medium text-gray-900 break-words">{offer.title}</p>
               <p className="text-sm text-gray-500">{discountLabel(offer)}</p>
+              <p className="text-sm text-gray-700">{offer.creditsRequired ?? 0} Ruchi Credits</p>
               <OfferMetrics
                 issued={offer.issued}
                 redeemed={offer.redeemed}

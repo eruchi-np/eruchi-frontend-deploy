@@ -1,7 +1,15 @@
 import React from "react";
 import SurveyDetailBody from "./SurveyDetailBody.jsx";
 
-const SurveyManagement = ({ surveys, refetchSurveys, NAVY }) => {
+const SurveyManagement = ({ surveys, surveysLoading, refetchSurveys, NAVY }) => {
+  if (surveysLoading && !surveys.length) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+        <p className="text-gray-500">Loading surveys...</p>
+      </div>
+    );
+  }
+
   if (!surveys.length) {
     return (
       <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">

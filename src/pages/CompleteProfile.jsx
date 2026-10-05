@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import DemographicsWizard from "../components/demographics/DemographicsWizard";
-import WelcomeToERuchi from "../components/demographics/steps/WelcomeToERuchi";
 import OnboardingShell from "../components/onboarding/OnboardingShell";
 import CreditRewardBadge from "../components/onboarding/CreditRewardBadge";
 import { PROFILE_COMPLETION_1_CREDITS, PROFILE_COMPLETION_2_CREDITS } from "../utils/onboardingCredits";
@@ -13,20 +12,19 @@ const CompleteProfile = ({ mode = "registration" }) => {
   const navigate = useNavigate();
   const { logout, user, refreshUser } = useAuth();
   const refreshPays = isRefresh && user?.profileOutdated;
-  const [profileCompleted, setProfileCompleted] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
 
   const handleProfileComplete = async (awarded) => {
     window.dispatchEvent(new Event("profileComplete"));
+    await refreshUser();
     if (isRefresh) {
-      await refreshUser();
       navigate("/refresh-additional-profile", {
         replace: true,
         state: { demographicsSaved: Number(awarded) > 0 },
       });
       return;
     }
-    setProfileCompleted(true);
+    navigate("/additional-profile", { replace: true });
   };
 
   const handleLogout = async () => {
@@ -38,10 +36,6 @@ const CompleteProfile = ({ mode = "registration" }) => {
       setLoggingOut(false);
     }
   };
-
-  if (profileCompleted) {
-    return <WelcomeToERuchi />;
-  }
 
   return (
     <OnboardingShell onLogout={handleLogout} loggingOut={loggingOut}>
