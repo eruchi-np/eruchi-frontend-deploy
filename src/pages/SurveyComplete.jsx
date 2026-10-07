@@ -354,6 +354,7 @@ export default function SurveyComplete() {
       {selectedOffer && (
         <VoucherRedeemModal
           offer={selectedOffer}
+          receivedVia="survey_complete"
           userCredits={credits}
           onClose={() => setSelectedOffer(null)}
           onRedeemed={() => {

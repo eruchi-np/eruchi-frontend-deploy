@@ -17,6 +17,8 @@ import MatrixQuestion, {
   emptyMatrixValue,
   isMatrixComplete,
 } from "../components/survey/MatrixQuestion";
+import { SurveyRichText } from "../components/survey/SurveyTextField";
+import { plainSurveyText } from "../utils/surveyMarkup";
 
 const StandaloneSurvey = () => {
   const { surveyId } = useParams();
@@ -38,7 +40,7 @@ const StandaloneSurvey = () => {
     const current = surveyRef.current;
     let last = null;
     for (const question of getTimingData().questions || []) {
-      const position = current?.questions?.findIndex((item) => item.questionText === question.questionText) ?? -1;
+      const position = current?.questions?.findIndex((item) => plainSurveyText(item.questionText) === question.questionText) ?? -1;
       if (position < 0 || !question.durationMs) continue;
       last = last == null ? position : Math.max(last, position);
       trackHealthEvent("survey_question_answered", {
@@ -247,11 +249,11 @@ const StandaloneSurvey = () => {
             <div
               key={i}
               className="border-b border-neutral-100 pb-12 last:border-0"
-              onPointerDown={() => handleQuestionFocus(q.questionText)}
-              onFocus={() => handleQuestionFocus(q.questionText)}
+              onPointerDown={() => handleQuestionFocus(plainSurveyText(q.questionText))}
+              onFocus={() => handleQuestionFocus(plainSurveyText(q.questionText))}
             >
               <h3 className="text-lg font-medium text-neutral-900 mb-6">
-                {i + 1}. {q.questionText}
+                {i + 1}. <SurveyRichText text={q.questionText} />
                 {q.isRequired === false && (
                   <span className="ml-2 text-sm font-normal text-neutral-400">(optional)</span>
                 )}

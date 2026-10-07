@@ -242,7 +242,10 @@ export const voucherAPI = {
   // ALL PATHS PERFECTLY ALIGNED TO BACKEND BASE PATH
   getOffers: (options = {}) => getRequest('/vouchers/voucher-offers', options),
   getRecommended: (options = {}) => getRequest('/vouchers/recommended', options),
-  redeem: (offerId, config = {}) => api.post('/vouchers/redeem', { offerId }, config),
+  redeem: (offerId, { receivedVia, ...config } = {}) => api.post('/vouchers/redeem', {
+    offerId,
+    ...(receivedVia ? { receivedVia } : {}),
+  }, config),
   getMyVouchers: (options = {}) => getRequest('/vouchers', options),
   getVoucherById: (id, config = {}) => api.get(`/vouchers/${id}`, config),
 };

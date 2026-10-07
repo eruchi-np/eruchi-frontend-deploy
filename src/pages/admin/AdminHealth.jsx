@@ -115,6 +115,15 @@ const STREAK_LABELS = {
   '30plus': '30 or more',
 };
 
+const VOUCHER_CHANNEL_LABELS = {
+  shop_recommended: 'Shop page recommendation',
+  shop: 'Shop page normal',
+  survey_complete: 'Complete-survey page',
+  admin_gift: 'Gifted by admin',
+  merchant: 'Merchant page',
+  not_recorded: 'Not recorded',
+};
+
 const PROMPT_LABELS = {
   bought: 'Bought a voucher',
   voucher: 'Opened a voucher',
@@ -770,6 +779,7 @@ function Surveys({ data }) {
           xKey="day"
           peopleKey="users"
           rateKey="rate"
+          peopleLabel="People who answered"
           rateLabel={`Share of ${denomLabel}`}
         />
       </Card>
@@ -780,6 +790,7 @@ function Surveys({ data }) {
             xKey="week"
             peopleKey="users"
             rateKey="rate"
+            peopleLabel="People who answered"
             rateLabel={`Share of ${denomLabel}`}
           />
         </Card>
@@ -806,6 +817,8 @@ function Surveys({ data }) {
               xKey="label"
               yKey="count"
               label="People"
+              xLabel="Surveys finished"
+              yLabel="People"
               percentOnTop
             />
           </>
@@ -822,6 +835,8 @@ function Surveys({ data }) {
         <MultiSeriesHybridChart
           rows={data.S7.publishedWeeks || []}
           xKey="week"
+          yLabel="Surveys published"
+          yRightLabel="3-period average"
           bars={[{ key: 'count', label: 'Surveys published', axis: 'left', opacity: 0.85 }]}
           showWmaFor="count"
         />
@@ -1002,8 +1017,8 @@ function Rewards({ data }) {
               rate: row.day7?.rate ?? null,
             }))}
             xKey="week"
-            peopleLabel="Purchased"
-            rateLabel="Redeemed in 7 days"
+            peopleLabel="Vouchers purchased"
+            rateLabel="Redeemed within 7 days"
           />
           <div className="overflow-x-auto mt-4">
             <table className="w-full text-sm">
@@ -1033,6 +1048,7 @@ function Rewards({ data }) {
         </Card>
       </div>
       <RewardsPhase2 data={data} />
+      {data.R15 ? <VoucherChannels metric={data.R15} /> : null}
       <RewardsPhase3 data={data} />
     </div>
   );
@@ -1082,6 +1098,9 @@ function Retention({ data }) {
         <MultiSeriesHybridChart
           rows={l1Chart}
           xKey="week"
+          yLabel="People"
+          yRightLabel="Share who answered"
+          yRightUnit="%"
           bars={[{ key: 'people', label: 'People', axis: 'left', opacity: 0.75 }]}
           lines={[
             { key: 'week1', label: 'Week 1 %', axis: 'right', color: '#1B2A4A' },
@@ -1452,6 +1471,8 @@ function SurveysPhase2({ data }) {
         <MultiSeriesHybridChart
           rows={data.S1.weeks || []}
           xKey="week"
+          yLabel="Responses"
+          yRightLabel="Early responses"
           bars={[{ key: 'total', label: 'All-time responses', axis: 'left', opacity: 0.8, color: '#7DD3FC' }]}
           lines={[
             { key: 'first24h', label: 'First 24 hours', axis: 'right', color: '#0284C7' },
@@ -1464,6 +1485,8 @@ function SurveysPhase2({ data }) {
         <MultiSeriesHybridChart
           rows={data.S6.weeks || []}
           xKey="week"
+          yLabel="People and responses"
+          yRightLabel="Surveys per person"
           bars={[
             { key: 'n', label: 'People', axis: 'left', opacity: 0.8, color: '#7DD3FC' },
             { key: 'totalResponses', label: 'Total responses', axis: 'left', opacity: 0.75, color: '#0EA5E9' },
@@ -1476,7 +1499,7 @@ function SurveysPhase2({ data }) {
         />
       </Card>
       <Card metricId="S14" title="Streaks" summary="How long current answer streaks are, and who reached 7, 14, and 30 days." note={data.S14.gaps?.[0]}>
-        <SimpleBarChart rows={streakRows} xKey="label" yKey="count" label="People" percentOnTop totalForPercent={data.S14.activeNow || 0} />
+        <SimpleBarChart rows={streakRows} xKey="label" yKey="count" label="People" xLabel="Streak length" yLabel="People" percentOnTop totalForPercent={data.S14.activeNow || 0} />
         <p className="text-sm text-gray-700 mt-3">Reached day 7: {shareText(data.S14.milestones.day7, false, 'people who ever streaked')}</p>
         <p className="text-sm text-gray-700">Reached day 14: {shareText(data.S14.milestones.day14, false, 'people who ever streaked')}</p>
         <p className="text-sm text-gray-700">Reached day 30: {shareText(data.S14.milestones.day30, false, 'people who ever streaked')}</p>
@@ -1495,7 +1518,7 @@ function SurveysPhase2({ data }) {
         ) : null}
         <p className="text-sm text-gray-700 mb-3">Median across pairs: {data.S16.median == null ? '–' : <Pct rate={data.S16.median} />}</p>
         {s16Clusters.length ? (
-          <HorizontalRateChart rows={s16Clusters} yKey="clusterName" rateKey="rate" label="Survey to next survey" />
+          <HorizontalRateChart rows={s16Clusters} yKey="clusterName" rateKey="rate" label="Survey to next survey" yLabel="Cluster" xLabel="Share who took the next survey" />
         ) : (
           <p className="text-sm text-gray-500">No cluster survey pairs in the selected weeks yet.</p>
         )}
@@ -1518,6 +1541,8 @@ function RewardsPhase2({ data }) {
         <MultiSeriesHybridChart
           rows={data.R1.weeks || []}
           xKey="week"
+          yLabel="Credits"
+          yRightLabel="Net credits"
           bars={[
             { key: 'issuedTotal', label: 'Issued', axis: 'left', opacity: 0.85, color: '#38BDF8' },
             { key: 'spentTotal', label: 'Spent', axis: 'left', opacity: 0.85, color: '#1B2A4A' },
@@ -2056,8 +2081,72 @@ function SurveysPhase3({ data }) {
   );
 }
 
+function Distribution({ title, rows, labelOf = (row) => row.id, empty, split = false }) {
+  const list = rows || [];
+  const max = Math.max(1, ...list.map((row) => Number(row.count) || 0));
+  return (
+    <div>
+      <p className="text-xs font-medium uppercase tracking-wide text-gray-400 mb-3">{title}</p>
+      {list.length === 0 ? (
+        <p className="text-sm text-gray-500">{empty}</p>
+      ) : (
+        <div className={split ? 'grid lg:grid-cols-2 gap-x-8 gap-y-3' : 'space-y-3'}>
+          {list.map((row) => {
+            const width = Math.max(4, Math.min(100, ((Number(row.count) || 0) / max) * 100));
+            return (
+              <div key={row.id}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="text-sm text-gray-800 min-w-0 break-words">{labelOf(row)}</span>
+                  <span className="text-sm text-gray-900 shrink-0 tabular-nums">
+                    {int(row.count)}
+                    <span className="text-gray-300"> · </span>
+                    <Pct rate={row.share} plain />
+                  </span>
+                </div>
+                <div className="mt-1.5 h-1.5 rounded-full bg-gray-100 overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${width}%`, backgroundColor: NAVY }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const counted = (share, unit) => (
+  share?.denominator ? `${int(share.numerator)} of ${int(share.denominator)}${unit ? ` ${unit}` : ''}` : ''
+);
+
+function VoucherChannels({ metric }) {
+  const rows = (metric.channels || []).map((row) => ({
+    label: VOUCHER_CHANNEL_LABELS[row.id] || row.id,
+    count: row.count || 0,
+  }));
+  return (
+    <Card metricId="R15" title="Voucher reception channel" summary="Where each voucher was received: the shop recommendation row, the rest of the shop, the page after a survey, a merchant page, or an admin gift." note={metric.note}>
+      {!metric.total ? (
+        <p className="text-sm text-gray-500">No vouchers yet.</p>
+      ) : (
+        <SimpleBarChart
+          rows={rows}
+          xKey="label"
+          yKey="count"
+          label="Vouchers"
+          yLabel="Channel"
+          horizontal
+          percentOnTop
+          totalForPercent={metric.total}
+        />
+      )}
+    </Card>
+  );
+}
+
 function RewardsPhase3({ data }) {
   if (!data.R14) return null;
+  const fit = data.R12;
   return (
     <>
       <Card metricId="R14" title="Credit sinks" summary="Where spent credits went: vouchers, streak guards, and other spends." note={data.R14.note}>
@@ -2089,39 +2178,34 @@ function RewardsPhase3({ data }) {
           </table>
         </div>
       </Card>
-      <Card metricId="R12" title="Catalog fit" summary="Which voucher categories and prices people buy and open." note={data.R12.views.note}>
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div>
-            <p className="text-xs text-gray-500 mb-1">Purchases by category</p>
-            {data.R12.byCategory.map((row) => (
-              <p key={row.id} className="text-sm text-gray-700">{row.id}: {int(row.count)} · <Pct rate={row.share} plain /></p>
-            ))}
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 mb-1">Purchases by price</p>
-            {data.R12.byPrice.map((row) => (
-              <p key={row.id} className="text-sm text-gray-700">{row.id}: {int(row.count)} · <Pct rate={row.share} plain /></p>
-            ))}
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 mb-1">Views by category</p>
-            {data.R12.views.byCategory.length ? data.R12.views.byCategory.map((row) => (
-              <p key={row.id} className="text-sm text-gray-700">{row.id}: {int(row.count)} · <Pct rate={row.share} plain /></p>
-            )) : <p className="text-sm text-gray-500">No voucher views stored yet.</p>}
-          </div>
-          <div>
-            <p className="text-xs text-gray-500 mb-1">Merchants opened</p>
-            <p className="text-sm text-gray-700">Median {num(data.R12.views.merchantsViewed.median)} · 2 or more {shareText(data.R12.views.twoMerchants)}</p>
-          </div>
+      <Card metricId="R12" title="Catalog fit" summary="Which voucher categories and prices people buy and open." note={fit.views.note}>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Mini label="Purchases" value={int(fit.purchases)} />
+          <Mini label="Same municipality" value={<Pct rate={fit.locality.rate} plain />} sub={counted(fit.locality, 'purchases')} />
+          <Mini label="Merchants opened" value={num(fit.views.merchantsViewed.median)} sub="Median per person" />
+          <Mini label="Opened 2 or more" value={<Pct rate={fit.views.twoMerchants.rate} plain />} sub={counted(fit.views.twoMerchants, 'eligible')} />
         </div>
-        <div className="mt-4">
-          <p className="text-xs text-gray-500 mb-1">Views by voucher</p>
-          {data.R12.views.vouchers?.length ? data.R12.views.vouchers.map((row) => (
-            <p key={row.id} className="text-sm text-gray-700">{row.title}: {int(row.count)} · <Pct rate={row.share} plain /></p>
-          )) : <p className="text-sm text-gray-500">No voucher views stored yet.</p>}
+        <p className="text-xs text-gray-500 mt-2">{fit.locality.note}</p>
+        <div className="grid lg:grid-cols-2 gap-6 mt-5">
+          <Distribution title="Purchases by category" rows={fit.byCategory} />
+          <Distribution title="Views by category" rows={fit.views.byCategory} empty="No voucher views stored yet." />
         </div>
-        <p className="text-sm text-gray-700 mt-3">Same municipality: {shareText(data.R12.locality)}</p>
-        <p className="text-xs text-gray-500 mt-1">{data.R12.locality.note}</p>
+        <div className="mt-6">
+          <Distribution
+            title="Purchases by price"
+            rows={fit.byPrice}
+            split
+            labelOf={(row) => (row.id === 'unknown' ? 'Unknown' : `${row.id} credits`)}
+          />
+        </div>
+        <div className="mt-6">
+          <Distribution
+            title="Views by voucher"
+            rows={fit.views.vouchers}
+            labelOf={(row) => row.title}
+            empty="No voucher views stored yet."
+          />
+        </div>
       </Card>
       <Card metricId="R13" title={data.R13.title} summary="What people do on the page right after a survey: buy a voucher there, open the shop, or take another survey." note={data.R13.note}>
         {!data.R13.shown ? (
@@ -2156,14 +2240,16 @@ function RetentionPhase3({ data }) {
       </Card>
       <LastAction metric={data.L6.lastAction} />
       {data.L7 ? (
-        <Card metricId="L7" title="Referral" summary="Invites sent, signups from those invites, and how many of those people activated within 7 days." note={data.L7.note}>
-          <div className="grid sm:grid-cols-3 gap-3 mb-4">
-            <Mini label="Invites sent" value={int(data.L7.invites)} />
-            <Mini label="Signups from invites" value={int(data.L7.signups)} />
-            <Mini label="Invite to signup" value={shareText(data.L7.conversion)} />
+        <Card metricId="L7" title="Referral" summary="Accounts that signed up with a referral code, and how many of those people activated within 7 days." note={data.L7.note}>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <Mini label="Signups with a code" value={int(data.L7.signups)} />
+            <Mini label="Completed" value={int(data.L7.completed)} />
+            <Mini label="Still pending" value={int(data.L7.pending)} />
+            <Mini label="Expired" value={int(data.L7.expired)} />
           </div>
-          {data.L7.invites > 0 ? (
+          {data.L7.signups > 0 ? (
             <>
+              <p className="text-sm text-gray-700 mb-3">Completed: {shareText(data.L7.conversion, false, 'referral signups')}</p>
               <p className="text-sm text-gray-700 mb-3">Survey within 7 days: {data.L7.surveyActivated ? shareText(data.L7.surveyActivated) : 'None of these signups are 7 days old yet'}</p>
               <p className="text-sm text-gray-700 mb-4">Activated within 7 days: {data.L7.activated ? shareText(data.L7.activated) : 'None of these signups are 7 days old yet'}</p>
               <div className="overflow-x-auto">
@@ -2171,9 +2257,10 @@ function RetentionPhase3({ data }) {
                   <thead>
                     <tr className="text-left text-xs text-gray-500">
                       <th className="py-2 pr-3 font-medium">Referrer signup week</th>
-                      <th className="py-2 pr-3 font-medium">Invites</th>
                       <th className="py-2 pr-3 font-medium">Signups</th>
-                      <th className="py-2 pr-3 font-medium">Invite to signup</th>
+                      <th className="py-2 pr-3 font-medium">Completed</th>
+                      <th className="py-2 pr-3 font-medium">Pending</th>
+                      <th className="py-2 pr-3 font-medium">Expired</th>
                       <th className="py-2 font-medium">Survey within 7 days</th>
                     </tr>
                   </thead>
@@ -2183,9 +2270,10 @@ function RetentionPhase3({ data }) {
                       .map((row) => (
                       <tr key={row.cohort} className="border-t border-gray-100">
                         <td className="py-2 pr-3">{row.cohort}</td>
-                        <td className="py-2 pr-3">{int(row.invites)}</td>
                         <td className="py-2 pr-3">{int(row.signups)}</td>
-                        <td className="py-2 pr-3">{shareText(row.conversion)}</td>
+                        <td className="py-2 pr-3">{int(row.completed)}</td>
+                        <td className="py-2 pr-3">{int(row.pending)}</td>
+                        <td className="py-2 pr-3">{int(row.expired)}</td>
                         <td className="py-2">{row.surveyActivated ? shareText(row.surveyActivated) : '–'}</td>
                       </tr>
                     ))}

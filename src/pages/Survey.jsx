@@ -11,6 +11,8 @@ import MatrixQuestion, {
   emptyMatrixValue,
   isMatrixComplete,
 } from '../components/survey/MatrixQuestion';
+import { SurveyRichText } from '../components/survey/SurveyTextField';
+import { plainSurveyText } from '../utils/surveyMarkup';
 
 const Survey = () => {
   const { campaignId } = useParams();
@@ -143,40 +145,40 @@ const Survey = () => {
       switch (question.questionType) {
         case 'rating':
           if (value === 0) {
-            validationErrors.push(`Please provide a rating for: "${questionText}"`);
+            validationErrors.push(`Please provide a rating for: "${plainSurveyText(questionText)}"`);
           }
           break;
         case 'yes_no':
         case 'single_checkbox':
         case 'attention_check':
           if (!value || value === '') {
-            validationErrors.push(`Please select an option for: "${questionText}"`);
+            validationErrors.push(`Please select an option for: "${plainSurveyText(questionText)}"`);
           }
           break;
         case 'likert': {
           const point = Number(value);
           const count = (question.options || []).length;
           if (!Number.isInteger(point) || point < 1 || point > count) {
-            validationErrors.push(`Please select an option for: "${questionText}"`);
+            validationErrors.push(`Please select an option for: "${plainSurveyText(questionText)}"`);
           }
           break;
         }
         case 'multiple_checkbox':
           if (!value || value.length === 0) {
-            validationErrors.push(`Please select at least one option for: "${questionText}"`);
+            validationErrors.push(`Please select at least one option for: "${plainSurveyText(questionText)}"`);
           } else if (question.maxSelections && value.length > question.maxSelections) {
-            validationErrors.push(`Please select no more than ${question.maxSelections} options for: "${questionText}"`);
+            validationErrors.push(`Please select no more than ${question.maxSelections} options for: "${plainSurveyText(questionText)}"`);
           }
           break;
         case 'matrix_radio':
           if (!isMatrixComplete(value, question.rows || [])) {
-            validationErrors.push(`Please answer every row for: "${questionText}"`);
+            validationErrors.push(`Please answer every row for: "${plainSurveyText(questionText)}"`);
           }
           break;
         case 'text_short':
         case 'text_long':
           if (!value || value.trim() === '') {
-            validationErrors.push(`Please provide an answer for: "${questionText}"`);
+            validationErrors.push(`Please provide an answer for: "${plainSurveyText(questionText)}"`);
           }
           break;
         case 'slider':
@@ -184,7 +186,7 @@ const Survey = () => {
           break;
         default:
           if (!value || value === '') {
-            validationErrors.push(`Please provide an answer for: "${questionText}"`);
+            validationErrors.push(`Please provide an answer for: "${plainSurveyText(questionText)}"`);
           }
       }
     });
@@ -542,7 +544,7 @@ const Survey = () => {
                 <div key={index} className="border-b border-gray-200 pb-8 last:border-b-0">
                   <div className="flex items-start justify-between mb-4">
                     <label className="block text-lg font-medium text-gray-900">
-                      {index + 1}. {question.questionText}
+                      {index + 1}. <SurveyRichText text={question.questionText} />
                       <span className="text-red-500 ml-1">*</span>
                     </label>
                     <div className="flex items-center text-gray-500 text-sm ml-4">

@@ -17,7 +17,7 @@ import skyBg from "../assets/home/sky.jpg";
 import "../components/homepage/homepage.css";
 import "../components/shop/shop.css";
 
-const SHOP_PAGE_SIZE = 6;
+const SHOP_PAGE_SIZE = 12;
 
 export default function Shop() {
   const { user } = useAuth();
@@ -32,6 +32,7 @@ export default function Shop() {
   const catalogPage = parsePage(searchParams.get("page"));
   const [searchDraft, setSearchDraft] = useState(search);
   const [selectedOffer, setSelectedOffer] = useState(null);
+  const [selectedVia, setSelectedVia] = useState("shop");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [voucherOffers, setVoucherOffers] = useState([]);
   const [recommendedOffers, setRecommendedOffers] = useState([]);
@@ -188,7 +189,7 @@ export default function Shop() {
     };
   }, [user, recommendedTick]);
 
-  const handleSelectOffer = (offer, index = 0) => {
+  const handleSelectOffer = (offer, index = 0, receivedVia = "shop") => {
     if (!user) {
       toast.error("Please log in to redeem vouchers.");
       navigate("/login");
@@ -199,6 +200,7 @@ export default function Shop() {
       return;
     }
     setSelectedIndex(index);
+    setSelectedVia(receivedVia);
     setSelectedOffer(offer);
   };
 
@@ -333,7 +335,7 @@ export default function Shop() {
                     <RewardCard
                       offer={offer}
                       index={idx}
-                      onRedeem={handleSelectOffer}
+                      onRedeem={(offer, index) => handleSelectOffer(offer, index, "shop_recommended")}
                       onViewStore={(businessId) => navigate(`/shop/merchant/${businessId}`)}
                     />
                   </div>
@@ -496,6 +498,7 @@ export default function Shop() {
         <VoucherRedeemModal
           offer={selectedOffer}
           index={selectedIndex}
+          receivedVia={selectedVia}
           userCredits={userCredits}
           onClose={() => setSelectedOffer(null)}
           onSuccess={() => {

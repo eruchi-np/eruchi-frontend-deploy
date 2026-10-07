@@ -13,6 +13,7 @@ import { BASIC_DETAILS_CREDITS } from "../utils/onboardingCredits";
 import { formatNepalPhone, phoneFormatError } from "../utils/phoneFormat";
 import { trackOnboardingError, trackOnboardingSubmit, trackOnboardingView } from "../utils/healthEvents";
 import { getPostLoginPath } from "../utils/auth";
+import { clearStoredReferralCode, digitsOnly, readStoredReferralCode, storeReferralCode } from "../utils/referral";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -48,6 +49,10 @@ const CompleteBasicInfo = () => {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [loggingOut, setLoggingOut] = useState(false);
+  const storedReferral = readStoredReferralCode();
+  const [hasReferral, setHasReferral] = useState(storedReferral ? "yes" : "no");
+  const [referralCode, setReferralCode] = useState(storedReferral);
+  const canEnterReferral = !user?.referralStatus;
 
   const {
     register,
@@ -105,6 +110,13 @@ const CompleteBasicInfo = () => {
       return;
     }
 
+    const enteredCode = digitsOnly(referralCode);
+    if (canEnterReferral && hasReferral === "yes" && enteredCode.length !== 6) {
+      setSubmitError("Enter the 6-digit referral code.");
+      setSubmitting(false);
+      return;
+    }
+
     try {
       await axios.put(
         `${API_BASE_URL}/users/me/basic-profile`,
@@ -112,9 +124,11 @@ const CompleteBasicInfo = () => {
           phone: data.phone.trim(),
           dateOfBirth: data.dateOfBirth,
           gender: data.gender,
+          ...(canEnterReferral && hasReferral === "yes" ? { referralCode: enteredCode } : {}),
         },
         { withCredentials: true }
       );
+      clearStoredReferralCode();
 
       toast.success(`Saved — ${BASIC_DETAILS_CREDITS} Ruchi Credits added.`);
       trackOnboardingSubmit("step2");
@@ -219,6 +233,52 @@ const CompleteBasicInfo = () => {
             </select>
             {errors.gender && <p className="onboard-error">{errors.gender.message}</p>}
           </div>
+
+          {canEnterReferral && (
+            <div className="onboard-field">
+              <label>Do you have a referral code?</label>
+              <div className="onboard-tabs" role="group" aria-label="Do you have a referral code?">
+                <button
+                  type="button"
+                  className={`onboard-tab ${hasReferral === "no" ? "is-on" : ""}`}
+                  onClick={() => {
+                    setHasReferral("no");
+                    clearStoredReferralCode();
+                  }}
+                >
+                  No
+                </button>
+                <button
+                  type="button"
+                  className={`onboard-tab ${hasReferral === "yes" ? "is-on" : ""}`}
+                  onClick={() => setHasReferral("yes")}
+                >
+                  Yes
+                </button>
+              </div>
+            </div>
+          )}
+
+          {canEnterReferral && hasReferral === "yes" && (
+            <div className={`onboard-field ${submitError && digitsOnly(referralCode).length !== 6 ? "is-error" : ""}`}>
+              <label htmlFor="referralCode">Referral code</label>
+              <input
+                id="referralCode"
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                maxLength={6}
+                placeholder="6-digit code"
+                value={referralCode}
+                onChange={(event) => {
+                  const next = digitsOnly(event.target.value);
+                  setReferralCode(next);
+                  storeReferralCode(next);
+                }}
+              />
+              <p className="onboard-hint">You get 10 extra credits with this code.</p>
+            </div>
+          )}
 
           {submitError && <p className="onboard-error">{submitError}</p>}
 

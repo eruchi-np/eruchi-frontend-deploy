@@ -5,6 +5,8 @@ import { sepSurveyAPI, fifteenDaySurveyAPI, clusterAPI } from '../../services/ap
 import { ArrowLeft, Plus, Trash2, Save, Type, FileText, CheckSquare, ListOrdered, Loader2, Sliders, AlertCircle, Eye, Settings as SettingsIcon, Clock, Calendar, Award, Users, Target, Table2, ChevronUp, ChevronDown, ShieldAlert } from 'lucide-react';
 import toast from 'react-hot-toast';
 import MatrixQuestion from '../../components/survey/MatrixQuestion';
+import SurveyTextField, { SurveyRichText } from '../../components/survey/SurveyTextField';
+import { plainSurveyText, sanitizeSurveyMarkup } from '../../utils/surveyMarkup';
 
 export const SATISFACTION_SCALE = [
   'Completely satisfied',
@@ -410,7 +412,7 @@ const CreateSepSurvey = () => {
       return toast.error('Cluster send date/time is required');
     }
 
-    const questionTexts = formData.questions.map((q) => q.questionText.trim());
+    const questionTexts = formData.questions.map((q) => plainSurveyText(q.questionText));
     if (questionTexts.some((text) => !text)) return toast.error('All questions must have text');
     if (questionTexts.some((text) => text.length > 200)) {
       return toast.error('Question text must be 200 characters or less');
@@ -478,7 +480,7 @@ const CreateSepSurvey = () => {
 
       const questions = formData.questions.map(q => {
           const base = {
-            questionText: q.questionText.trim(),
+            questionText: sanitizeSurveyMarkup(q.questionText),
             questionType: q.questionType,
             isRequired: q.isRequired !== false,
             metricTag: q.metricTag === 'cep' || q.metricTag === 'nps' ? q.metricTag : 'none'
@@ -776,7 +778,7 @@ const CreateSepSurvey = () => {
                       required
                     />
                     <p className="text-xs text-gray-500 mt-1.5">
-                      For cluster / merchant-assigned users, the timer starts when the survey email is sent.
+                      For cluster / merchant-assigned users, the timer starts when they become eligible.
                     </p>
                   </div>
 
@@ -785,7 +787,7 @@ const CreateSepSurvey = () => {
                       Send to clusters
                     </label>
                     <p className="text-xs text-gray-500 mb-3">
-                      Select one or more clusters. If status is Published, membership is snapshotted and emails are queued at the send time below.
+                      Select one or more clusters. If status is Published, membership is snapshotted and those users become eligible at the send time below.
                     </p>
                     {clustersLoading ? (
                       <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -838,7 +840,7 @@ const CreateSepSurvey = () => {
                           required
                         />
                         <p className="text-xs text-gray-500 mt-1.5">
-                          Membership is snapshotted and emails go out at this time (same as now if you leave it as the current time).
+                          Membership is snapshotted and users become eligible at this time (same as now if you leave it as the current time).
                         </p>
                       </div>
                     )}
@@ -1021,13 +1023,9 @@ const CreateSepSurvey = () => {
                           {q.isRequired === false ? 'Optional' : 'Required'}
                         </button>
 
-                        <input
-                          type="text"
+                        <SurveyTextField
                           value={q.questionText}
-                          onChange={e => handleQuestionChange(idx, 'questionText', e.target.value)}
-                          placeholder="Enter question text..."
-                          className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500"
-                          required
+                          onChange={(next) => handleQuestionChange(idx, 'questionText', next)}
                         />
                       </div>
 
@@ -1455,7 +1453,7 @@ const CreateSepSurvey = () => {
                         {q.questionType === 'matrix_radio' && (
                           <div className="bg-white border border-dashed border-gray-300 rounded-lg p-4 opacity-90">
                             <p className="text-sm font-medium text-gray-800 mb-4">
-                              {q.questionText.trim() || 'How satisfied are you with each of the following?'}
+                              <SurveyRichText text={plainSurveyText(q.questionText) ? q.questionText : 'How satisfied are you with each of the following?'} />
                             </p>
                             <MatrixQuestion
                               preview

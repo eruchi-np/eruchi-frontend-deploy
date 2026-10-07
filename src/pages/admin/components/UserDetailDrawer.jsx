@@ -6,6 +6,14 @@ import { adminAPI } from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 import { canAdjustCredits as userCanAdjustCredits } from "../../../utils/adminRoles";
 
+const LIFECYCLE_LABELS = {
+  onboarding: "Onboarding",
+  stalled: "Stalled",
+  active: "Active",
+  atRisk: "At risk",
+  dormant: "Dormant",
+};
+
 const REASON_LABELS = {
   campaign_completion: "Campaign",
   sep_survey_completion: "Survey",
@@ -277,6 +285,10 @@ export default function UserDetailDrawer({ userId, onClose, NAVY, onCreditsChang
                   ))}
                 </ul>
               )}
+              <p>
+                Lifecycle: {LIFECYCLE_LABELS[user.lifecycleState] || "Not tagged yet"}
+                {user.lifecycleStateAt ? ` · ${formatWhen(user.lifecycleStateAt)}` : ""}
+              </p>
               <p>Last online: {formatWhen(user.lastActiveAt)}</p>
               <p>Last survey filled: {formatWhen(user.lastSurveyCompletedAt)}</p>
               <p>

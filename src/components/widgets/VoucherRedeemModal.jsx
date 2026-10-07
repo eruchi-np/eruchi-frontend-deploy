@@ -96,6 +96,7 @@ export default function VoucherRedeemModal({
   onSuccess,
   onRedeemed,
   index,
+  receivedVia,
 }) {
   const [step, setStep] = useState("confirm");
   const [loading, setLoading] = useState(false);
@@ -172,7 +173,7 @@ export default function VoucherRedeemModal({
       detail: fromPrompt ? { action: "bought", sessionId: healthSessionId() } : undefined,
     });
     try {
-      const res = await voucherAPI.redeem(offer._id);
+      const res = await voucherAPI.redeem(offer._id, { receivedVia });
       setVoucher(res.data.voucher);
       setStep("success");
       if (res.data.voucher?._id) {

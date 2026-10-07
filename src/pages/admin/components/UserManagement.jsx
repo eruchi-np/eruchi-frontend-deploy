@@ -193,12 +193,25 @@ const UserManagement = ({
   }, [addressQuery]);
 
   const addAddress = () => {
-    const ward = Number(addressWard);
+    if (!addressMunicipality || !addressWard) return;
+    const allWards = addressWard === '*';
+    const ward = allWards ? null : Number(addressWard);
     const maxWards = getMaxWards(addressMunicipality);
-    if (!addressMunicipality || !Number.isInteger(ward) || ward < 1 || ward > maxWards) return;
+    if (!allWards && (!Number.isInteger(ward) || ward < 1 || ward > maxWards)) return;
     setAdvancedDraft((prev) => {
       const addresses = prev.addresses || [];
-      if (addresses.some((item) => item.municipality === addressMunicipality && item.ward === ward)) {
+      const sameTown = (item) => item.municipality === addressMunicipality;
+      if (allWards) {
+        if (addresses.some((item) => sameTown(item) && item.ward == null)) return prev;
+        return {
+          ...prev,
+          addresses: [
+            ...addresses.filter((item) => !sameTown(item)),
+            { municipality: addressMunicipality, ward: null },
+          ],
+        };
+      }
+      if (addresses.some((item) => sameTown(item) && (item.ward == null || item.ward === ward))) {
         return prev;
       }
       return { ...prev, addresses: [...addresses, { municipality: addressMunicipality, ward }] };
@@ -485,6 +498,7 @@ const UserManagement = ({
                     aria-label="Ward"
                   >
                     <option value="">Ward</option>
+                    {addressMunicipality ? <option value="*">All wards</option> : null}
                     {addressMunicipality
                       ? Array.from({ length: getMaxWards(addressMunicipality) }, (_, index) => index + 1).map((ward) => (
                           <option key={ward} value={String(ward)}>
@@ -506,12 +520,12 @@ const UserManagement = ({
                   <div className="flex flex-wrap gap-2 mt-2">
                     {advancedDraft.addresses.map((item) => (
                       <button
-                        key={`${item.municipality}|${item.ward}`}
+                        key={`${item.municipality}|${item.ward ?? '*'}`}
                         type="button"
                         onClick={() => removeAddress(item.municipality, item.ward)}
                         className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-gray-50 px-3 py-1 text-xs font-medium text-gray-800 hover:bg-gray-100"
                       >
-                        {item.municipality} · Ward {item.ward}
+                        {item.ward == null ? `${item.municipality} · All wards` : `${item.municipality} · Ward ${item.ward}`}
                         <X className="h-3 w-3" />
                       </button>
                     ))}

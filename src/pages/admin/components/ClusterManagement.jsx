@@ -405,7 +405,7 @@ const ClusterManagement = ({ NAVY }) => {
               ["Pending", live.pending ?? 0],
               ["Completed", live.completed ?? 0],
               ["Skipped", live.skipped ?? 0],
-              ["Emailed", live.emailed ?? 0],
+              ["Eligible", live.emailed ?? 0],
             ].map(([label, value]) => (
               <div key={label} className="rounded-xl bg-gray-50 border border-gray-100 p-4">
                 <div className="text-xs text-gray-500 uppercase tracking-wide">{label}</div>

@@ -393,6 +393,72 @@
   z-index: 2;
 }
 
+.home-referral-slot {
+  padding-bottom: 4px;
+}
+
+.home-referral-slot + .home-meet {
+  padding-top: 28px;
+}
+
+.home-referral {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border: 1.5px solid #e4e8ee;
+  border-radius: 20px;
+}
+
+.home-referral-kicker {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.home-referral-code {
+  margin: 4px 0 0;
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  color: var(--navy);
+}
+
+.home-referral-note {
+  margin: 6px 0 0;
+  max-width: 520px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.home-referral-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-shrink: 0;
+  height: 44px;
+  padding: 0 22px;
+  border-radius: 999px;
+  border: 1.5px solid #d8dde3;
+  background: #fff;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.home-referral-btn:hover {
+  transform: translateY(-1px);
+}
+
 .home-streak-anchor {
   position: absolute;
   right: 36px;
@@ -1476,6 +1542,11 @@ button.streak-badge {
 }
 
 @media (max-width: 640px) {
+  .home-referral {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .home-hero {
     min-height: 100%;
     height: 100%;

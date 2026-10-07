@@ -1,10 +1,16 @@
 export const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 export const BUSINESS_CATEGORIES = [
-  'Restaurant', 'Cafe', 'Bakery', 'Bar & Lounge', 'Fast Food',
-  'Fine Dining', 'Food Court', 'Ice Cream & Desserts',
-  'Retail', 'Fashion', 'Electronics', 'Health & Beauty',
-  'Entertainment', 'Fitness', 'Spa & Wellness', 'Hotel', 'Other',
+  'Cafe, coffee shop, chiya pasal or bakery',
+  'Cinema',
+  'eCommerce',
+  'Food from a social media seller',
+  'Gym, fitness',
+  'Handmade goods from a social media seller',
+  'Restaurants',
+  'Salon, barber or spa',
+  'Sports entertainment',
+  'Other',
 ];
 
 export const inputCls =

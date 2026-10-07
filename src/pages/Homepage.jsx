@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy } from "lucide-react";
+import toast from "react-hot-toast";
 import HomeStreakBadge from "../components/homepage/HomeStreakBadge";
 import HomeStreakBonus from "../components/homepage/HomeStreakBonus";
 import HomeBlob from "../components/homepage/HomeBlob";
@@ -140,6 +141,18 @@ export default function Homepage() {
     navigate(isLoggedIn ? "/standalone-surveys" : "/signup");
   };
 
+  const copyReferral = async () => {
+    const code = user?.referralCode;
+    if (!code) return;
+    const link = `${window.location.origin}/signup?ref=${code}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success("Invite link copied");
+    } catch {
+      toast.error("Could not copy the invite link");
+    }
+  };
+
   const scrollCarousel = (dir) => {
     const el = scrollerRef.current;
     if (!el) return;
@@ -185,6 +198,32 @@ export default function Homepage() {
         </div>
 
         <div className="home-sheet">
+        {isLoggedIn && user?.referralCode && (
+          <section className="home-section home-referral-slot">
+            <div className="home-referral">
+              <div>
+                <p className="home-referral-kicker">Refer your friends and earn more <b>Ruchi Credits</b></p>
+                <p className="home-referral-code">{user.referralCode}</p>
+                <p className="home-referral-note">
+                  {`${user.referralsCompleted || 0} of ${user.referralsMax || 5} people referred.`}
+                  {user.nextReferralCredits
+                    ? ` Next referral pays ${user.nextReferralCredits} credits. Each refers earns you more credits`
+                    : " You've used all 5 referrals."}
+                  {user.referralsReserved > 0
+                    ? ` ${user.referralsReserved} waiting to verify their email.`
+                    : ""}
+                  {user.acceptingReferrals === false && user.nextReferralCredits
+                    ? " This code is full until one of those signups verifies or expires."
+                    : ""}
+                </p>
+              </div>
+              <button type="button" className="home-referral-btn" onClick={copyReferral}>
+                <Copy size={14} />
+                Copy invite link
+              </button>
+            </div>
+          </section>
+        )}
         <section className="home-section home-meet" id="meet">
           <HomeDots />
 

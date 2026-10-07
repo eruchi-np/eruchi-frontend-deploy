@@ -40,6 +40,30 @@ const rateFill = (pct) => {
   return '#DC2626';
 };
 
+function AxisGutter({ label }) {
+  if (!label) return null;
+  return (
+    <div className="relative w-8 shrink-0">
+      <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 -rotate-90 whitespace-nowrap text-[11px] text-gray-500">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+function AxisFrame({ yLabel, yRightLabel, xLabel, children }) {
+  return (
+    <div>
+      <div className="flex">
+        <AxisGutter label={yLabel} />
+        <div className="min-w-0 flex-1">{children}</div>
+        <AxisGutter label={yRightLabel} />
+      </div>
+      {xLabel ? <p className="text-center text-[11px] text-gray-500 mt-1">{xLabel}</p> : null}
+    </div>
+  );
+}
+
 export function WeekChecklist({
   weeks,
   selected,
@@ -122,6 +146,9 @@ export function HybridPeopleShareChart({
   rateKey = 'rate',
   peopleLabel = 'People',
   rateLabel = 'Share',
+  yLabel,
+  yRightLabel,
+  xLabel,
   showWma = true,
 }) {
   const data = useMemo(() => {
@@ -139,6 +166,7 @@ export function HybridPeopleShareChart({
   if (!data.length) return <p className="text-sm text-gray-500">No rows yet.</p>;
 
   return (
+    <AxisFrame yLabel={yLabel || peopleLabel} yRightLabel={yRightLabel || rateLabel} xLabel={xLabel}>
     <div className="h-72 w-full">
       <ResponsiveContainer>
         <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
@@ -182,10 +210,11 @@ export function HybridPeopleShareChart({
         </ComposedChart>
       </ResponsiveContainer>
     </div>
+    </AxisFrame>
   );
 }
 
-export function StackedRegistrationsChart({ rows, xKey, showWma = true }) {
+export function StackedRegistrationsChart({ rows, xKey, yLabel = 'Accounts', xLabel, showWma = true }) {
   const data = useMemo(() => {
     const chron = (rows || []).map((row) => ({
       ...row,
@@ -199,6 +228,7 @@ export function StackedRegistrationsChart({ rows, xKey, showWma = true }) {
   }, [rows, showWma]);
   if (!data.length) return <p className="text-sm text-gray-500">No rows yet.</p>;
   return (
+    <AxisFrame yLabel={yLabel} xLabel={xLabel}>
     <div className="h-72 w-full">
       <ResponsiveContainer>
         <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
@@ -224,6 +254,7 @@ export function StackedRegistrationsChart({ rows, xKey, showWma = true }) {
         </ComposedChart>
       </ResponsiveContainer>
     </div>
+    </AxisFrame>
   );
 }
 
@@ -234,6 +265,9 @@ export function SimpleBarChart({
   label = 'Value',
   percentOnTop = false,
   totalForPercent = null,
+  xLabel,
+  yLabel,
+  horizontal = false,
 }) {
   const data = useMemo(() => {
     const total = totalForPercent ?? (rows || []).reduce((sum, row) => sum + (Number(row[yKey]) || 0), 0);
@@ -245,14 +279,37 @@ export function SimpleBarChart({
   }, [rows, yKey, totalForPercent]);
 
   if (!data.length) return <p className="text-sm text-gray-500">No rows yet.</p>;
+  const tilt = !horizontal && data.some((row) => String(row[xKey] || '').length > 8);
+  const chartHeight = horizontal ? Math.max(220, data.length * 40) : undefined;
 
   return (
-    <div className="h-72 w-full">
+    <AxisFrame yLabel={yLabel || (horizontal ? undefined : label)} xLabel={xLabel || (horizontal ? label : undefined)}>
+    <div className={horizontal ? 'w-full' : 'h-72 w-full'} style={horizontal ? { height: chartHeight } : undefined}>
       <ResponsiveContainer>
-        <BarChart data={data} margin={{ top: 24, right: 12, left: 0, bottom: 0 }}>
+        <BarChart
+          data={data}
+          layout={horizontal ? 'vertical' : 'horizontal'}
+          margin={{ top: horizontal ? 8 : 24, right: horizontal ? 48 : 12, left: horizontal ? 8 : 0, bottom: tilt ? 12 : 0 }}
+        >
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis dataKey={xKey} tick={{ fontSize: 11 }} />
-          <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+          {horizontal ? (
+            <>
+              <XAxis type="number" tick={{ fontSize: 11 }} allowDecimals={false} />
+              <YAxis type="category" dataKey={xKey} width={188} tick={{ fontSize: 11 }} interval={0} />
+            </>
+          ) : (
+            <>
+              <XAxis
+                dataKey={xKey}
+                tick={{ fontSize: 11 }}
+                interval={0}
+                angle={tilt ? -24 : 0}
+                textAnchor={tilt ? 'end' : 'middle'}
+                height={tilt ? 56 : 30}
+              />
+              <YAxis tick={{ fontSize: 11 }} allowDecimals={false} />
+            </>
+          )}
           <Tooltip
             formatter={(value, name, props) => {
               if (percentOnTop) {
@@ -264,9 +321,9 @@ export function SimpleBarChart({
           <Bar
             dataKey="_value"
             name={label}
-            radius={[4, 4, 0, 0]}
+            radius={horizontal ? [0, 4, 4, 0] : [4, 4, 0, 0]}
             label={percentOnTop ? {
-              position: 'top',
+              position: horizontal ? 'right' : 'top',
               formatter: (value, entry) => `${Math.round((entry?.payload?._pct || 0) * 10) / 10}%`,
               fontSize: 11,
               fill: '#4b5563',
@@ -282,6 +339,7 @@ export function SimpleBarChart({
         </BarChart>
       </ResponsiveContainer>
     </div>
+    </AxisFrame>
   );
 }
 
@@ -291,6 +349,10 @@ export function MultiSeriesHybridChart({
   bars = [],
   lines = [],
   showWmaFor,
+  yLabel = 'Count',
+  yRightLabel,
+  yRightUnit,
+  xLabel,
 }) {
   const data = useMemo(() => {
     const chron = [...(rows || [])];
@@ -305,15 +367,17 @@ export function MultiSeriesHybridChart({
   if (!data.length) return <p className="text-sm text-gray-500">No rows yet.</p>;
   const barPalette = [COLORS.bar, COLORS.barStrong, '#A78BFA', '#F9A8D4'];
   const linePalette = [COLORS.line, COLORS.line2, COLORS.line3, COLORS.line4, COLORS.wma];
+  const rightTitle = yRightLabel || (showWmaFor ? '3-period average' : undefined);
 
   return (
+    <AxisFrame yLabel={yLabel} yRightLabel={rightTitle} xLabel={xLabel}>
     <div className="h-80 w-full">
       <ResponsiveContainer>
         <ComposedChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey={xKey} tick={{ fontSize: 11 }} />
           <YAxis yAxisId="left" tick={{ fontSize: 11 }} allowDecimals={false} />
-          <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} />
+          <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 11 }} unit={yRightUnit} />
           <Tooltip
             formatter={(value, name) => {
               if (name === '3-period avg' || String(name).includes('%')) {
@@ -363,10 +427,11 @@ export function MultiSeriesHybridChart({
         </ComposedChart>
       </ResponsiveContainer>
     </div>
+    </AxisFrame>
   );
 }
 
-export function HorizontalRateChart({ rows, yKey, rateKey = 'rate', label = 'Rate' }) {
+export function HorizontalRateChart({ rows, yKey, rateKey = 'rate', label = 'Rate', xLabel, yLabel }) {
   const data = useMemo(
     () => (rows || []).map((row) => ({
       ...row,
@@ -376,6 +441,7 @@ export function HorizontalRateChart({ rows, yKey, rateKey = 'rate', label = 'Rat
   );
   if (!data.length) return <p className="text-sm text-gray-500">No rows yet.</p>;
   return (
+    <AxisFrame yLabel={yLabel} xLabel={xLabel || label}>
     <div className="w-full" style={{ height: Math.max(220, data.length * 36) }}>
       <ResponsiveContainer>
         <BarChart data={data} layout="vertical" margin={{ top: 8, right: 24, left: 8, bottom: 0 }}>
@@ -391,6 +457,7 @@ export function HorizontalRateChart({ rows, yKey, rateKey = 'rate', label = 'Rat
         </BarChart>
       </ResponsiveContainer>
     </div>
+    </AxisFrame>
   );
 }
 
@@ -398,6 +465,7 @@ export function ImpactWeightChart({ rows }) {
   const data = useMemo(() => [...(rows || [])].sort((a, b) => a.weight - b.weight), [rows]);
   if (!data.length) return null;
   return (
+    <AxisFrame yLabel="Survey trait" xLabel="Relative impact on response rate">
     <div className="w-full" style={{ height: Math.max(180, data.length * 40) }}>
       <ResponsiveContainer>
         <BarChart data={data} layout="vertical" margin={{ top: 8, right: 24, left: 8, bottom: 0 }}>
@@ -413,6 +481,7 @@ export function ImpactWeightChart({ rows }) {
         </BarChart>
       </ResponsiveContainer>
     </div>
+    </AxisFrame>
   );
 }
 

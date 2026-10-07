@@ -15,6 +15,7 @@ const emptyForm = {
   municipality: '',
   wardNumber: '',
   category: '',
+  categories: [],
   description: '',
   instagram: '',
   website: '',
@@ -47,6 +48,7 @@ export default function BusinessProfile() {
           municipality: biz.municipality || '',
           wardNumber: biz.wardNumber || '',
           category: biz.category || '',
+          categories: Array.isArray(biz.categories) ? biz.categories : [],
           description: biz.description || '',
           instagram: biz.instagram || '',
           website: biz.website || '',
@@ -74,6 +76,15 @@ export default function BusinessProfile() {
         ? prev.operatingDays.filter((d) => d !== day)
         : [...prev.operatingDays, day],
     }));
+  };
+
+  const toggleCategory = (cat) => {
+    setForm((prev) => {
+      const has = prev.categories.includes(cat);
+      if (has) return { ...prev, categories: prev.categories.filter((c) => c !== cat) };
+      if (prev.categories.length >= 3) return prev; // max 3
+      return { ...prev, categories: [...prev.categories, cat] };
+    });
   };
 
   const handleLogoUpload = async (file) => {
@@ -104,6 +115,7 @@ export default function BusinessProfile() {
         municipality: form.municipality,
         wardNumber: form.wardNumber,
         category: form.category,
+        categories: form.categories,
         description: form.description,
         instagram: form.instagram,
         website: form.website,
@@ -192,13 +204,46 @@ export default function BusinessProfile() {
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Category</label>
-            <select value={form.category} onChange={setField('category')} className={inputCls}>
-              <option value="">Select category</option>
-              {BUSINESS_CATEGORIES.map((c) => (
+            <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">
+              Categories
+              <span className="ml-1 font-normal text-gray-400 normal-case">(up to 3)</span>
+            </label>
+            <select
+              className={inputCls}
+              value=""
+              onChange={(e) => { if (e.target.value) toggleCategory(e.target.value); }}
+            >
+              <option value="">
+                {form.categories.length === 0
+                  ? 'Select categories…'
+                  : form.categories.length >= 3
+                  ? 'Max 3 selected'
+                  : `${form.categories.length} selected — add more`}
+              </option>
+              {BUSINESS_CATEGORIES.filter((c) => !form.categories.includes(c)).map((c) => (
                 <option key={c} value={c}>{c}</option>
               ))}
             </select>
+            {form.categories.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {form.categories.map((c) => (
+                  <span
+                    key={c}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-gray-100 text-gray-700 text-xs rounded-lg"
+                  >
+                    {c}
+                    <button
+                      type="button"
+                      onClick={() => toggleCategory(c)}
+                      className="text-gray-400 hover:text-gray-700 leading-none"
+                      aria-label={`Remove ${c}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">

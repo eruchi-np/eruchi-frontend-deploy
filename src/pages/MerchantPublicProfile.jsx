@@ -268,6 +268,7 @@ export default function MerchantPublicProfile() {
       {selectedOffer && (
         <VoucherRedeemModal
           offer={selectedOffer}
+          receivedVia="merchant"
           userCredits={userCredits}
           onClose={() => setSelectedOffer(null)}
           onSuccess={() => setSelectedOffer(null)}

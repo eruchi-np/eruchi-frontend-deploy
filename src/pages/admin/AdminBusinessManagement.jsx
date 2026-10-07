@@ -39,10 +39,16 @@ const last7NepalDaysRange = () => {
 const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 const CATEGORIES = [
-  'Restaurant', 'Cafe', 'Bakery', 'Bar & Lounge', 'Fast Food',
-  'Fine Dining', 'Food Court', 'Ice Cream & Desserts',
-  'Retail', 'Fashion', 'Electronics', 'Health & Beauty',
-  'Entertainment', 'Fitness', 'Spa & Wellness', 'Hotel', 'Other',
+  'Cafe, coffee shop, chiya pasal or bakery',
+  'Cinema',
+  'eCommerce',
+  'Food from a social media seller',
+  'Gym, fitness',
+  'Handmade goods from a social media seller',
+  'Restaurants',
+  'Salon, barber or spa',
+  'Sports entertainment',
+  'Other',
 ];
 
 const TRIGGER_OPTIONS = [
@@ -122,6 +128,7 @@ const EMPTY_BUSINESS_FORM = {
   phone: '',
   address: '',
   category: '',
+  categories: [],
   description: '',
   contactName: '',
   contactDesignation: '',
@@ -634,6 +641,7 @@ export default function AdminBusinessManagement() {
     phone: business.phone || '',
     address: business.address || '',
     category: business.category || '',
+    categories: Array.isArray(business.categories) ? business.categories : [],
     description: business.description || '',
     contactName: business.contactPerson?.name || '',
     contactDesignation: business.contactPerson?.designation || '',
@@ -671,6 +679,7 @@ export default function AdminBusinessManagement() {
     municipality: businessForm.municipality,
     wardNumber:   businessForm.wardNumber,
     category:     businessForm.category,
+    categories:   businessForm.categories,
     description:  businessForm.description,
     contactPerson: {
       name:        businessForm.contactName,
@@ -785,6 +794,15 @@ export default function AdminBusinessManagement() {
         ? f.operatingDays.filter(d => d !== day)
         : [...f.operatingDays, day],
     }));
+  };
+
+  const toggleCategory = (cat) => {
+    setBusinessForm(f => {
+      const has = f.categories.includes(cat);
+      if (has) return { ...f, categories: f.categories.filter(c => c !== cat) };
+      if (f.categories.length >= 3) return f; // max 3
+      return { ...f, categories: [...f.categories, cat] };
+    });
   };
 
   const handleDeleteBusiness = async (business) => {
@@ -1004,7 +1022,9 @@ export default function AdminBusinessManagement() {
                         <div>
                           <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Category / Phone</p>
                           <p className="text-sm text-gray-600 mt-0.5">
-                            {business.category || 'N/A'} · {business.phone || 'N/A'}
+                            {(business.categories?.length
+                              ? business.categories.join(', ')
+                              : business.category) || 'N/A'} · {business.phone || 'N/A'}
                           </p>
                         </div>
                         <div className="flex flex-col items-start gap-2 md:justify-start">
@@ -1282,11 +1302,48 @@ export default function AdminBusinessManagement() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Category</label>
-                      <select {...bField('category')} className={`${inputCls} bg-white`}>
-                        <option value="">Select category</option>
-                        {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
+                      <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">
+                        Categories
+                        <span className="ml-1 font-normal text-gray-400 normal-case">(up to 3)</span>
+                      </label>
+                      <div className="relative">
+                        <select
+                          className={`${inputCls} bg-white`}
+                          value=""
+                          onChange={(e) => { if (e.target.value) toggleCategory(e.target.value); }}
+                        >
+                          <option value="">
+                            {businessForm.categories.length === 0
+                              ? 'Select categories…'
+                              : businessForm.categories.length >= 3
+                              ? 'Max 3 selected'
+                              : `${businessForm.categories.length} selected — add more`}
+                          </option>
+                          {CATEGORIES.filter(c => !businessForm.categories.includes(c)).map(c => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                        {businessForm.categories.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {businessForm.categories.map(c => (
+                              <span
+                                key={c}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 bg-gray-100 text-gray-700 text-xs rounded-lg"
+                              >
+                                {c}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleCategory(c)}
+                                  className="text-gray-400 hover:text-gray-700 leading-none"
+                                  aria-label={`Remove ${c}`}
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Street address *</label>

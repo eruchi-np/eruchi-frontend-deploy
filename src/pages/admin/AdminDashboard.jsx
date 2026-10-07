@@ -185,7 +185,7 @@ const AdminDashboard = () => {
     setIf("lastSurveyCompletedAtTo", filters.lastSurveyCompletedAtTo);
     if (Array.isArray(filters.addresses) && filters.addresses.length > 0) {
       params.addresses = filters.addresses
-        .map((item) => `${item.municipality}|${item.ward}`)
+        .map((item) => `${item.municipality}|${item.ward == null ? '*' : item.ward}`)
         .join(",");
     }
     return params;

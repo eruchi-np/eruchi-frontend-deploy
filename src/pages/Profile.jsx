@@ -64,17 +64,14 @@ function nepalWeekDays(now = new Date()) {
 
 function Credits1kBadge() {
   return (
-    <span className="profile-1k-badge" title="First to 1,000 credits">
-      <img src={mks1kBadge} alt="First to 1,000 credits" />
+    <span className="profile-1k-badge" title="Reached 1,000 credits">
+      <img src={mks1kBadge} alt="Reached 1,000 credits" />
     </span>
   );
 }
 
-function showCredits1kBadge(user, firstName) {
-  const name = String(firstName || "").trim().toLowerCase();
-  const username = String(user?.username || "").trim().toLowerCase();
-  const email = String(user?.email || "").trim().toLowerCase();
-  return name === "mks" || username === "ryanshr02" || email === "ryanshr02@gmail.com";
+function showCredits1kBadge(user) {
+  return Boolean(user?.credits1kBadge);
 }
 
 function creditGoal(credits) {
@@ -373,7 +370,7 @@ export default function Profile() {
           <div>
             <div className="profile-hero-name">
               <h1>Hi, {firstName}.</h1>
-              {showCredits1kBadge(user, firstName) ? <Credits1kBadge /> : null}
+              {showCredits1kBadge(user) ? <Credits1kBadge /> : null}
               <button
                 type="button"
                 className="profile-guard-btn"
@@ -446,12 +443,13 @@ export default function Profile() {
         {user.referralCode && (
           <section className="profile-referral">
             <div>
-              <p className="profile-referral-kicker">Your referral code</p>
+              <p className="profile-referral-kicker">Refer your friends and earn more <b>Ruchi Credits</b></p>
               <p className="profile-referral-code">{user.referralCode}</p>
               <p className="profile-referral-note">
                 {`${user.referralsCompleted || 0} of ${user.referralsMax || 5} people referred.`}
                 {user.nextReferralCredits
-                  ? ` Next referral pays ${user.nextReferralCredits} credits.`
+                  ? ` Next referral pays ${user.nextReferralCredits} credits.
+                  Each refers earns you more credits`
                   : " You've used all 5 referrals."}
                 {user.referralsReserved > 0
                   ? ` ${user.referralsReserved} waiting to verify their email.`
