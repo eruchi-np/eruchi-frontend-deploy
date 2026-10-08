@@ -73,25 +73,12 @@ export const authAPI = {
 
 export const userAPI = {
   getProfile: (config = {}) => api.get('/users/me', config),
-  getCampaignHistory: (config = {}) => api.get('/users/me/campaign-history', config),
   deleteAccount: (config = {}) => api.delete('/users/me/delete', config),
   updateBasicProfile: (data, config = {}) => api.put('/users/me/basic-profile', data, config),
   updateDemographics: (data, config = {}) => api.put('/users/me/demographics', data, config),
   updateAdditionalProfile: (data, config = {}) => api.put('/users/me/additional-profile', data, config),
   purchaseStreakGuard: (days, config = {}) => api.post('/users/me/streak-guard', { days }, config),
   getActivity: (options = {}) => getRequest('/users/me/activity', options),
-};
-
-export const campaignAPI = {
-  getCampaigns: (config = {}) => api.get('/campaigns', config),
-  joinCampaign: (id, config = {}) => api.post(`/campaigns/${id}/join`, {}, config),
-};
-
-export const surveyAPI = {
-  getSurvey: (campaignId, config = {}) => api.get(`/surveys/${campaignId}`, config),
-  submitSurvey: (data, config = {}) => api.post('/surveys', data, config),
-  skipSurvey: (config = {}) => api.post('/surveys/skip', {}, config),
-  getSurveyHistory: (config = {}) => api.get('/surveys/history', config),
 };
 
 export const adminAPI = {
@@ -157,7 +144,7 @@ export const adminAPI = {
   promoteStaff: (data, config = {}) => api.post('/admin/staff', data, config),
   getNpsMetrics: (options = {}) => getRequest('/admin/metrics/nps', options),
   getCepMetrics: (options = {}) => getRequest('/admin/metrics/cep', options),
-  getPhase1Health: (options = {}) => getRequest('/admin/health/phase1', options),
+  getHealth: (options = {}) => getRequest('/admin/health', options),
 };
 
 export const faqAPI = {

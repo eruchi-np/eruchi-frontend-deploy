@@ -32,9 +32,6 @@ const Signup = lazy(() => import('./pages/Signup'));
 const Login = lazy(() => import('./pages/Login'));
 const LoginSuccess = lazy(() => import('./pages/LoginSuccess'));
 const Profile = lazy(() => import('./pages/Profile'));
-const Campaigns = lazy(() => import('./pages/Campaigns'));
-const Survey = lazy(() => import('./pages/Survey'));
-const CampaignHistory = lazy(() => import('./pages/CampaignHistory'));
 const CompleteProfile = lazy(() => import('./pages/CompleteProfile'));
 const CompleteBasicInfo = lazy(() => import('./pages/CompleteBasicInfo'));
 const EmailVerificationPending = lazy(() => import('./pages/EmailVerificationPending'));
@@ -51,11 +48,11 @@ const Terms = lazy(() => import('./pages/Terms'));
 const PrivacyPolicy = lazy(() => import('./pages/LegalNotice'));
 const CompleteAdditionalProfile = lazy(() => import('./pages/CompleteAdditionalProfile'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
-const CreateSepSurvey = lazy(() => import('./pages/admin/CreateSepSurvey.jsx'));
+const CreateSepSurvey = lazy(() => import('./pages/admin/sep-survey/CreateSepSurvey.jsx'));
 const FifteenDaySurveyAdmin = lazy(() => import('./pages/admin/FifteenDaySurveyAdmin.jsx'));
-const AdminBusinessManagement = lazy(() => import('./pages/admin/AdminBusinessManagement'));
+const AdminBusinessManagement = lazy(() => import('./pages/admin/admin-business/AdminBusinessManagement.jsx'));
 const AdminFaqManagement = lazy(() => import('./pages/admin/AdminFaqManagement.jsx'));
-const AdminHealth = lazy(() => import('./pages/admin/AdminHealth.jsx'));
+const AdminHealth = lazy(() => import('./pages/admin/admin-health/AdminHealth.jsx'));
 const BusinessScan = lazy(() => import('./pages/business/BusinessScan'));
 const BusinessDashboard = lazy(() => import('./pages/business/BusinessDashboard'));
 const BusinessProfile = lazy(() => import('./pages/business/BusinessProfile'));
@@ -256,33 +253,6 @@ function App() {
               element={
                 <ProtectedRoute>
                   <VoucherDetail />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/campaigns"
-              element={
-                <ProtectedRoute requireProfileComplete={true}>
-                  <Campaigns />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/survey/:campaignId"
-              element={
-                <ProtectedRoute requireProfileComplete={true}>
-                  <Survey />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="/campaign-history"
-              element={
-                <ProtectedRoute requireProfileComplete={true}>
-                  <CampaignHistory />
                 </ProtectedRoute>
               }
             />

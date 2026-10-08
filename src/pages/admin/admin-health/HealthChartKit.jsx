@@ -1,3 +1,5 @@
+// Charts for the health tabs. Bars, week checklists, and the back-to-top control.
+
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   Bar,
@@ -13,7 +15,7 @@ import {
   BarChart,
 } from 'recharts';
 import { ArrowUp } from 'lucide-react';
-import { weightedMovingAverage } from '../../../utils/healthChartMath';
+import { weightedMovingAverage } from './healthChartMath';
 
 /** Shared health-dashboard palette — navy brand + clear series hues. */
 const COLORS = {

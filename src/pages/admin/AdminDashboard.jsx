@@ -170,6 +170,7 @@ const AdminDashboard = () => {
       params[key] = value;
     };
     setIf("activity", filters.activity);
+    setIf("lifecycleState", filters.lifecycleState);
     if (filters.q?.trim()) params.q = filters.q.trim();
     setIf("isVerified", filters.isVerified);
     setIf("isProfileComplete", filters.isProfileComplete);

@@ -1,3 +1,5 @@
+// Chart helpers. Moving average, display names, and which retention weeks are old enough to show.
+
 /** Newest-heavy 3-period weighted moving average. */
 export const weightedMovingAverage = (values, periods = 3) => {
   const nums = (values || []).map((value) => (Number.isFinite(Number(value)) ? Number(value) : null));

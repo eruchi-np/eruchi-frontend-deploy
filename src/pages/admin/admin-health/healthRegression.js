@@ -1,3 +1,5 @@
+// Survey impact weights. Turns predictor columns into one comparable score.
+
 /** Standardized multiple linear regression (OLS). Returns null if underdetermined. */
 export function standardizedImpactWeights(rows, predictors, outcomeKey) {
   const sample = (rows || []).filter((row) => {

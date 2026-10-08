@@ -45,7 +45,18 @@ const EMAIL_EXPORT_TYPES = [
   },
 ];
 
+const LIFECYCLE_OPTIONS = [
+  { value: "", label: "Any" },
+  { value: "onboarding", label: "Onboarding" },
+  { value: "stalled", label: "Stalled" },
+  { value: "active", label: "Active" },
+  { value: "atRisk", label: "At risk" },
+  { value: "dormant", label: "Dormant" },
+  { value: "none", label: "Not tagged yet" },
+];
+
 const EMPTY_ADVANCED = {
+  lifecycleState: "",
   isVerified: "",
   isProfileComplete: "",
   isAdditionalProfileComplete: "",
@@ -403,6 +414,20 @@ const UserManagement = ({
           {advancedOpen && (
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                <label className="block">
+                  <span className="text-xs font-medium text-gray-600">Lifecycle</span>
+                  <select
+                    value={advancedDraft.lifecycleState}
+                    onChange={(e) => setDraft("lifecycleState", e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-200"
+                  >
+                    {LIFECYCLE_OPTIONS.map((opt) => (
+                      <option key={opt.value || "any"} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <BoolSelect label="Verified" field="isVerified" />
                 <BoolSelect label="Profile complete" field="isProfileComplete" />
                 <BoolSelect label="Additional profile complete" field="isAdditionalProfileComplete" />
