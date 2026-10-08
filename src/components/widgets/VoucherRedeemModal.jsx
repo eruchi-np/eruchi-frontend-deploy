@@ -559,7 +559,7 @@ export default function VoucherRedeemModal({
                     disabled={loading || !agreed}
                   >
                     {loading && <Loader2 size={16} className="animate-spin" />}
-                    Redeem
+                    Buy
                   </button>
                 )}
               </div>
