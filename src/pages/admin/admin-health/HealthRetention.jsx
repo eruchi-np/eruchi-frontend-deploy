@@ -32,7 +32,7 @@ function ReturnVisits({ data }) {
       </div>
       <Card metricId="L2" title="Cohort matrix" summary="Full signup-week by later-week grid. Same retention rule as L1, for every week 0–12." note={data.L2.note}>
         <p className="text-xs text-gray-500 mb-3">
-          Unlike L1, this shows every later week, not only 1/2/4/8. Each cell is <span className="font-medium text-gray-600">answer % · median surveys</span> among those who answered. Hover a cell for the exact counts. Signup weeks on or before 2026-06-18 are left out.
+          Unlike L1, this shows every later week, not only 1/2/4/8. Each cell is <span className="font-medium text-gray-600">answer % · median surveys</span> among those who answered. A week still open shows n= for the people whose own window has already closed. Hover a cell for the exact counts. Signup weeks on or before 2026-06-18 are left out.
         </p>
         <div className="overflow-x-auto">
           <table className="text-sm border-separate border-spacing-0 min-w-max">
@@ -175,10 +175,10 @@ export function Retention({ data }) {
       return {
         week: cohort.week,
         people: cohort.cohortSize,
-        week1: point(1)?.survey?.rate == null ? null : point(1).survey.rate * 100,
-        week2: point(2)?.survey?.rate == null ? null : point(2).survey.rate * 100,
-        week4: point(4)?.survey?.rate == null ? null : point(4).survey.rate * 100,
-        week8: point(8)?.survey?.rate == null ? null : point(8).survey.rate * 100,
+        week1: point(1)?.complete && point(1).survey?.rate != null ? point(1).survey.rate * 100 : null,
+        week2: point(2)?.complete && point(2).survey?.rate != null ? point(2).survey.rate * 100 : null,
+        week4: point(4)?.complete && point(4).survey?.rate != null ? point(4).survey.rate * 100 : null,
+        week8: point(8)?.complete && point(8).survey?.rate != null ? point(8).survey.rate * 100 : null,
       };
     }), [data.L1.cohorts]);
   return (
@@ -193,14 +193,14 @@ export function Retention({ data }) {
               key={key}
               label={label}
               value={point?.survey ? shareText(point.survey, false, 'signups') : 'Not ready'}
-              sub={tile ? `Week of ${tile.week} · ${int(tile.cohortSize)} people` : 'No cohort is old enough'}
+              sub={tile ? `Week of ${tile.week} · ${point?.complete === false ? `n=${int(point.closed)}` : `${int(tile.cohortSize)} people`}` : 'No cohort is old enough'}
             />
           );
         })}
       </div>
       <Card metricId="L1" title="Survey retention by signup week" summary="Of each signup week, who finished a survey in week 1, week 2, week 4, and week 8." note={(data.L1.gaps || []).join(' ')}>
         <p className="text-xs text-gray-500 mb-3">
-          Checkpoint view only. The cohort matrix below is the same rule for every later week 0–12. Signup weeks on or before 2026-06-18 are left out.
+          Checkpoint view only. The cohort matrix below is the same rule for every later week 0–12. A week still open shows the people whose own window has already closed, marked n=. Signup weeks on or before 2026-06-18 are left out.
         </p>
         <MultiSeriesHybridChart
           rows={l1Chart}
@@ -233,7 +233,18 @@ export function Retention({ data }) {
                   <td className="py-2 pr-3">{int(cohort.cohortSize)}</td>
                   {[1, 2, 4, 8].map((week) => {
                     const point = cohort.points.find((row) => row.week === week);
-                    return <td key={week} className="py-2 pr-3">{point?.ready ? shareText(point.survey, false, 'signups') : '–'}</td>;
+                    return (
+                      <td key={week} className="py-2 pr-3">
+                        {point?.ready ? (
+                          point.complete === false ? (
+                            <span className="inline-flex items-baseline gap-1.5">
+                              <Pct rate={point.survey?.rate} />
+                              <span className="text-xs text-gray-500">n={int(point.closed)}</span>
+                            </span>
+                          ) : shareText(point.survey, false, 'signups')
+                        ) : '–'}
+                      </td>
+                    );
                   })}
                 </tr>
               ))}

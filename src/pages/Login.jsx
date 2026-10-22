@@ -12,11 +12,16 @@ import { businessAPI } from "../services/api";
 import GoogleOAuthHint from "../components/auth/GoogleOAuthHint";
 import GoogleSignInButton from "../components/auth/GoogleSignInButton";
 import { consumeIncompleteGoogleOAuthAttempt } from "../utils/googleOAuth";
+import { ensureCsrfToken } from "../utils/csrf";
 import OnboardingShell from "../components/onboarding/OnboardingShell";
 import { parseStep } from "../utils/onboardingSchemas";
 import "../components/onboarding/onboarding.css";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5000/api";
+
+const LOGIN_NETWORK_MESSAGE =
+  "Can't reach the login server. Check your connection and try again.";
 
 const loginSchema = z.object({
   username: z
@@ -93,6 +98,13 @@ const Login = () => {
     setAttemptedEmail(data.username);
 
     try {
+      try {
+        await ensureCsrfToken();
+      } catch {
+        setLoginError(LOGIN_NETWORK_MESSAGE);
+        return;
+      }
+
       const response = await axios.post(
         `${API_BASE_URL}/auth/login`,
         {
@@ -108,6 +120,11 @@ const Login = () => {
       toast.success("Login successful!");
       navigate(getPostLoginPath(userData), { replace: true });
     } catch (error) {
+      if (!error.response) {
+        setLoginError(LOGIN_NETWORK_MESSAGE);
+        return;
+      }
+
       const errorMessage =
         error.response?.data?.message ||
         error.response?.data?.errors?.[0]?.msg ||
@@ -163,7 +180,11 @@ const Login = () => {
 
       navigate("/business/dashboard");
     } catch (err) {
-      setBizError(err.response?.data?.message || "Invalid credentials");
+      setBizError(
+        !err.response
+          ? LOGIN_NETWORK_MESSAGE
+          : err.response?.data?.message || "Invalid credentials"
+      );
     } finally {
       setBizLoading(false);
     }
@@ -197,13 +218,7 @@ const Login = () => {
         {activeTab === "user" && (
           <>
             {googleOAuthHint && <GoogleOAuthHint />}
-            <GoogleSignInButton
-              onSuccess={(userData) => {
-                toast.success("Login successful!");
-                navigate(getPostLoginPath(userData), { replace: true });
-              }}
-              onError={() => setGoogleOAuthHint(true)}
-            />
+            <GoogleSignInButton />
 
             <div className="onboard-divider">
               <span>Or continue with email</span>

@@ -38,7 +38,10 @@ const CompleteAdditionalProfile = ({ mode = "registration" }) => {
       return;
     }
     await refreshUser();
-    navigate("/standalone-surveys", { replace: true });
+    navigate("/standalone-surveys", {
+      replace: true,
+      state: { scrollToCatalog: true, firstSurveyNudge: true },
+    });
   };
 
   const handleLogout = async () => {

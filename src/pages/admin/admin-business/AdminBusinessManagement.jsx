@@ -1,6 +1,6 @@
 // Business management. Lists merchants, redeemed vouchers, and the dialogs to edit a business or a voucher offer.
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { adminAPI, sepSurveyAPI } from '../../../services/api';
 import { useAuth } from '../../../context/AuthContext';
@@ -15,13 +15,13 @@ import BusinessList from './BusinessList.jsx';
 import BusinessFormModal from './BusinessFormModal.jsx';
 import BusinessPasswordModal from './BusinessPasswordModal.jsx';
 import VoucherOfferModal from './VoucherOfferModal.jsx';
+import useAdminBusinessList from './useAdminBusinessList.js';
+import useRedeemedVouchersView from './useRedeemedVouchersView.js';
 import {
-  BUSINESS_PAGE_SIZE,
   EMPTY_BUSINESS_FORM,
   EMPTY_FEEDBACK_SURVEY_ROW,
   EMPTY_VOUCHER_FORM,
   NAVY,
-  VOUCHER_STATUSES,
   formFromOffer,
   last7NepalDaysRange,
   placeError,
@@ -34,24 +34,56 @@ export default function AdminBusinessManagement() {
   const [searchParams, setSearchParams] = useSearchParams();
   const verifiedParam = searchParams.get('verified');
   const verifiedFilter = verifiedParam === 'pending' ? 'pending' : 'all';
-  const showingRedeemed = searchParams.get('view') === 'redeemed' && !fullAdmin;
-  const voucherStatusParam = VOUCHER_STATUSES.includes(searchParams.get('status'))
-    ? searchParams.get('status')
-    : 'used';
-  const voucherFromParam = searchParams.get('from') || '';
-  const voucherToParam = searchParams.get('to') || '';
 
-  // Business list
-  const [businesses, setBusinesses]               = useState([]);
-  const [loading, setLoading]                     = useState(true);
-  const [currentPage, setCurrentPage]             = useState(1);
-  const [totalPages, setTotalPages]               = useState(1);
-  const [listTotal, setListTotal]                 = useState(0);
-    const [dashboardStats, setDashboardStats]       = useState(null);
-  const [expandedBusinesses, setExpandedBusinesses] = useState({});
-  const [businessOffers, setBusinessOffers]       = useState({});
-  const [offersLoading, setOffersLoading]         = useState({});
-  const [logoUploading, setLogoUploading]         = useState({});
+  const {
+    businesses,
+    setBusinesses,
+    loading,
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    listTotal,
+    setListTotal,
+    dashboardStats,
+    expandedBusinesses,
+    businessOffers,
+    setBusinessOffers,
+    offersLoading,
+    logoUploading,
+    repeatVisitSaving,
+    fetchStats,
+    fetchBusinesses,
+    fetchOffers,
+    setVerifiedFilter,
+    handleRepeatVisitsToggle,
+    toggleExpand,
+    handleLogoUpload,
+    handleDeleteOffer,
+    handleDeleteBusiness,
+  } = useAdminBusinessList({ verifiedFilter, setSearchParams });
+
+  const {
+    showingRedeemed,
+    voucherStatusParam,
+    voucherFromParam,
+    voucherToParam,
+    vouchers,
+    voucherLoading,
+    voucherPage,
+    setVoucherPage,
+    voucherPagination,
+    voucherStatusCounts,
+    voucherRedeemedInRange,
+    loadRedeemedVouchers,
+    handleVoucherStatusFilter,
+    handleVoucherDateRangeChange,
+    leaveRedeemedView,
+  } = useRedeemedVouchersView({
+    searchParams,
+    setSearchParams,
+    fullAdmin,
+    navigate,
+  });
 
   // Voucher offer modal
   const [selectedBusinessForModal, setSelectedBusinessForModal] = useState(null);
@@ -80,130 +112,6 @@ export default function AdminBusinessManagement() {
   const [passwordSubmitLoading, setPasswordSubmitLoading]             = useState(false);
   const [showNewPassword, setShowNewPassword]                         = useState(false);
   const [dashboardBusiness, setDashboardBusiness]                     = useState(null);
-  const [repeatVisitSaving, setRepeatVisitSaving]                   = useState({});
-  const [vouchers, setVouchers] = useState([]);
-  const [voucherLoading, setVoucherLoading] = useState(false);
-  const [voucherPage, setVoucherPage] = useState(1);
-  const [voucherPagination, setVoucherPagination] = useState(null);
-  const [voucherStatusCounts, setVoucherStatusCounts] = useState({
-    active: 0,
-    used: 0,
-    expired: 0,
-    cancelled: 0,
-  });
-  const [voucherRedeemedInRange, setVoucherRedeemedInRange] = useState(null);
-
-  // ── Lifecycle ──────────────────────────────────────────────────────────────
-
-  useEffect(() => { fetchStats(); }, []);
-  useEffect(() => {
-    fetchBusinesses(currentPage);
-  }, [currentPage, verifiedFilter]);
-
-  useEffect(() => {
-    if (searchParams.get('view') !== 'redeemed' || !fullAdmin) return;
-    const from = searchParams.get('from') || '';
-    const to = searchParams.get('to') || '';
-    const status = VOUCHER_STATUSES.includes(searchParams.get('status'))
-      ? searchParams.get('status')
-      : 'used';
-    const params = new URLSearchParams({ tab: 'vouchers', status });
-    if (from) params.set('from', from);
-    if (to) params.set('to', to);
-    navigate(`/admin?${params.toString()}`, { replace: true });
-  }, [fullAdmin, navigate, searchParams]);
-
-  const loadRedeemedVouchers = useCallback(async (status, page, from, to) => {
-    setVoucherLoading(true);
-    try {
-      const [listRes, statsRes] = await Promise.all([
-        adminAPI.getVouchers({
-          status,
-          page,
-          limit: 20,
-          ...(from && { from }),
-          ...(to && { to }),
-          skipErrorToast: true,
-        }),
-        adminAPI.getVoucherStats({
-          ...(from && { from }),
-          ...(to && { to }),
-          skipErrorToast: true,
-        }),
-      ]);
-      setVouchers(listRes.data.data || []);
-      setVoucherPagination(listRes.data.pagination || null);
-      const data = statsRes.data.data || {};
-      if (from || to) {
-        setVoucherStatusCounts(data.inRangeByStatus || { active: 0, used: 0, expired: 0, cancelled: 0 });
-        setVoucherRedeemedInRange(data.redeemedInRange ?? 0);
-      } else {
-        setVoucherStatusCounts(data.byStatus || { active: 0, used: 0, expired: 0, cancelled: 0 });
-        setVoucherRedeemedInRange(null);
-      }
-    } catch {
-      toast.error('Failed to load vouchers');
-    } finally {
-      setVoucherLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!showingRedeemed) return;
-    loadRedeemedVouchers(voucherStatusParam, voucherPage, voucherFromParam, voucherToParam);
-  }, [
-    showingRedeemed,
-    voucherStatusParam,
-    voucherPage,
-    voucherFromParam,
-    voucherToParam,
-    loadRedeemedVouchers,
-  ]);
-
-  const handleVoucherStatusFilter = (status) => {
-    setVoucherPage(1);
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set('view', 'redeemed');
-      next.set('status', status);
-      return next;
-    });
-  };
-
-  const handleVoucherDateRangeChange = ({ from, to }) => {
-    setVoucherPage(1);
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.set('view', 'redeemed');
-      if (from) next.set('from', from);
-      else next.delete('from');
-      if (to) next.set('to', to);
-      else next.delete('to');
-      return next;
-    });
-  };
-
-  const leaveRedeemedView = () => {
-    setVoucherPage(1);
-    setSearchParams((prev) => {
-      const next = new URLSearchParams(prev);
-      next.delete('view');
-      next.delete('status');
-      next.delete('from');
-      next.delete('to');
-      return next;
-    });
-  };
-
-  const setVerifiedFilter = (next) => {
-    setCurrentPage(1);
-    setSearchParams((prev) => {
-      const params = new URLSearchParams(prev);
-      if (next === 'pending') params.set('verified', 'pending');
-      else params.delete('verified');
-      return params;
-    });
-  };
 
   const addPublicSurveyRow = () => {
     setVoucherForm((prev) => ({
@@ -229,76 +137,6 @@ export default function AdminBusinessManagement() {
 
   const updatePublicSurveyRow = handlePublicSurveyChange;
 
-  // ── Data fetching ──────────────────────────────────────────────────────────
-
-  const fetchStats = async () => {
-    try {
-      const res = await adminAPI.getStats({ skipErrorToast: true });
-      setDashboardStats(res.data.data);
-    } catch (err) {
-      console.error('Failed to fetch admin stats', err);
-    }
-  };
-
-  const fetchBusinesses = async (page = currentPage) => {
-    try {
-      setLoading(true);
-      const res = await adminAPI.getBusinesses({
-        page,
-        limit: BUSINESS_PAGE_SIZE,
-        ...(verifiedFilter === 'pending' ? { isVerified: 'false' } : {}),
-        skipErrorToast: true,
-      });
-      setBusinesses(res.data.data || []);
-      setCurrentPage(res.data.pagination?.currentPage || page);
-      setTotalPages(res.data.pagination?.totalPages || 1);
-      setListTotal(res.data.pagination?.total || 0);
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to load businesses');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRepeatVisitsToggle = async (business, showRepeatVisits) => {
-    const previous = business.showRepeatVisits !== false;
-    setBusinesses((prev) => prev.map((row) => (
-      row._id === business._id ? { ...row, showRepeatVisits } : row
-    )));
-    setRepeatVisitSaving((prev) => ({ ...prev, [business._id]: true }));
-    try {
-      await adminAPI.setRepeatVisits(business._id, showRepeatVisits, { skipErrorToast: true });
-    } catch (err) {
-      console.error(err);
-      setBusinesses((prev) => prev.map((row) => (
-        row._id === business._id ? { ...row, showRepeatVisits: previous } : row
-      )));
-      toast.error('Failed to update visit counts');
-    } finally {
-      setRepeatVisitSaving((prev) => ({ ...prev, [business._id]: false }));
-    }
-  };
-
-  const fetchOffers = async (businessId) => {
-    try {
-      setOffersLoading(prev => ({ ...prev, [businessId]: true }));
-      const res = await adminAPI.getVoucherOffers({ businessId, skipErrorToast: true });
-      setBusinessOffers(prev => ({ ...prev, [businessId]: res.data.data || [] }));
-    } catch (err) {
-      console.error(err);
-      toast.error('Failed to load voucher offers');
-    } finally {
-      setOffersLoading(prev => ({ ...prev, [businessId]: false }));
-    }
-  };
-
-  const toggleExpand = async (businessId) => {
-    const isExpanded = !!expandedBusinesses[businessId];
-    setExpandedBusinesses(prev => ({ ...prev, [businessId]: !isExpanded }));
-    if (!isExpanded && !businessOffers[businessId]) fetchOffers(businessId);
-  };
-
   // Fetch the full survey list (admin sees everything, including drafts and
   // targeted surveys) once, the first time the voucher offer modal is opened.
   const fetchAvailableSurveys = async () => {
@@ -312,26 +150,6 @@ export default function AdminBusinessManagement() {
       toast.error('Failed to load surveys for feedback picker');
     } finally {
       setSurveysLoading(false);
-    }
-  };
-
-  // ── Logo actions ───────────────────────────────────────────────────────────
-
-  const handleLogoUpload = async (business, file) => {
-    if (!file) return;
-    try {
-      setLogoUploading(prev => ({ ...prev, [business._id]: true }));
-      const formData = new FormData();
-      formData.append('logo', file);
-      const res = await adminAPI.uploadBusinessLogo(business._id, formData);
-      const updated = res.data.data;
-      setBusinesses(prev => prev.map(b => (b._id === business._id ? updated : b)));
-      toast.success('Logo updated');
-    } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.message || 'Failed to upload logo');
-    } finally {
-      setLogoUploading(prev => ({ ...prev, [business._id]: false }));
     }
   };
 
@@ -356,21 +174,6 @@ export default function AdminBusinessManagement() {
   const closeVoucherModal = () => {
     setSelectedBusinessForModal(null);
     setEditingOffer(null);
-  };
-
-  const handleDeleteOffer = async (offerId, businessId) => {
-    if (!window.confirm('Are you sure you want to permanently delete this voucher offer?')) return;
-    try {
-      await adminAPI.deleteVoucherOffer(offerId);
-      toast.success('Voucher offer deleted');
-      setBusinessOffers(prev => ({
-        ...prev,
-        [businessId]: (prev[businessId] || []).filter(o => o._id !== offerId),
-      }));
-    } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.message || 'Failed to delete voucher offer');
-    }
   };
 
   // ── Feedback survey row helpers ─────────────────────────────────────────────
@@ -444,6 +247,11 @@ export default function AdminBusinessManagement() {
         approxValue:         voucherForm.approxValue !== '' ? Number(voucherForm.approxValue) : null,
         creditsRequired:     Number(voucherForm.creditsRequired),
         expiryDays:          Number(voucherForm.expiryDays),
+        availableDays:       voucherForm.availableDays || [],
+        availableHours: {
+          open:  voucherForm.availableOpeningTime || '',
+          close: voucherForm.availableClosingTime || '',
+        },
         validUntil:          new Date(voucherForm.validUntil).toISOString(),
         perUserMonthlyLimit: voucherForm.perUserMonthlyLimit !== '' ? Number(voucherForm.perUserMonthlyLimit) : null,
         totalStock:          voucherForm.totalStock !== '' ? Number(voucherForm.totalStock) : null,
@@ -662,6 +470,15 @@ export default function AdminBusinessManagement() {
     }));
   };
 
+  const toggleAvailableDay = (day) => {
+    setVoucherForm(f => ({
+      ...f,
+      availableDays: f.availableDays.includes(day)
+        ? f.availableDays.filter(d => d !== day)
+        : [...f.availableDays, day],
+    }));
+  };
+
   const toggleCategory = (cat) => {
     setBusinessForm(f => {
       const has = f.categories.includes(cat);
@@ -669,18 +486,6 @@ export default function AdminBusinessManagement() {
       if (f.categories.length >= 3) return f; // max 3
       return { ...f, categories: [...f.categories, cat] };
     });
-  };
-
-  const handleDeleteBusiness = async (business) => {
-    if (!window.confirm(`Permanently delete "${business.name}"? This cannot be undone.`)) return;
-    try {
-      await adminAPI.deleteBusiness(business._id);
-      toast.success('Business deleted');
-      setBusinesses(prev => prev.filter(b => b._id !== business._id));
-    } catch (err) {
-      console.error(err);
-      toast.error(err.response?.data?.message || 'Failed to delete business');
-    }
   };
 
   const handleChangePassword = async (e) => {
@@ -880,7 +685,9 @@ export default function AdminBusinessManagement() {
         removeFeedbackSurveyRow={removeFeedbackSurveyRow}
         removePublicSurveyRow={removePublicSurveyRow}
         selectedBusinessForModal={selectedBusinessForModal}
+        setVoucherForm={setVoucherForm}
         surveysLoading={surveysLoading}
+        toggleAvailableDay={toggleAvailableDay}
         updateFeedbackSurveyRow={updateFeedbackSurveyRow}
         updatePublicSurveyRow={updatePublicSurveyRow}
         vField={vField}

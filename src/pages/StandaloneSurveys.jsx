@@ -6,80 +6,19 @@ import { sepSurveyAPI, fifteenDaySurveyAPI, userAPI } from "../services/api";
 import { StreakArc, pageWindow } from "../components/shop/CreditArc";
 import HomeFooter from "../components/homepage/HomeFooter";
 import { flipShopCatalog, initShopCinema, scrollShopToCatalog } from "../components/shop/shopCinema";
+import FirstSurveyNudge from "../components/survey/FirstSurveyNudge";
 import { useAuth } from "../context/AuthContext";
 import { parsePage, writeSearchParams } from "../utils/searchParams";
 import { trackEvent } from "../utils/visitorEvents";
 import { trackSurveyCards } from "../utils/healthEvents";
 import { PROFILE_REFRESH_BLOCKED, PROFILE_REFRESH_BODY, PROFILE_REFRESH_TITLE } from "../utils/profileRefreshCopy";
 import { AnimationContext } from "../components/animations/AnimationContext";
+import SurveyRow, { isSurveyOpen } from "../components/survey/SurveyRow";
 import skyBg from "../assets/home/sky.jpg";
 import "../components/homepage/homepage.css";
 import "../components/shop/shop.css";
 
 const SURVEY_PAGE_SIZE = 8;
-
-function isSurveyOpen(survey) {
-  const now = new Date();
-  if (survey.isMerchantFeedback) return true;
-  if (survey.status !== "published") return false;
-  if (survey.startDate && now < new Date(survey.startDate)) return false;
-  if (survey.endDate && now > new Date(survey.endDate)) return false;
-  return true;
-}
-
-function minutesLabel(survey) {
-  const mins = Number(survey.estimatedMinutes);
-  if (!Number.isFinite(mins) || mins <= 0) return "—";
-  return `${mins}Min`;
-}
-
-function SurveyRow({ survey, onView }) {
-  const expired = !isSurveyOpen(survey);
-
-  return (
-    <article
-      className={`surveys-row ${expired ? "is-expired" : ""}`}
-      data-survey-id={survey._id}
-      onClick={() => !expired && onView(survey)}
-    >
-      <span className="surveys-row-icon" aria-hidden="true" />
-      <div className="surveys-row-copy">
-        <h3>
-          {survey.title}
-          {survey.isMerchantFeedback ? (
-            <span className="surveys-row-tag">
-              {survey.feedbackBusinessName ? `Feedback · ${survey.feedbackBusinessName}` : "Feedback"}
-            </span>
-          ) : null}
-          {survey.isDailySprint ? (
-            <span className="surveys-row-tag">
-              Day {survey.daySlot}{survey.wave > 1 ? ` · round ${survey.wave}` : ""}
-            </span>
-          ) : null}
-          {survey.kind === "daily" ? (
-            <span className="surveys-row-tag">Daily</span>
-          ) : null}
-        </h3>
-        <p>{survey.description}</p>
-      </div>
-      <div className="surveys-row-meta">
-        <span className="surveys-row-time">{minutesLabel(survey)}</span>
-        <span className="surveys-row-credits">{survey.credits || 0}</span>
-      </div>
-      <button
-        type="button"
-        className="surveys-row-view"
-        disabled={expired}
-        onClick={(event) => {
-          event.stopPropagation();
-          onView(survey);
-        }}
-      >
-        {expired ? "closed" : "view"}
-      </button>
-    </article>
-  );
-}
 
 function sortSurveys(items, sortOrder) {
   if (sortOrder === "credits-desc") {
@@ -102,6 +41,7 @@ export default function StandaloneSurveys() {
   const listRef = useRef(null);
   const rectsRef = useRef(new Map());
   const lastCatalogPage = useRef(null);
+  const nudgeHandledRef = useRef(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const sortOrder = searchParams.get("sort") || "oldest";
   const catalogPage = parsePage(searchParams.get("page"));
@@ -111,6 +51,7 @@ export default function StandaloneSurveys() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [retryTick, setRetryTick] = useState(0);
+  const [showFirstSurveyNudge, setShowFirstSurveyNudge] = useState(false);
 
   const setListParams = useCallback(
     (patch) =>
@@ -166,6 +107,19 @@ export default function StandaloneSurveys() {
     window.scrollTo(0, 0);
     return undefined;
   }, [location.state]);
+
+  useEffect(() => {
+    if (nudgeHandledRef.current) return undefined;
+    if (!location.state?.firstSurveyNudge) return undefined;
+    if (!user) return undefined;
+    if (user.first_survey_completed) {
+      nudgeHandledRef.current = true;
+      return undefined;
+    }
+    nudgeHandledRef.current = true;
+    const timer = window.setTimeout(() => setShowFirstSurveyNudge(true), 500);
+    return () => window.clearTimeout(timer);
+  }, [location.state, user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -293,15 +247,15 @@ export default function StandaloneSurveys() {
                 <div className="shop-hero-copy">
                   <h1>
                     <span className="shop-hero-line-wrap">
-                      <span className="shop-hero-line">Your next favourite.</span>
+                      <span className="shop-hero-line">Your path to rewards.</span>
                     </span>
                     <span className="shop-hero-line-wrap">
-                      <span className="shop-hero-line">Already earned.</span>
+                      <span className="shop-hero-line">Little bit every day.</span>
                     </span>
                   </h1>
                   <p>
-                    A coffee on your way. A climb after work. Turn your everyday opinions into a
-                    little more of what you love.
+                    Surveys earn Ruchi Credits. Use Ruchi Credits to buy discount vouchers to your
+                    favorite cafe, restaurant, sports venue, and more!
                   </p>
                   <button type="button" className="home-pill home-pill-lg home-pill-white" onClick={goCatalog}>
                     Surveys
@@ -366,9 +320,6 @@ export default function StandaloneSurveys() {
                   </span>
                   <h2>Available Surveys</h2>
                 </div>
-                <p className="shop-head-copy">
-                  Every survey you have been a part of, all in one place.
-                </p>
               </div>
             </div>
 
@@ -499,6 +450,11 @@ export default function StandaloneSurveys() {
       </div>
 
       <HomeFooter />
+
+      <FirstSurveyNudge
+        open={showFirstSurveyNudge}
+        onClose={() => setShowFirstSurveyNudge(false)}
+      />
     </div>
   );
 }

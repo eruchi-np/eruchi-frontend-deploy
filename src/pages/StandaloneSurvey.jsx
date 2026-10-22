@@ -1,374 +1,506 @@
-import React, { useState, useEffect, useRef } from "react";
-import { useParams, useNavigate, useSearchParams } from "react-router-dom";
-import { sepSurveyAPI, fifteenDaySurveyAPI } from "../services/api";
+import React from "react";
 import {
-  ArrowLeft,
-  Loader2,
-  Award,
-} from "lucide-react";
-import toast from "react-hot-toast";
-import useSurveyTimer from "../hooks/userSurveyTimer";
-import { trackHealthEvent, useSurveyVisit } from "../utils/healthEvents";
-import { useAuth } from "../context/AuthContext";
-import { PROFILE_REFRESH_BLOCKED, PROFILE_REFRESH_BODY, PROFILE_REFRESH_TITLE } from "../utils/profileRefreshCopy";
-import { completionFromSubmitResponse, goToSurveyComplete } from "../utils/surveyComplete";
+  PROFILE_REFRESH_TITLE,
+} from "../utils/profileRefreshCopy";
 import SurveySubmitConfirm from "../components/survey/SurveySubmitConfirm";
-import MatrixQuestion, {
-  emptyMatrixValue,
-  isMatrixComplete,
-} from "../components/survey/MatrixQuestion";
 import { SurveyRichText } from "../components/survey/SurveyTextField";
 import { plainSurveyText } from "../utils/surveyMarkup";
+import skyBg from "../assets/home/sky.jpg";
+import "../components/survey/surveyFlow.css";
+import { ArrowIcon, CheckIcon, WarnIcon } from "./surveyTake/icons";
+import SliderField from "./surveyTake/SliderField";
+import MatrixFlow from "./surveyTake/MatrixFlow";
+import useStandaloneSurvey from "./surveyTake/useStandaloneSurvey";
 
-const StandaloneSurvey = () => {
-  const { surveyId } = useParams();
-  const [searchParams] = useSearchParams();
-  const isSprint = searchParams.get("sprint") === "1";
-  const sprintWave = Number(searchParams.get("wave"));
-  const navigate = useNavigate();
-  const { user } = useAuth();
-  const [survey, setSurvey] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [responses, setResponses] = useState({});
-  const [error, setError] = useState(null);
-  const { startQuestion, getTimingData } = useSurveyTimer();
-  const surveyRef = useRef(null);
-  surveyRef.current = survey;
-  const markSurveySaved = useSurveyVisit(surveyId, ({ sessionId }) => {
-    const current = surveyRef.current;
-    let last = null;
-    for (const question of getTimingData().questions || []) {
-      const position = current?.questions?.findIndex((item) => plainSurveyText(item.questionText) === question.questionText) ?? -1;
-      if (position < 0 || !question.durationMs) continue;
-      last = last == null ? position : Math.max(last, position);
-      trackHealthEvent("survey_question_answered", {
-        refId: surveyId,
-        eventId: `q:${surveyId}:${position}:${sessionId}`,
-        detail: { position, durationMs: Math.round(question.durationMs), sessionId },
-      });
-    }
-    trackHealthEvent("survey_abandoned", {
-      refId: surveyId,
-      eventId: `abandon:${surveyId}:${sessionId}`,
-      detail: last == null ? { sessionId } : { sessionId, position: last },
-    });
-  });
+export default function StandaloneSurvey() {
+  const {
+    user,
+    navigate,
+    survey,
+    loading,
+    error,
+    submitting,
+    confirmOpen,
+    setConfirmOpen,
+    responses,
+    missed,
+    showBanner,
+    activeIndex,
+    questions,
+    answeredFlags,
+    answeredCount,
+    requiredLeft,
+    optionalUnanswered,
+    progressPct,
+    nextUnanswered,
+    handleChange,
+    handleCheckbox,
+    handleQuestionFocus,
+    scrollToQuestion,
+    requestSubmit,
+    handleSubmit,
+    exitSurvey,
+  } = useStandaloneSurvey();
 
-  useEffect(() => {
-    let cancelled = false;
-    const fetchSurvey = async () => {
-      setLoading(true);
-      setError(null);
-      if (user?.profileSurveyBlocked) {
-        if (!cancelled) {
-          setError(`${PROFILE_REFRESH_BODY} ${PROFILE_REFRESH_BLOCKED}`);
-          setLoading(false);
-        }
-        return;
-      }
-      try {
-        const res = isSprint
-          ? await fifteenDaySurveyAPI.getToTake(surveyId, sprintWave)
-          : await sepSurveyAPI.getById(surveyId);
-        if (cancelled) return;
-        setSurvey(res.data.data);
-
-        const initial = {};
-        res.data.data.questions.forEach((q) => {
-          if (q.questionType === "multiple_checkbox") {
-            initial[q.questionText] = [];
-          } else if (q.questionType === "slider") {
-            initial[q.questionText] = Number.isFinite(Number(q.minValue)) ? Number(q.minValue) : 0;
-          } else if (q.questionType === "matrix_radio") {
-            initial[q.questionText] = emptyMatrixValue(q.rows || []);
-          } else {
-            initial[q.questionText] = "";
-          }
-        });
-        if (!cancelled) setResponses(initial);
-      } catch (err) {
-        if (!cancelled) setError(err.response?.data?.message || "Failed to load survey");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    fetchSurvey();
-    return () => {
-      cancelled = true;
-    };
-  }, [surveyId, isSprint, sprintWave, user?.profileSurveyBlocked]);
-
-  const handleChange = (qText, value) => {
-    setResponses((prev) => ({ ...prev, [qText]: value }));
-  };
-
-  const handleCheckbox = (qText, option, checked) => {
-    const current = Array.isArray(responses[qText]) ? responses[qText] : [];
-    const question = survey?.questions?.find((item) => item.questionText === qText);
-    const max = Math.max(1, Number(question?.maxSelections) || 1);
-    if (checked && !current.includes(option) && current.length >= max) {
-      toast.error(max === 1 ? "You can pick one option" : `You can pick up to ${max} options`);
-      return;
-    }
-    setResponses((prev) => {
-      const arr = Array.isArray(prev[qText]) ? prev[qText] : [];
-      if (!checked) return { ...prev, [qText]: arr.filter((v) => v !== option) };
-      if (arr.includes(option) || arr.length >= max) return prev;
-      return { ...prev, [qText]: [...arr, option] };
-    });
-  };
-
-  const handleQuestionFocus = (questionText) => {
-    startQuestion(questionText);
-  };
-
-  const matrixTouched = (val) =>
-    val &&
-    typeof val === "object" &&
-    !Array.isArray(val) &&
-    Object.values(val).some((item) => item != null && item !== "");
-
-  const isComplete = () => {
-    return survey.questions.every((q) => {
-      const val = responses[q.questionText];
-      if (q.isRequired === false) {
-        if (q.questionType === "matrix_radio" && matrixTouched(val)) {
-          return isMatrixComplete(val, q.rows || []);
-        }
-        return true;
-      }
-      if (q.questionType === "multiple_checkbox") return Array.isArray(val) && val.length > 0;
-      if (q.questionType === "single_checkbox" || q.questionType === "attention_check") {
-        return typeof val === "string" && (q.options || []).includes(val);
-      }
-      if (q.questionType === "likert") {
-        const point = Number(val);
-        return Number.isInteger(point) && point >= 1 && point <= (q.options || []).length;
-      }
-      if (q.questionType === "slider") return true;
-      if (q.questionType === "matrix_radio") {
-        return isMatrixComplete(val, q.rows || []);
-      }
-      return val && (typeof val !== "string" || val.trim());
-    });
-  };
-
-  const requestSubmit = () => {
-    if (!isComplete()) {
-      toast.error("Please answer all questions");
-      return;
-    }
-    setConfirmOpen(true);
-  };
-
-  const handleSubmit = async () => {
-    setSubmitting(true);
-    try {
-      const timingData = getTimingData();
-      const previousStreak = user?.streakCount ?? 0;
-      const res = isSprint
-        ? await fifteenDaySurveyAPI.submit(surveyId, responses, timingData, survey.wave)
-        : await sepSurveyAPI.submit(surveyId, responses, timingData);
-      setConfirmOpen(false);
-      markSurveySaved();
-      window.dispatchEvent(new Event("authChange"));
-      goToSurveyComplete(
-        navigate,
-        completionFromSubmitResponse(res, {
-          creditsEarned: survey.credits || 0,
-          previousStreak,
-          kind: survey.kind || "normal",
-        })
-      );
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to submit");
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  if (loading)
+  if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <Loader2 className="h-12 w-12 animate-spin text-neutral-900" />
+      <div className="sf-page min-h-screen flex items-center justify-center bg-white">
+        <span className="spin" aria-label="Loading survey" />
       </div>
     );
-  if (error)
+  }
+
+  if (error) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center text-neutral-900 p-6 text-center gap-4">
-        {user?.profileSurveyBlocked ? <h3>{PROFILE_REFRESH_TITLE}</h3> : null}
-        <p>{error}</p>
-        {user?.profileSurveyBlocked ? (
-          <button
-            type="button"
-            onClick={() => navigate("/refresh-profile")}
-            className="text-white py-3 px-6 rounded-md"
-            style={{ backgroundColor: "#134074" }}
-          >
-            Update profile
-          </button>
-        ) : null}
+      <div className="sf-page min-h-screen bg-white">
+        <div className="sf-status sf-enter">
+          <h3>{user?.profileSurveyBlocked ? PROFILE_REFRESH_TITLE : "Couldn’t load survey"}</h3>
+          <p>{error}</p>
+          {user?.profileSurveyBlocked ? (
+            <button
+              type="button"
+              className="btn navy"
+              onClick={() => navigate("/refresh-profile")}
+            >
+              Update profile
+            </button>
+          ) : (
+            <button type="button" className="btn navy" onClick={() => navigate(-1)}>
+              Go back
+            </button>
+          )}
+        </div>
       </div>
     );
+  }
+
+  const mins = Number(survey.estimatedMinutes);
+  const minutesChip =
+    Number.isFinite(mins) && mins > 0 ? `About ${mins} min` : null;
 
   return (
-    <div className="min-h-screen bg-white pb-24" style={{ fontFamily: "'Inter', sans-serif" }}>
-      <div className="max-w-5xl mx-auto px-4 py-8 sm:py-16">
-        <button
-          onClick={() => navigate(-1)}
-          className="flex items-center text-neutral-500 mb-8 hover:text-neutral-900 transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5 mr-2" /> Back
+    <div className="sf-page pg">
+      <div className="mstrip">
+        <button type="button" className="x" aria-label="Exit survey" onClick={exitSurvey}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18" />
+          </svg>
         </button>
-
-        <div className="mb-12">
-          <h1 className="text-2xl sm:text-[40px] font-light text-neutral-900 mb-4 break-words">{survey.title}</h1>
-          <p className="text-neutral-600 text-lg leading-relaxed">{survey.description}</p>
-          {survey.isDailySprint ? (
-            <p className="mt-3 text-sm text-neutral-500">
-              Daily Sprint · Day {survey.daySlot}
-              {survey.wave > 1 ? ` · round ${survey.wave}` : ""}
-            </p>
-          ) : null}
-
-          <div className="flex flex-wrap gap-6 mt-8 text-sm text-neutral-500 border-t border-neutral-100 pt-6">
-            <div className="flex items-center gap-2">
-              <Award className="h-4 w-4" /> {survey.credits} Credits
-            </div>
-            {survey.kind === "daily" ? (
-              <div className="text-amber-700">Daily survey · credits only, no streak</div>
-            ) : null}
-          </div>
+        <div className="cnt">
+          {answeredCount} of {questions.length} <span>answered</span>
         </div>
-
-        <div className="space-y-12">
-          {survey.questions.map((q, i) => (
-            <div
-              key={i}
-              className="border-b border-neutral-100 pb-12 last:border-0"
-              onPointerDown={() => handleQuestionFocus(plainSurveyText(q.questionText))}
-              onFocus={() => handleQuestionFocus(plainSurveyText(q.questionText))}
-            >
-              <h3 className="text-lg font-medium text-neutral-900 mb-6">
-                {i + 1}. <SurveyRichText text={q.questionText} />
-                {q.isRequired === false && (
-                  <span className="ml-2 text-sm font-normal text-neutral-400">(optional)</span>
-                )}
-              </h3>
-
-              {q.questionType === "text_short" && (
-                <input
-                  type="text"
-                  value={responses[q.questionText] || ""}
-                  onChange={(e) => handleChange(q.questionText, e.target.value)}
-                  className="w-full p-4 border border-neutral-200 rounded-md focus:border-neutral-900 outline-none transition-colors"
-                  placeholder="Your answer..."
-                />
-              )}
-
-              {q.questionType === "text_long" && (
-                <textarea
-                  value={responses[q.questionText] || ""}
-                  onChange={(e) => handleChange(q.questionText, e.target.value)}
-                  className="w-full p-4 border border-neutral-200 rounded-md min-h-[140px] focus:border-neutral-900 outline-none transition-colors"
-                  placeholder="Your detailed response..."
-                />
-              )}
-
-              {(q.questionType === "single_checkbox" || q.questionType === "likert" || q.questionType === "attention_check") && (
-                <div className="space-y-3">
-                  {q.options.map((opt, optionIndex) => {
-                    const stored = q.questionType === "likert" ? String(optionIndex + 1) : opt;
-                    return (
-                      <label key={optionIndex} className="flex items-center gap-3 cursor-pointer group">
-                        <input
-                          type="radio"
-                          name={q.questionText}
-                          checked={responses[q.questionText] === stored}
-                          onChange={() => handleChange(q.questionText, stored)}
-                          className="h-4 w-4 text-neutral-900 border-neutral-300 focus:ring-0"
-                        />
-                        <span className="text-neutral-600 group-hover:text-neutral-900 transition-colors">{opt}</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-
-              {q.questionType === "multiple_checkbox" && (
-                <div className="space-y-3">
-                  {q.options.map((opt) => (
-                    <label key={opt} className="flex items-center gap-3 cursor-pointer group">
-                      <input
-                        type="checkbox"
-                        checked={Array.isArray(responses[q.questionText]) && responses[q.questionText].includes(opt)}
-                        onChange={(e) => handleCheckbox(q.questionText, opt, e.target.checked)}
-                        className="h-4 w-4 text-neutral-900 border-neutral-300 rounded focus:ring-0"
-                      />
-                      <span className="text-neutral-600 group-hover:text-neutral-900 transition-colors">{opt}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-
-              {q.questionType === "slider" && (
-                <div className="pt-2">
-                  <input
-                    type="range"
-                    min={q.minValue}
-                    max={q.maxValue}
-                    value={responses[q.questionText] ?? q.minValue}
-                    onChange={(e) => handleChange(q.questionText, Number(e.target.value))}
-                    className="w-full h-1 bg-neutral-200 rounded-lg appearance-none cursor-pointer accent-neutral-900"
-                  />
-                  <div className="flex justify-between text-xs mt-3 text-neutral-400">
-                    <span>{q.minValue}</span>
-                    <span className="font-medium text-neutral-900">{responses[q.questionText] ?? q.minValue}</span>
-                    <span>{q.maxValue}</span>
-                  </div>
-                </div>
-              )}
-
-              {q.questionType === "matrix_radio" && (
-                <MatrixQuestion
-                  rows={q.rows || []}
-                  columns={q.options || []}
-                  value={responses[q.questionText] || {}}
-                  onChange={(next) => handleChange(q.questionText, next)}
-                  namePrefix={`q-${i}`}
-                />
-              )}
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-16 pt-8 border-t border-neutral-100">
-          <button
-            onClick={requestSubmit}
-            disabled={submitting}
-            className="w-full text-white py-4 px-8 rounded-md font-medium hover:opacity-90 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
-            style={{ backgroundColor: "#134074" }}
-          >
-            {submitting ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              "Submit & Earn Credits"
-            )}
-          </button>
+        <span className="pill">+{survey.credits || 0}</span>
+        <div
+          className="mbar"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={questions.length}
+          aria-valuenow={answeredCount}
+          aria-label="Questions answered"
+        >
+          <i style={{ width: `${progressPct}%` }} />
         </div>
       </div>
+
+      <header className="band">
+        <img className="sky" src={skyBg} alt="" />
+        <div className="veil" />
+        <div className="band-in">
+          <div className="hdr">
+            <span className="sr">eRuchi survey</span>
+            <span aria-hidden="true" />
+            <button type="button" className="hbtn" onClick={exitSurvey}>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.4"
+                strokeLinecap="round"
+                aria-hidden="true"
+              >
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+              Exit survey
+            </button>
+          </div>
+          <div className="hero sf-enter">
+            <div className="hero-h">
+              <span className="dots" aria-hidden="true" />
+              <h1>{survey.title}</h1>
+            </div>
+            {survey.description ? <p>{survey.description}</p> : null}
+            <div className="chips">
+              {survey.isDailySprint ? (
+                <span className="chip">
+                  Daily Sprint
+                  {survey.daySlot != null ? ` · Day ${survey.daySlot}` : ""}
+                </span>
+              ) : null}
+              {survey.kind === "daily" ? <span className="chip">Daily</span> : null}
+              {minutesChip ? <span className="chip">{minutesChip}</span> : null}
+              <span className="chip">
+                {questions.length} question{questions.length === 1 ? "" : "s"}
+              </span>
+              <span className="chip tert">
+                +{survey.credits || 0} Ruchi Credits on submit
+              </span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="sheet">
+        <div className="sv-wrap">
+          <div className="qs">
+            {showBanner && missed.size > 0 ? (
+              <div className="banner" role="alert">
+                <WarnIcon />
+                <div>
+                  <b>
+                    {missed.size} question{missed.size === 1 ? "" : "s"} still need
+                    an answer.
+                  </b>{" "}
+                  <a
+                    href={`#sf-q${questions.findIndex((q) => missed.has(q.questionText)) + 1}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      const first = questions.findIndex((q) =>
+                        missed.has(q.questionText)
+                      );
+                      if (first >= 0) scrollToQuestion(first);
+                    }}
+                  >
+                    Jump to the first one
+                  </a>
+                </div>
+              </div>
+            ) : null}
+
+            {questions.map((q, i) => {
+              const qId = `sf-q${i + 1}`;
+              const titleId = `${qId}t`;
+              const val = responses[q.questionText];
+              const isBad = missed.has(q.questionText);
+              const optional = q.isRequired === false;
+
+              return (
+                <section
+                  key={qId}
+                  className={`q${isBad ? " bad" : ""}`}
+                  id={qId}
+                  aria-labelledby={titleId}
+                  onPointerDown={() =>
+                    handleQuestionFocus(plainSurveyText(q.questionText), i)
+                  }
+                  onFocus={() =>
+                    handleQuestionFocus(plainSurveyText(q.questionText), i)
+                  }
+                >
+                  <span className="q-n" aria-hidden="true">
+                    {i + 1}
+                  </span>
+                  <div>
+                    <h2 className="q-t" id={titleId}>
+                      <SurveyRichText text={q.questionText} />
+                      {optional ? <span className="tag">Optional</span> : null}
+                    </h2>
+
+                    {q.questionType === "multiple_checkbox" ? (
+                      <p className="q-h">
+                        Choose up to {Math.max(1, Number(q.maxSelections) || 1)}
+                        {Array.isArray(val) && val.length > 0 ? (
+                          <>
+                            {" "}
+                            · <b>{val.length} selected</b>
+                          </>
+                        ) : null}
+                      </p>
+                    ) : null}
+
+                    <div className="q-b">
+                      {(q.questionType === "single_checkbox" ||
+                        q.questionType === "attention_check") && (
+                        <div className="opts" role="radiogroup" aria-labelledby={titleId}>
+                          {(q.options || []).map((opt) => {
+                            const on = val === opt;
+                            return (
+                              <label key={opt} className={`o${on ? " on" : ""}`}>
+                                <input
+                                  className="sr"
+                                  type="radio"
+                                  name={qId}
+                                  checked={on}
+                                  onChange={() => handleChange(q.questionText, opt)}
+                                />
+                                <span className="rb" />
+                                <span>{opt}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {q.questionType === "likert" && (
+                        <>
+                          <div
+                            className="lk"
+                            role="radiogroup"
+                            aria-labelledby={titleId}
+                            style={{
+                              gridTemplateColumns: `repeat(${Math.max(
+                                (q.options || []).length,
+                                1
+                              )}, minmax(0, 1fr))`,
+                            }}
+                          >
+                            {(q.options || []).map((opt, optionIndex) => {
+                              const stored = String(optionIndex + 1);
+                              const on = val === stored;
+                              return (
+                                <label key={stored} className={on ? "on" : undefined}>
+                                  <input
+                                    className="sr"
+                                    type="radio"
+                                    name={qId}
+                                    checked={on}
+                                    onChange={() =>
+                                      handleChange(q.questionText, stored)
+                                    }
+                                  />
+                                  <span>{opt}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                          <div
+                            className="opts lk-mobile"
+                            role="radiogroup"
+                            aria-labelledby={titleId}
+                          >
+                            {(q.options || []).map((opt, optionIndex) => {
+                              const stored = String(optionIndex + 1);
+                              const on = val === stored;
+                              return (
+                                <label
+                                  key={`m-${stored}`}
+                                  className={`o${on ? " on" : ""}`}
+                                >
+                                  <input
+                                    className="sr"
+                                    type="radio"
+                                    name={`${qId}-m`}
+                                    checked={on}
+                                    onChange={() =>
+                                      handleChange(q.questionText, stored)
+                                    }
+                                  />
+                                  <span className="rb" />
+                                  <span>{opt}</span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+
+                      {q.questionType === "multiple_checkbox" && (
+                        <div
+                          className={`opts${(q.options || []).length > 4 ? " two" : ""}`}
+                          role="group"
+                          aria-labelledby={titleId}
+                        >
+                          {(q.options || []).map((opt) => {
+                            const on = Array.isArray(val) && val.includes(opt);
+                            return (
+                              <label key={opt} className={`o${on ? " on" : ""}`}>
+                                <input
+                                  className="sr"
+                                  type="checkbox"
+                                  checked={on}
+                                  onChange={(e) =>
+                                    handleCheckbox(
+                                      q.questionText,
+                                      opt,
+                                      e.target.checked
+                                    )
+                                  }
+                                />
+                                <span className="cb">
+                                  <CheckIcon />
+                                </span>
+                                <span>{opt}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {q.questionType === "slider" && (
+                        <SliderField
+                          question={q}
+                          value={val}
+                          labelledBy={titleId}
+                          onChange={(next) => handleChange(q.questionText, next)}
+                        />
+                      )}
+
+                      {q.questionType === "text_short" && (
+                        <input
+                          className={`tx${isBad ? " bad" : ""}`}
+                          type="text"
+                          value={val || ""}
+                          onChange={(e) =>
+                            handleChange(q.questionText, e.target.value)
+                          }
+                          placeholder="Type your answer"
+                          aria-labelledby={titleId}
+                        />
+                      )}
+
+                      {q.questionType === "text_long" && (
+                        <textarea
+                          className={`tx${isBad ? " bad" : ""}`}
+                          value={val || ""}
+                          onChange={(e) =>
+                            handleChange(q.questionText, e.target.value)
+                          }
+                          placeholder="Type your answer"
+                          aria-labelledby={titleId}
+                        />
+                      )}
+
+                      {q.questionType === "matrix_radio" && (
+                        <MatrixFlow
+                          rows={q.rows || []}
+                          columns={q.options || []}
+                          value={val || {}}
+                          namePrefix={qId}
+                          onChange={(next) => handleChange(q.questionText, next)}
+                        />
+                      )}
+
+                      {isBad ? (
+                        <div className="err" role="alert">
+                          <WarnIcon />
+                          <span>Please answer this question.</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                </section>
+              );
+            })}
+
+            <div className="sub">
+              <p className="sub-t">
+                {requiredLeft > 0 ? (
+                  <>
+                    <b>
+                      {requiredLeft} required question
+                      {requiredLeft === 1 ? "" : "s"} left.
+                    </b>
+                    {optionalUnanswered ? (
+                      <>
+                        <br />
+                        Some optional questions are still open.
+                      </>
+                    ) : null}
+                  </>
+                ) : (
+                  <b>All required questions answered.</b>
+                )}
+              </p>
+              <button
+                type="button"
+                className="btn pri"
+                onClick={requestSubmit}
+                disabled={submitting}
+              >
+                Submit survey
+                <ArrowIcon />
+              </button>
+            </div>
+          </div>
+
+          <aside className="rail" aria-label="Survey progress">
+            <h2>Your progress</h2>
+            <div className="rail-n">
+              <b>
+                {answeredCount} of {questions.length}
+              </b>{" "}
+              answered
+            </div>
+            <div
+              className="bar"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={questions.length}
+              aria-valuenow={answeredCount}
+              aria-label="Questions answered"
+            >
+              <i style={{ width: `${progressPct}%` }} />
+            </div>
+            <nav className="jump" aria-label="Jump to question">
+              {questions.map((q, i) => {
+                const done = answeredFlags[i];
+                const bad = missed.has(q.questionText);
+                const cur = activeIndex === i;
+                const className = [
+                  done ? "done" : "",
+                  cur ? "cur" : "",
+                  bad ? "bad" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ");
+                return (
+                  <a
+                    key={i}
+                    href={`#sf-q${i + 1}`}
+                    className={className || undefined}
+                    aria-label={`Question ${i + 1}${done ? ", answered" : ""}${
+                      q.isRequired === false ? ", optional" : ""
+                    }`}
+                    aria-current={cur ? "true" : undefined}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      scrollToQuestion(i);
+                    }}
+                  >
+                    {i + 1}
+                  </a>
+                );
+              })}
+            </nav>
+            {nextUnanswered >= 0 ? (
+              <a
+                className="rail-link"
+                href={`#sf-q${nextUnanswered + 1}`}
+                onClick={(event) => {
+                  event.preventDefault();
+                  scrollToQuestion(nextUnanswered);
+                }}
+              >
+                Jump to next unanswered
+              </a>
+            ) : null}
+            <p className="rail-note">
+              Your answers aren’t saved if you leave before submitting.
+            </p>
+          </aside>
+        </div>
+      </main>
 
       <SurveySubmitConfirm
         open={confirmOpen}
         submitting={submitting}
+        answeredCount={answeredCount}
+        totalCount={questions.length}
+        credits={survey.credits || 0}
         onCancel={() => !submitting && setConfirmOpen(false)}
         onConfirm={handleSubmit}
       />
     </div>
   );
-};
-
-export default StandaloneSurvey;
+}

@@ -14,11 +14,15 @@ export function parseAcquisition(input) {
   const source = cleanPart(input.source);
   const medium = cleanPart(input.medium);
   const campaign = cleanPart(input.campaign);
-  if (!source && !medium && !campaign) return null;
+  const content = cleanPart(input.content);
+  const term = cleanPart(input.term);
+  if (!source && !medium && !campaign && !content && !term) return null;
   return {
     source: source || null,
     medium: medium || null,
     campaign: campaign || null,
+    content: content || null,
+    term: term || null,
   };
 }
 
@@ -39,6 +43,8 @@ export function rememberAcquisition(search = '') {
     source: params.get('utm_source'),
     medium: params.get('utm_medium'),
     campaign: params.get('utm_campaign'),
+    content: params.get('utm_content'),
+    term: params.get('utm_term'),
   });
   const existing = readAcquisition();
   if (!incoming || existing) return existing;

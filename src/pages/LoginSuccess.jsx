@@ -5,7 +5,8 @@ import axios from 'axios';
 import { getPostLoginPath, persistAuthSession } from '../utils/auth';
 import { clearGoogleOAuthAttempt } from '../utils/googleOAuth';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
 const LoginSuccess = () => {
   const navigate = useNavigate();
@@ -26,8 +27,9 @@ const LoginSuccess = () => {
         await new Promise((resolve) => setTimeout(resolve, 200));
         navigate(getPostLoginPath(userData), { replace: true });
       } catch (err) {
-        const message =
-          err.response?.data?.message || err.message || 'Authentication failed. Please try again.';
+        const message = !err.response
+          ? "Can't reach the login server. Check your connection and try again."
+          : err.response?.data?.message || err.message || 'Authentication failed. Please try again.';
         setError(message);
 
         localStorage.removeItem('access_token');

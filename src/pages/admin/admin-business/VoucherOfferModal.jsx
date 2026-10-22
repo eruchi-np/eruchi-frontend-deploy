@@ -1,7 +1,7 @@
 // Create or edit a voucher offer, including feedback and public surveys.
 
 import { MessageSquarePlus, Plus, ShieldAlert, X } from 'lucide-react';
-import { NAVY, TRIGGER_OPTIONS } from './businessShared.js';
+import { DAYS_OF_WEEK, NAVY, TRIGGER_OPTIONS } from './businessShared.js';
 
 export default function VoucherOfferModal({
   addFeedbackSurveyRow,
@@ -14,7 +14,9 @@ export default function VoucherOfferModal({
   removeFeedbackSurveyRow,
   removePublicSurveyRow,
   selectedBusinessForModal,
+  setVoucherForm,
   surveysLoading,
+  toggleAvailableDay,
   updateFeedbackSurveyRow,
   updatePublicSurveyRow,
   vField,
@@ -141,6 +143,53 @@ export default function VoucherOfferModal({
                   {...vField('validUntil')}
                   className={`${inputCls} border-red-200 bg-amber-50/20`}
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 uppercase mb-2">Available Days</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {DAYS_OF_WEEK.map((day) => {
+                    const active = voucherForm.availableDays.includes(day);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleAvailableDay(day)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                          active
+                            ? 'text-white border-transparent'
+                            : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+                        }`}
+                        style={active ? { backgroundColor: NAVY } : {}}
+                      >
+                        {day.slice(0, 3)}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setVoucherForm((f) => ({
+                        ...f,
+                        availableDays: f.availableDays.length === 7 ? [] : [...DAYS_OF_WEEK],
+                      }))
+                    }
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-dashed border-gray-300 bg-gray-50 text-gray-500 hover:border-gray-400 transition-colors"
+                  >
+                    {voucherForm.availableDays.length === 7 ? 'Clear all' : 'All days'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Available From</label>
+                  <input type="time" {...vField('availableOpeningTime')} className={inputCls} />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase mb-1">Available Until</label>
+                  <input type="time" {...vField('availableClosingTime')} className={inputCls} />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">

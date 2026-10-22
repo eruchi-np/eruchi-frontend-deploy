@@ -73,9 +73,12 @@ export default defineConfig(({ mode }) => {
   )
   const snippets = analyticsSnippets(gtmId, pixelId)
 
+  // Relative /api (same-origin proxy) needs no extra connect-src host; 'self' covers it.
   const apiOrigin = (() => {
+    const base = String(env.VITE_API_BASE_URL || 'http://localhost:5000/api').trim()
+    if (!base || base.startsWith('/')) return null
     try {
-      return new URL(env.VITE_API_BASE_URL || 'http://localhost:5000/api').origin
+      return new URL(base).origin
     } catch {
       return 'http://localhost:5000'
     }
@@ -95,7 +98,7 @@ export default defineConfig(({ mode }) => {
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",
-      `connect-src 'self' ${apiOrigin} http://localhost:5000 http://localhost:5001 https://eruchi.com.np https://www.eruchi.com.np https://accounts.google.com https://www.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://connect.facebook.net https://www.facebook.com https://www.clarity.ms https://c.clarity.ms https://*.clarity.ms`,
+      `connect-src 'self' ${apiOrigin || ''} http://localhost:5000 http://localhost:5001 https://api.eruchi.com.np https://eruchi.com.np https://www.eruchi.com.np https://accounts.google.com https://www.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com https://connect.facebook.net https://www.facebook.com https://www.clarity.ms https://c.clarity.ms https://*.clarity.ms`.replace(/\s+/g, ' ').trim(),
       "frame-src https://accounts.google.com https://www.googletagmanager.com",
       "form-action 'self'",
     ].join('; '),

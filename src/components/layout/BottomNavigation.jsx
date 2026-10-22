@@ -49,6 +49,10 @@ const BottomNavigation = () => {
   const location = useLocation();
   const { user } = useAuth();
 
+  if (location.pathname.startsWith('/brand')) {
+    return null;
+  }
+
   if (location.pathname.startsWith('/business')) {
     return <BusinessBottomNavigation />;
   }

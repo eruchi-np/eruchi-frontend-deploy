@@ -20,8 +20,12 @@ api.interceptors.response.use(
     const skipToast = error.config?.skipErrorToast;
 
     if (status === 401 && !error.config?.skipAuthRedirect) {
-      const isBusinessRequest = error.config?.url?.includes('/business');
-      if (isBusinessRequest) {
+      const url = error.config?.url || '';
+      const isBrandRequest = url.includes('/brand/');
+      const isBusinessRequest = url.includes('/business');
+      if (isBrandRequest) {
+        window.location.href = '/brand/login';
+      } else if (isBusinessRequest) {
         localStorage.removeItem('is_business');
         localStorage.removeItem('business_name');
         window.location.href = '/login';
@@ -145,6 +149,10 @@ export const adminAPI = {
   getNpsMetrics: (options = {}) => getRequest('/admin/metrics/nps', options),
   getCepMetrics: (options = {}) => getRequest('/admin/metrics/cep', options),
   getHealth: (options = {}) => getRequest('/admin/health', options),
+  getBrandMetrics: (category, brand, metrics, config = {}) => api.get('/admin/brand-metrics', {
+    ...config,
+    params: { category, brand, metrics },
+  }),
 };
 
 export const faqAPI = {
@@ -260,6 +268,18 @@ export const businessAPI = {
       ...config,
     }),
   getPublicProfile: (id, config = {}) => api.get(`/business/public/${id}`, config),
+};
+
+export const brandAPI = {
+  catalog: (options = {}) => getRequest('/brand/catalog', options),
+  signup: (data, config = {}) => api.post('/brand/auth/signup', data, config),
+  login: (data, config = {}) => api.post('/brand/auth/login', data, config),
+  logout: (config = {}) => api.post('/brand/auth/logout', {}, config),
+  me: (config = {}) => api.get('/brand/auth/me', config),
+  metrics: (metrics, config = {}) => api.get('/brand/metrics', {
+    ...config,
+    params: { metrics },
+  }),
 };
 
 export default api;

@@ -223,9 +223,11 @@ const matrixCell = (cell) => {
       median == null ? '' : ` · median ${median} surveys among those who did`
     }`
     : undefined;
+  const openCount = cell.complete === false && cell.closed ? ` n=${int(cell.closed)}` : '';
   return (
     <span className="block tabular-nums leading-tight" title={title}>
       <span className="font-medium text-gray-900">{pct}</span>
+      {openCount ? <span className="text-gray-500">{openCount}</span> : null}
       {median == null ? null : <span className="text-gray-400"> · {median}</span>}
     </span>
   );

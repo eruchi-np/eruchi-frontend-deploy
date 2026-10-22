@@ -26,16 +26,20 @@ function LandingConversion({ metric }) {
                   <th className="py-2 pr-3 font-medium">Source</th>
                   <th className="py-2 pr-3 font-medium">Medium</th>
                   <th className="py-2 pr-3 font-medium">Campaign</th>
+                  <th className="py-2 pr-3 font-medium">Content</th>
+                  <th className="py-2 pr-3 font-medium">Term</th>
                   <th className="py-2 pr-3 font-medium">Visitors</th>
                   <th className="py-2 font-medium">Registered within 24 hours</th>
                 </tr>
               </thead>
               <tbody>
                 {metric.groups.map((group) => (
-                  <tr key={`${group.source}|${group.medium}|${group.campaign}`} className="border-t border-gray-100">
+                  <tr key={`${group.source}|${group.medium}|${group.campaign}|${group.content}|${group.term}`} className="border-t border-gray-100">
                     <td className="py-2 pr-3">{group.source}</td>
                     <td className="py-2 pr-3">{group.medium}</td>
                     <td className="py-2 pr-3">{group.campaign}</td>
+                    <td className="py-2 pr-3">{group.content}</td>
+                    <td className="py-2 pr-3">{group.term}</td>
                     <td className="py-2 pr-3">{int(group.visitors)}</td>
                     <td className="py-2">{shareText(group.converted)}</td>
                   </tr>

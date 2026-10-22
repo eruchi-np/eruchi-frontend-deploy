@@ -53,8 +53,13 @@ const FifteenDaySurveyAdmin = lazy(() => import('./pages/admin/FifteenDaySurveyA
 const AdminBusinessManagement = lazy(() => import('./pages/admin/admin-business/AdminBusinessManagement.jsx'));
 const AdminFaqManagement = lazy(() => import('./pages/admin/AdminFaqManagement.jsx'));
 const AdminHealth = lazy(() => import('./pages/admin/admin-health/AdminHealth.jsx'));
+const AdminBrandTracker = lazy(() => import('./pages/admin/AdminBrandTracker.jsx'));
 const BusinessScan = lazy(() => import('./pages/business/BusinessScan'));
 const BusinessDashboard = lazy(() => import('./pages/business/BusinessDashboard'));
+const BrandLogin = lazy(() => import('./pages/brand/BrandLogin'));
+const BrandSignup = lazy(() => import('./pages/brand/BrandSignup'));
+const BrandDashboard = lazy(() => import('./pages/brand/BrandDashboard'));
+const BrandProtectedRoute = lazy(() => import('./pages/brand/BrandProtectedRoute'));
 const BusinessProfile = lazy(() => import('./pages/business/BusinessProfile'));
 const BusinessVouchers = lazy(() => import('./pages/business/BusinessVouchers'));
 const MerchantPublicProfile = lazy(() => import('./pages/MerchantPublicProfile'));
@@ -73,7 +78,10 @@ function AppChrome({ children }) {
   const isProfile = pathname === '/profile';
   const isShop = pathname === '/shop';
   const isSurveys = pathname === '/standalone-surveys';
+  const isSurveyTake = pathname.startsWith('/standalone-survey/');
+  const isSurveyComplete = pathname === '/survey-complete';
   const isBusiness = pathname.startsWith('/business');
+  const isBrand = pathname.startsWith('/brand');
   const isProfileCompletion =
     pathname === '/complete-basic-info' ||
     pathname === '/complete-profile' ||
@@ -85,17 +93,26 @@ function AppChrome({ children }) {
     pathname === '/login' ||
     pathname === '/signup' ||
     pathname === '/email-verification';
-  const hideNav = isProfileCompletion || isProfileOnboardingLocked(user);
-  const overlayNav = isHome || isProfile || isShop || isSurveys || isOnboarding;
+  const hideNav =
+    isProfileCompletion ||
+    isProfileOnboardingLocked(user) ||
+    isSurveyTake;
+  const overlayNav =
+    isHome ||
+    isProfile ||
+    isShop ||
+    isSurveys ||
+    isSurveyComplete ||
+    isOnboarding;
   const navVariant = overlayNav ? 'overlay' : 'page';
 
   return (
     <>
-      {!isBusiness && !hideNav && <HomeNav variant={navVariant} />}
+      {!isBusiness && !isBrand && !hideNav && <HomeNav variant={navVariant} />}
       <BusinessAccessGuard />
-      <div className={`min-w-0 max-w-full ${overlayNav ? "overflow-x-clip" : "overflow-x-hidden"}`}>
+      <div className={`min-w-0 max-w-full ${isBrand || pathname === '/admin/brands' ? 'overflow-visible' : overlayNav ? 'overflow-x-clip' : 'overflow-x-hidden'}`}>
         {children}
-        {!isHome && !isProfile && !isShop && !isSurveys && !isBusiness && !isOnboarding && <Footer />}
+        {!isHome && !isProfile && !isShop && !isSurveys && !isSurveyTake && !isSurveyComplete && !isBusiness && !isBrand && !isOnboarding && <Footer />}
       </div>
     </>
   );
@@ -352,6 +369,27 @@ function App() {
                 <AdminRoute permission="analytics">
                   <AdminHealth />
                 </AdminRoute>
+              }
+            />
+            <Route
+              path="/admin/brands"
+              element={
+                <AdminRoute permission="analytics">
+                  <AdminBrandTracker />
+                </AdminRoute>
+              }
+            />
+
+            {/* ==================== BRAND CLIENT ROUTES ==================== */}
+
+            <Route path="/brand/login" element={<BrandLogin />} />
+            <Route path="/brand/signup" element={<BrandSignup />} />
+            <Route
+              path="/brand/dashboard"
+              element={
+                <BrandProtectedRoute>
+                  <BrandDashboard />
+                </BrandProtectedRoute>
               }
             />
 

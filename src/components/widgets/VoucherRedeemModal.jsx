@@ -1,93 +1,18 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate } from "react-router-dom";
-import QRCode from "react-qr-code";
-import { X, Loader2, CheckCircle2 } from "lucide-react";
 import { voucherAPI } from "../../services/api";
-import { VOUCHER_TERMS } from "../../constants/voucherTerms";
-import { CARD_COLORS } from "../shop/RewardCard";
 import { playClaimBody, playClaimOpen } from "../shop/shopCinema";
 import { getOfferStock } from "../../utils/pickSurveyOffers";
 import { healthSessionId, trackHealthEvent } from "../../utils/healthEvents";
+import {
+  getBrandPalette,
+  claimColor,
+  prettyCategory,
+  formatAvailable,
+} from "./voucherOfferFormatters.js";
+import VoucherTicketFace from "./VoucherTicketFace.jsx";
 import "../shop/shop.css";
-
-const TICKET_PALETTES = [
-  { bg: "#00704A", accent: "#005C3C", text: "#FFFFFF" },
-  { bg: "#E50914", accent: "#B8070F", text: "#FFFFFF" },
-  { bg: "#1E88E5", accent: "#1565C0", text: "#FFFFFF" },
-  { bg: "#FB8C00", accent: "#EF6C00", text: "#FFFFFF" },
-  { bg: "#212121", accent: "#000000", text: "#FFFFFF" },
-  { bg: "#EC407A", accent: "#D81B60", text: "#FFFFFF" },
-  { bg: "#6A1B9A", accent: "#4A148C", text: "#FFFFFF" },
-  { bg: "#00897B", accent: "#00695C", text: "#FFFFFF" },
-  { bg: "#3949AB", accent: "#283593", text: "#FFFFFF" },
-  { bg: "#C62828", accent: "#8E0000", text: "#FFFFFF" },
-];
-
-const WEEKDAYS = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-];
-
-const getBrandPalette = (brandName = "") => {
-  let hash = 0;
-  for (let i = 0; i < brandName.length; i++) {
-    hash = (hash << 5) - hash + brandName.charCodeAt(i);
-    hash |= 0;
-  }
-  return TICKET_PALETTES[Math.abs(hash) % TICKET_PALETTES.length];
-};
-
-function claimColor(index, offer) {
-  if (Number.isFinite(index)) {
-    return CARD_COLORS[Math.abs(index) % CARD_COLORS.length];
-  }
-  const key = String(offer?._id || offer?.business?.brandName || offer?.business?.name || "");
-  let hash = 0;
-  for (let i = 0; i < key.length; i++) {
-    hash = (hash << 5) - hash + key.charCodeAt(i);
-    hash |= 0;
-  }
-  return CARD_COLORS[Math.abs(hash) % CARD_COLORS.length];
-}
-
-function prettyCategory(value) {
-  if (!value) return "Partner reward";
-  return String(value)
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function discountHeadline(offer) {
-  if (offer.discountType === "percentage") return `${offer.discountValue}% OFF`;
-  if (offer.discountType === "free_item") {
-    return offer.discountValue ? `FREE ${String(offer.discountValue).toUpperCase()}` : "FREE";
-  }
-  if (offer.discountType === "value_combo") return "VALUE COMBO";
-  if (offer.discountValue != null && offer.discountValue !== "") {
-    return `Rs. ${offer.discountValue} OFF`;
-  }
-  return "REWARD";
-}
-
-function formatAvailable(days) {
-  if (!Array.isArray(days) || days.length === 0) return "See partner for hours";
-  const indexes = WEEKDAYS.map((day, i) => (days.includes(day) ? i : -1)).filter((i) => i >= 0);
-  if (indexes.length === 0) return days.join(", ");
-  const min = Math.min(...indexes);
-  const max = Math.max(...indexes);
-  if (indexes.length === max - min + 1) {
-    if (min === 0 && max === 6) return "Every day";
-    if (min === 0 && max === 4) return "Monday – Friday";
-    return `${WEEKDAYS[min]} – ${WEEKDAYS[max]}`;
-  }
-  return days.join(", ");
-}
 
 export default function VoucherRedeemModal({
   offer,
@@ -118,7 +43,7 @@ export default function VoucherRedeemModal({
     offer.expiryDays != null
       ? `${offer.expiryDays} day${offer.expiryDays === 1 ? "" : "s"} after claiming`
       : "See partner for details";
-  const available = formatAvailable(offer.business?.operatingDays);
+  const available = formatAvailable(offer);
   const accent = claimColor(index, offer);
   const stockInfo = useMemo(() => getOfferStock(offer), [offer]);
   const isOut = stockInfo !== null && stockInfo.remaining === 0;
@@ -462,152 +387,36 @@ export default function VoucherRedeemModal({
         className="reward-claim-motion"
         onClick={(event) => event.stopPropagation()}
       >
-        <article ref={cardRef} className="reward-claim" style={{ "--claim": accent }}>
-        <aside className="reward-claim-brand">
-          <p className="reward-claim-kicker">Eruchi exclusive</p>
-          <div className="reward-claim-arch">
-            <span>{brandName}</span>
-          </div>
-          <p className="reward-claim-tagline">
-            A little reward.
-            <br />
-            A great experience.
-          </p>
-          <p className="reward-claim-mark">Claim it. Enjoy it.</p>
-        </aside>
-
-        <div className="reward-claim-body">
-          <button
-            type="button"
-            className="reward-claim-close"
-            onClick={onClose}
-            aria-label="Close"
-          >
-            <X size={18} />
-          </button>
-
-          {step === "confirm" && (
-            <>
-              <p className="reward-claim-category">{category}</p>
-              <h2 className="reward-claim-title">{brandName}</h2>
-              <p className="reward-claim-copy">{description}</p>
-
-              <div className="reward-claim-deal">
-                <strong>{discountHeadline(offer)}</strong>
-                <span>{offer.title}</span>
-              </div>
-
-              <dl className="reward-claim-meta">
-                <div>
-                  <dt>Validity</dt>
-                  <dd>{validity}</dd>
-                </div>
-                <div>
-                  <dt>Available</dt>
-                  <dd>{available}</dd>
-                </div>
-                <div>
-                  <dt>Location</dt>
-                  <dd>{location}</dd>
-                </div>
-              </dl>
-
-              {canRedeem && (
-                <div className="reward-claim-legal">
-                  <label className="reward-claim-agree">
-                    <input
-                      type="checkbox"
-                      checked={agreed}
-                      onChange={(event) => setAgreed(event.target.checked)}
-                    />
-                    I have read and agree to the
-                  </label>
-                  <details className="reward-claim-terms">
-                    <summary>Terms &amp; Conditions</summary>
-                    <ul>
-                      {VOUCHER_TERMS.map((term, i) => (
-                        <li key={i}>{term}</li>
-                      ))}
-                    </ul>
-                  </details>
-                </div>
-              )}
-
-              {error ? <p className="reward-claim-error">{error}</p> : null}
-              {notEnoughCredits && !isOut ? (
-                <p className="reward-claim-error">Not enough credits</p>
-              ) : null}
-
-              <div className="reward-claim-foot">
-                <div>
-                  <p className="reward-claim-credits">{offer.creditsRequired || 0} Credits</p>
-                  <p className="reward-claim-balance">Your balance: {userCredits} credits</p>
-                </div>
-                {isOut ? (
-                  <button type="button" className="reward-claim-cta" disabled>
-                    Sold out
-                  </button>
-                ) : notEnoughCredits ? (
-                  <button type="button" className="reward-claim-cta" onClick={goSurveys}>
-                    Surveys
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className="reward-claim-cta"
-                    onClick={handleRedeem}
-                    disabled={loading || !agreed}
-                  >
-                    {loading && <Loader2 size={16} className="animate-spin" />}
-                    Buy
-                  </button>
-                )}
-              </div>
-
-              <p className="reward-claim-note">
-                Present your voucher at the venue. Terms and conditions apply.
-              </p>
-            </>
-          )}
-
-          {step === "success" && voucher && (
-            <div className="reward-claim-success">
-              <div className="reward-claim-success-head">
-                <CheckCircle2 size={22} />
-                <h2>Voucher redeemed</h2>
-              </div>
-              <div ref={qrRef} className="reward-claim-qr">
-                <QRCode
-                  value={JSON.stringify({ v: voucher._id, t: voucher.redemptionToken })}
-                  size={168}
-                />
-              </div>
-              <p className="reward-claim-copy">Show this QR to store staff to redeem.</p>
-              {voucher.redemptionCode ? (
-                <div className="reward-claim-code">
-                  <p className="reward-claim-code-label">Or give staff this code</p>
-                  <p className="reward-claim-code-value">{voucher.redemptionCode}</p>
-                </div>
-              ) : null}
-              <div className="reward-claim-success-actions">
-                <button type="button" className="reward-claim-secondary" onClick={downloadVoucher}>
-                  Download voucher
-                </button>
-                <button
-                  type="button"
-                  className="reward-claim-cta"
-                  onClick={() => {
-                    onSuccess?.();
-                    navigate("/vouchers");
-                  }}
-                >
-                  View my vouchers
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-        </article>
+        <VoucherTicketFace
+          cardRef={cardRef}
+          accent={accent}
+          brandName={brandName}
+          category={category}
+          description={description}
+          offer={offer}
+          validity={validity}
+          available={available}
+          location={location}
+          canRedeem={canRedeem}
+          agreed={agreed}
+          setAgreed={setAgreed}
+          error={error}
+          notEnoughCredits={notEnoughCredits}
+          isOut={isOut}
+          userCredits={userCredits}
+          loading={loading}
+          step={step}
+          voucher={voucher}
+          qrRef={qrRef}
+          onClose={onClose}
+          onRedeem={handleRedeem}
+          onGoSurveys={goSurveys}
+          onDownload={downloadVoucher}
+          onViewVouchers={() => {
+            onSuccess?.();
+            navigate("/vouchers");
+          }}
+        />
       </div>
     </div>,
     document.body

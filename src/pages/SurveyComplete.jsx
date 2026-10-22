@@ -1,355 +1,258 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
-import { Loader2, SearchX } from "lucide-react";
-import { fifteenDaySurveyAPI, sepSurveyAPI, userAPI, voucherAPI } from "../services/api";
-import { useAuth } from "../context/AuthContext";
-import VoucherCard from "../components/shop/VoucherCard";
 import VoucherRedeemModal from "../components/widgets/VoucherRedeemModal";
 import SearchBar from "../components/widgets/SearchBar";
-import StreakCelebration from "../components/survey/StreakCelebration";
-import AnimatedContent from "../components/animations/AnimatedContent";
+import SurveyRow from "../components/survey/SurveyRow";
 import { readSurveyCompleteState } from "../utils/surveyComplete";
-import {
-  isOfferAvailable,
-  matchesOfferSearch,
-  pickSuggestedOffers,
-} from "../utils/pickSurveyOffers";
 import { trackHealthEvent } from "../utils/healthEvents";
-
-const headingStyle = {
-  fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
-  fontSize: "clamp(28px, 7vw, 48px)",
-  fontWeight: 500,
-  lineHeight: 1.15,
-};
-
-const SEARCH_LIMIT = 8;
-
-async function lookupMoreSurveys() {
-  const [surveysResult, sprintResult] = await Promise.allSettled([
-    sepSurveyAPI.getAvailable({ page: 1, limit: 1, skipErrorToast: true }),
-    fifteenDaySurveyAPI.getMine({ skipErrorToast: true }),
-  ]);
-
-  const total =
-    surveysResult.status === "fulfilled"
-      ? Number(surveysResult.value.data?.pagination?.totalSurveys) ||
-        (surveysResult.value.data?.data || []).length
-      : 0;
-  const sprints =
-    sprintResult.status === "fulfilled"
-      ? sprintResult.value.data?.data || []
-      : [];
-
-  return total > 0 || sprints.length > 0;
-}
+import skyBg from "../assets/home/sky.jpg";
+import CreditArc from "./surveyComplete/CreditArc.jsx";
+import StreakChip from "./surveyComplete/StreakChip.jsx";
+import CompleteRewardCard from "./surveyComplete/CompleteRewardCard.jsx";
+import useSurveyCompleteOffers from "./surveyComplete/useSurveyCompleteOffers.js";
+import "../components/survey/surveyFlow.css";
+import "../components/shop/shop.css";
 
 export default function SurveyComplete() {
   const location = useLocation();
-  const { user, refreshUser } = useAuth();
   const completion = readSurveyCompleteState(location.state);
 
-  const [credits, setCredits] = useState(
-    completion?.credits ?? user?.credits ?? 0
-  );
-  const [streak, setStreak] = useState(
-    completion?.streakCount ?? user?.streakCount ?? 0
-  );
-  const [offers, setOffers] = useState([]);
-  const [recommended, setRecommended] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState("");
-  const [search, setSearch] = useState("");
-  const [selectedOffer, setSelectedOffer] = useState(null);
-  const [retryTick, setRetryTick] = useState(0);
-  const [hasMoreSurveys, setHasMoreSurveys] = useState(false);
-  const searched = useRef(false);
+  const {
+    credits,
+    loading,
+    fetchError,
+    search,
+    selectedOffer,
+    setSelectedOffer,
+    nextSurvey,
+    showingSearch,
+    displayedOffers,
+    almostThere,
+    shopLink,
+    trackAction,
+    handleSelectOffer,
+    openNextSurvey,
+    handleSearchChange,
+    handleRedeemed,
+    retry,
+  } = useSurveyCompleteOffers(completion);
+
+  const streakIncreased =
+    completion?.kind !== "daily" &&
+    Number(completion?.streakCount) > Number(completion?.previousStreak ?? 0);
 
   useEffect(() => {
     if (!completion?.promptId) return undefined;
     try {
       sessionStorage.setItem("eruchi_reward_prompt", completion.promptId);
     } catch {
-      // The action still records without the buy flag.
+      // ignore
     }
     trackHealthEvent("reward_prompt_shown", { eventId: completion.promptId });
     return () => {
       try {
         sessionStorage.removeItem("eruchi_reward_prompt");
       } catch {
-        // Ignore storage failures.
+        // ignore
       }
     };
   }, [completion?.promptId]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      if (!completion) return;
-      setLoading(true);
-      setFetchError("");
-      try {
-        const blocked =
-          user?.profileSurveyBlocked || user?.profileOutdated;
-        const [profileRes, offersRes, recommendedRes, moreSurveys] = await Promise.all([
-          userAPI.getProfile({ skipErrorToast: true }),
-          voucherAPI.getOffers({ all: 1, skipErrorToast: true }),
-          voucherAPI.getRecommended({ skipErrorToast: true }).catch(() => null),
-          blocked ? Promise.resolve(false) : lookupMoreSurveys(),
-        ]);
-        if (cancelled) return;
-
-        const nextUser = profileRes.data?.data?.user;
-        setCredits(
-          nextUser?.credits ?? completion?.credits ?? user?.credits ?? 0
-        );
-        setStreak(
-          nextUser?.streakCount ??
-            completion?.streakCount ??
-            user?.streakCount ??
-            0
-        );
-        refreshUser();
-
-        const responseData = offersRes.data?.data || offersRes.data;
-        setOffers(Array.isArray(responseData) ? responseData : []);
-        const recommendedData = recommendedRes?.data?.data;
-        setRecommended(Array.isArray(recommendedData) ? recommendedData : []);
-        setHasMoreSurveys(moreSurveys);
-      } catch (err) {
-        if (cancelled) return;
-        setFetchError(
-          err.response?.data?.message || "Could not load rewards. Please try again."
-        );
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [retryTick]);
-
-  const suggested = useMemo(() => {
-    const fromRecommendations = recommended.slice(0, 2);
-    if (fromRecommendations.length > 0) {
-      return { mode: "recommended", offers: fromRecommendations };
-    }
-    return pickSuggestedOffers(offers, credits, 2);
-  }, [recommended, offers, credits]);
-
-  const searchResults = useMemo(() => {
-    if (!search.trim()) return [];
-    return offers
-      .filter(isOfferAvailable)
-      .filter((offer) => matchesOfferSearch(offer, search))
-      .slice(0, SEARCH_LIMIT);
-  }, [offers, search]);
-
-  const showingSearch = Boolean(search.trim());
-  const displayedOffers = showingSearch ? searchResults : suggested.offers;
-  const almostThere = !showingSearch && suggested.mode === "almost";
 
   if (!completion) {
     return <Navigate to="/standalone-surveys" replace />;
   }
 
-  const trackAction = (action, refId) => {
-    if (!completion?.promptId) return;
-    trackHealthEvent("reward_prompt_action", {
-      eventId: `${action}:${completion.promptId}${refId ? `:${refId}` : ""}`,
-      refId,
-      detail: { action },
-    });
-  };
-
-  const handleSelectOffer = (offer) => {
-    trackAction("voucher", offer?._id);
-    setSelectedOffer(offer);
-  };
-
-  const shopLink = search.trim()
-    ? `/shop?q=${encodeURIComponent(search.trim())}`
-    : "/shop";
+  const earned = completion.creditsEarned || 0;
 
   return (
-    <div
-      className="min-h-screen bg-white pb-28"
-      style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}
-    >
-      <div className="max-w-[960px] mx-auto px-4 sm:px-8 lg:px-10 py-10 lg:py-16">
-        <AnimatedContent direction="vertical" distance={28} duration={0.6}>
-          <p className="text-[11px] font-semibold tracking-[1.5px] uppercase text-blue-600 mb-3">
-            Survey complete
-          </p>
-          <h1 className="text-gray-900 mb-4" style={headingStyle}>
-            Survey successfully completed!
-          </h1>
-          <p className="text-lg sm:text-xl text-gray-600 font-light max-w-2xl">
-            You have earned{" "}
-            <span className="font-semibold text-gray-900">
-              {completion.creditsEarned} Ruchi Credits
-            </span>
-            {completion.streakBonus > 0 ? (
-              <>
-                , including a{" "}
-                <span className="font-semibold text-gray-900">
-                  {completion.streakBonus} credit streak bonus
-                </span>
-              </>
-            ) : null}
-            .
-          </p>
-          <p className="mt-2 text-sm sm:text-base text-gray-500 font-light">
-            Your balance is now {credits.toLocaleString()} credits.
-          </p>
-        </AnimatedContent>
-
-        <div className="mt-10 flex justify-center sm:justify-start">
-          {completion.kind === "daily" ? (
-            <p className="text-sm text-gray-500 font-light">
-              Daily surveys award credits only — they don’t count toward your streak.
-            </p>
-          ) : (
-            <StreakCelebration
-              from={completion.previousStreak ?? 0}
-              to={completion.streakCount ?? streak}
-            />
-          )}
-        </div>
-
-        {hasMoreSurveys ? (
-          <div className="mt-8 flex justify-center sm:justify-start">
-            <Link
-              to="/standalone-surveys"
-              state={{ scrollToCatalog: true }}
-              onClick={() => trackAction("next_survey")}
-              className="px-6 py-3 rounded-full text-sm font-medium border border-gray-200 text-gray-700 hover:bg-gray-50"
-            >
-              More surveys
-            </Link>
+    <div className="sf-page pg is-complete">
+      <header className="band">
+        <img className="sky" src={skyBg} alt="" />
+        <div className="veil" />
+        <div className="band-in">
+          <div className="cp-hero sf-enter">
+            <div className="cp-l">
+              <div className="hero-h">
+                <span className="dots" aria-hidden="true" />
+                <h1>Survey complete</h1>
+              </div>
+              <p>
+                Thanks, your answers are in. {earned} Ruchi Credits have been
+                added to your balance
+                {completion.streakBonus > 0
+                  ? ` (including a ${completion.streakBonus} Ruchi Credit streak bonus)`
+                  : ""}
+                .
+              </p>
+              {streakIncreased ? (
+                <div className="cp-strk">
+                  <StreakChip
+                    from={completion.previousStreak ?? 0}
+                    to={completion.streakCount ?? 0}
+                  />
+                </div>
+              ) : null}
+              {completion.kind === "daily" ? (
+                <p style={{ marginTop: 16, fontSize: 15, opacity: 0.9 }}>
+                  Daily surveys award Ruchi Credits only — they don’t count toward
+                  your streak.
+                </p>
+              ) : null}
+              {nextSurvey ? (
+                <div className="sf-next">
+                  <SurveyRow
+                    survey={nextSurvey}
+                    onView={openNextSurvey}
+                    actionLabel="Next survey"
+                  />
+                </div>
+              ) : (
+                <div className="cp-act">
+                  <Link
+                    to="/standalone-surveys"
+                    state={{ scrollToCatalog: true }}
+                    onClick={() => trackAction("next_survey")}
+                    className="btn wline"
+                  >
+                    Back to surveys
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M5 12h14M13 6l6 6-6 6" />
+                    </svg>
+                  </Link>
+                </div>
+              )}
+            </div>
+            <CreditArc amount={earned} />
           </div>
-        ) : null}
+        </div>
+      </header>
 
-        <div className="mt-14 border-t border-gray-100 pt-10">
-          <div className="flex flex-col lg:flex-row lg:items-end gap-6 lg:gap-10 mb-8">
-            <div className="flex-1">
-              <h2 className="text-2xl sm:text-3xl font-medium text-gray-900 mb-2">
-                {showingSearch
-                  ? "Search rewards"
-                  : almostThere
-                    ? "Almost there"
-                    : "We think you might like these offers:"}
-              </h2>
-              <p className="text-gray-500 text-sm sm:text-base font-light max-w-xl">
-                {showingSearch
-                  ? "Redeem any matching offer right here — you don’t need to leave this page."
-                  : almostThere
-                    ? "You’re close to unlocking these rewards. A couple more surveys and they’re yours."
-                    : "Redeem with the credits you just earned — no need to leave this page."}
+      <main className="sheet" style={{ paddingTop: 56, paddingBottom: 96 }}>
+        <div className="band-in">
+          <div className="rw-h">
+            <div>
+              <div className="hero-h">
+                <span className="dots dk" aria-hidden="true" />
+                <h2>
+                  {showingSearch
+                    ? "Search rewards"
+                    : almostThere
+                      ? "Almost there"
+                      : "Rewards you can claim now"}
+                </h2>
+              </div>
+              <p>
+                {showingSearch ? (
+                  "Redeem any matching offer right here."
+                ) : almostThere ? (
+                  "You’re close to unlocking these rewards."
+                ) : (
+                  <>
+                    You have{" "}
+                    <b className="tn">{credits.toLocaleString()} Ruchi Credits</b>
+                    . Pick any of these.
+                  </>
+                )}
               </p>
             </div>
-            <div className="w-full lg:max-w-sm flex flex-col gap-3">
+            <div className="flex flex-col gap-3 w-full sm:w-auto sm:min-w-[240px]">
               <SearchBar
                 value={search}
-                onChange={(e) => {
-                  const next = e.target.value;
-                  setSearch(next);
-                  if (!searched.current && next.trim()) {
-                    searched.current = true;
-                    trackAction("search");
-                  }
-                }}
+                onChange={handleSearchChange}
                 placeholder="Search rewards..."
               />
               <Link
                 to={shopLink}
                 onClick={() => trackAction("shop")}
-                className="w-full text-center py-3 rounded-full text-sm font-medium text-white hover:opacity-90 transition-opacity"
-                style={{ backgroundColor: "#134074" }}
+                className="btn ghost"
+                style={{ height: 48, padding: "0 24px", fontSize: 16 }}
               >
-                View all offers
+                See all rewards
               </Link>
             </div>
           </div>
 
           {loading ? (
-            <div className="flex justify-center py-16">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            <div className="rw-grid" style={{ marginTop: 28 }}>
+              {[0, 1, 2, 3].map((n) => (
+                <div
+                  key={n}
+                  className="rc"
+                  style={{
+                    background: "var(--surf2)",
+                    minHeight: 232,
+                    animation: "sf-rise .6s ease both",
+                    animationDelay: `${n * 0.05}s`,
+                    opacity: 0.5,
+                  }}
+                />
+              ))}
             </div>
           ) : fetchError ? (
-            <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-3xl bg-gray-50/50 px-4">
-              <SearchX className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-600 mb-4">{fetchError}</p>
+            <div className="sf-status" style={{ marginTop: 40 }}>
+              <h3>Couldn’t load rewards</h3>
+              <p>{fetchError}</p>
               <button
                 type="button"
-                onClick={() => setRetryTick((n) => n + 1)}
-                className="px-6 py-3 text-white rounded-full text-sm font-medium hover:opacity-90"
-                style={{ backgroundColor: "#134074" }}
+                className="btn navy"
+                onClick={retry}
               >
                 Retry
               </button>
             </div>
           ) : displayedOffers.length === 0 ? (
-            <div className="text-center py-16 border-2 border-dashed border-gray-200 rounded-3xl bg-gray-50/50 px-4">
-              <SearchX className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-              <h3 className="text-gray-900 text-lg font-medium mb-2">
+            <div className="sf-status" style={{ marginTop: 40 }}>
+              <h3>
                 {showingSearch ? "No matching rewards" : "No offers right now"}
               </h3>
-              <p className="text-gray-500 text-sm max-w-sm mx-auto mb-6">
+              <p>
                 {showingSearch
                   ? "Try a different search, or browse the full rewards shop."
                   : "New partner rewards will show up here as they go live."}
               </p>
-              <Link
-                to="/shop"
-                onClick={() => trackAction("shop")}
-                className="inline-block px-6 py-3 text-white rounded-full text-sm font-medium hover:opacity-90"
-                style={{ backgroundColor: "#134074" }}
-              >
-                View all offers
+              <Link to="/shop" className="btn navy" onClick={() => trackAction("shop")}>
+                See all rewards
               </Link>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-2 gap-x-4 sm:gap-x-8 gap-y-8 max-w-2xl">
-              {displayedOffers.map((offer) => {
-                const shortfall = Math.max(
-                  0,
-                  (offer.creditsRequired || 0) - credits
-                );
-                return (
-                  <div key={offer._id} className="w-full">
-                    <VoucherCard
-                      offer={offer}
-                      userCredits={credits}
-                      showStoreLink={false}
-                      onRedeem={handleSelectOffer}
-                    />
-                    {shortfall > 0 && (
-                      <p className="mt-2 text-xs sm:text-sm font-medium text-orange-600">
-                        {shortfall} more credits to go
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            <>
+              <div className="rw-grid">
+                {displayedOffers.map((offer, index) => (
+                  <CompleteRewardCard
+                    key={offer._id}
+                    offer={offer}
+                    index={index}
+                    userCredits={credits}
+                    onRedeem={handleSelectOffer}
+                  />
+                ))}
+              </div>
+              <div className="rw-scroll">
+                {displayedOffers.map((offer, index) => (
+                  <CompleteRewardCard
+                    key={`m-${offer._id}`}
+                    offer={offer}
+                    index={index}
+                    userCredits={credits}
+                    onRedeem={handleSelectOffer}
+                  />
+                ))}
+              </div>
+            </>
           )}
-        </div>
 
-        <div className="mt-12 flex flex-wrap gap-3">
-          <Link
-            to="/"
-            onClick={() => trackAction("home")}
-            className="px-6 py-3 rounded-full text-sm font-medium text-gray-500 hover:text-gray-800"
-          >
-            Back home
-          </Link>
+          <div className="cp-end">
+            <Link
+              to="/"
+              onClick={() => trackAction("home")}
+              className="btn ghost"
+              style={{ height: 48, fontSize: 16 }}
+            >
+              Back home
+            </Link>
+          </div>
         </div>
-      </div>
+      </main>
 
       {selectedOffer && (
         <VoucherRedeemModal
@@ -357,28 +260,7 @@ export default function SurveyComplete() {
           receivedVia="survey_complete"
           userCredits={credits}
           onClose={() => setSelectedOffer(null)}
-          onRedeemed={() => {
-            const spent = selectedOffer.creditsRequired || 0;
-            const redeemedId = selectedOffer._id;
-            setCredits((current) => Math.max(0, current - spent));
-            setOffers((current) =>
-              current.map((offer) =>
-                offer._id === redeemedId
-                  ? {
-                      ...offer,
-                      totalRedeemed: (offer.totalRedeemed || 0) + 1,
-                    }
-                  : offer
-              )
-            );
-            voucherAPI.getRecommended({ skipErrorToast: true })
-              .then((res) => {
-                const data = res.data?.data;
-                setRecommended(Array.isArray(data) ? data : []);
-              })
-              .catch(() => {});
-            refreshUser();
-          }}
+          onRedeemed={handleRedeemed}
           onSuccess={() => setSelectedOffer(null)}
         />
       )}

@@ -1,57 +1,84 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Loader2 } from "lucide-react";
+import "./surveyFlow.css";
 
 export default function SurveySubmitConfirm({
   open,
   submitting = false,
+  answeredCount = 0,
+  totalCount = 0,
+  credits = 0,
   onCancel,
   onConfirm,
 }) {
+  const [isNarrow, setIsNarrow] = useState(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const mq = window.matchMedia("(max-width: 640px)");
+    const sync = () => setIsNarrow(mq.matches);
+    sync();
+    mq.addEventListener?.("change", sync);
+    return () => mq.removeEventListener?.("change", sync);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   return createPortal(
-    <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center px-4"
-      style={{ background: "rgba(12, 21, 32, 0.45)" }}
-      onClick={onCancel}
-    >
+    <div className="sf-confirm-root">
       <div
-        className="w-full max-w-md rounded-3xl bg-white p-6 sm:p-8 shadow-2xl"
-        style={{ fontFamily: "Inter, Helvetica Neue, Helvetica, sans-serif" }}
-        onClick={(event) => event.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="survey-submit-title"
-      >
-        <h2
-          id="survey-submit-title"
-          className="text-2xl font-semibold tracking-tight text-[#0c1520]"
+        className="scrim sf-confirm-scrim"
+        onClick={() => !submitting && onCancel?.()}
+        aria-hidden="true"
+      />
+      <div className="dlg-wrap">
+        <div
+          className={`dlg sf-confirm-dlg${isNarrow ? " sh is-sheet" : ""}`}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="survey-submit-title"
+          aria-busy={submitting || undefined}
+          onClick={(event) => event.stopPropagation()}
         >
-          Are you sure you’re done?
-        </h2>
-        <p className="mt-3 text-sm leading-relaxed text-[#5b6168]">
-          Once you submit, you can’t go back and change your answers. Take a
-          second look if you need to.
-        </p>
-        <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={submitting}
-            className="h-11 rounded-full border border-[#d8dde3] px-5 text-sm font-semibold text-[#0c1520] disabled:opacity-50"
-          >
-            Go back
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={submitting}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-[#0c1520] px-5 text-sm font-semibold text-white disabled:opacity-50"
-          >
-            {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            {submitting ? "Submitting…" : "Yes, submit"}
-          </button>
+          <h2 id="survey-submit-title">Are you sure you’re done?</h2>
+          <p>
+            Once you submit, you can’t go back and change your answers. Take a
+            second look if you need to.
+          </p>
+          <div className="dlg-sum">
+            <span>
+              {answeredCount} of {totalCount} answered
+            </span>
+            <b className="tn">+{credits} Ruchi Credits</b>
+          </div>
+          <div className="dlg-a">
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={onCancel}
+              disabled={submitting}
+            >
+              Go back
+            </button>
+            <button
+              type="button"
+              className={`btn ${submitting ? "busy" : "pri"}`}
+              onClick={onConfirm}
+              disabled={submitting}
+            >
+              {submitting ? <span className="spin" aria-hidden="true" /> : null}
+              {submitting ? "Submitting…" : "Yes, submit"}
+            </button>
+          </div>
         </div>
       </div>
     </div>,

@@ -100,3 +100,10 @@
     transform: scale(1.16) rotate(-4deg);
   }
 }
+
+html:has(.brand-dashboard),
+body:has(.brand-dashboard),
+#root:has(.brand-dashboard),
+#root:has(.brand-dashboard) > div {
+  overflow: visible;
+}

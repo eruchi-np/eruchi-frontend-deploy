@@ -142,13 +142,7 @@ const Signup = () => {
         </div>
 
         {googleOAuthHint && <GoogleOAuthHint />}
-        <GoogleSignInButton
-          onSuccess={(userData) => {
-            toast.success("Login successful!");
-            navigate(getPostLoginPath(userData), { replace: true });
-          }}
-          onError={() => setGoogleOAuthHint(true)}
-        />
+        <GoogleSignInButton />
         <div className="onboard-divider">
           <span>Or register with email</span>
         </div>
