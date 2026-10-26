@@ -161,58 +161,58 @@ export default function AdminBrandTracker() {
   const sampleForCategory = status?.sample?.find((item) => item.category === category);
   const usingLive = Boolean(liveForCategory?.rows);
 
-  return (
-    <div>
-      <div className="border-b border-gray-200 bg-white px-4 py-3">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm text-gray-700">
-            <p className="font-medium text-gray-900">
-              Data source: {usingLive ? 'Live' : 'Sample'}
-            </p>
-            <p className="text-xs text-gray-500">
-              Live {liveForCategory?.rows || 0} rows · Sample {sampleForCategory?.rows || 0} rows for {current.label}
-            </p>
-            {importMsg ? <p className="mt-1 text-xs text-blue-700">{importMsg}</p> : null}
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={downloadTemplate}
-              className="rounded-full border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-slate-50"
-            >
-              CSV template
-            </button>
-            <button
-              type="button"
-              disabled={importBusy}
-              onClick={() => fileRef.current?.click()}
-              className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {importBusy ? 'Importing...' : 'Import live CSV'}
-            </button>
-            <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onImport} />
-          </div>
-        </div>
+  const toolbar = (
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="text-sm text-gray-700">
+        <p className="font-medium text-gray-900">
+          Data source: {usingLive ? 'Live' : 'Sample'}
+        </p>
+        <p className="text-xs text-gray-500">
+          Live {liveForCategory?.rows || 0} rows · Sample {sampleForCategory?.rows || 0} rows for {current.label}
+        </p>
+        {importMsg ? <p className="mt-1 text-xs text-blue-700">{importMsg}</p> : null}
       </div>
-      <BrandDashboard
-        key={`${category}:${mode}:${mode === 'one' ? brand : 'multi'}`}
-        viewer={{
-          mode,
-          modes: MODES,
-          onMode,
-          category,
-          categoryLabel: current.label,
-          brand: apiBrand,
-          brands,
-          selectedBrands,
-          categories,
-          onCategory,
-          onBrand,
-          onToggleSelected: toggleSelected,
-          onFocusSelected: focusSelected,
-          fetchMetrics: (metrics) => adminAPI.getBrandMetrics(category, apiBrand, metrics, { skipErrorToast: true }),
-        }}
-      />
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={downloadTemplate}
+          className="rounded-full border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-slate-50"
+        >
+          CSV template
+        </button>
+        <button
+          type="button"
+          disabled={importBusy}
+          onClick={() => fileRef.current?.click()}
+          className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+        >
+          {importBusy ? 'Importing...' : 'Import live CSV'}
+        </button>
+        <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={onImport} />
+      </div>
     </div>
+  );
+
+  return (
+    <BrandDashboard
+      key={`${category}:${mode}:${mode === 'one' ? brand : 'multi'}`}
+      viewer={{
+        mode,
+        modes: MODES,
+        onMode,
+        category,
+        categoryLabel: current.label,
+        brand: apiBrand,
+        brands,
+        selectedBrands,
+        categories,
+        onCategory,
+        onBrand,
+        onToggleSelected: toggleSelected,
+        onFocusSelected: focusSelected,
+        toolbar,
+        fetchMetrics: (metrics) => adminAPI.getBrandMetrics(category, apiBrand, metrics, { skipErrorToast: true }),
+      }}
+    />
   );
 }

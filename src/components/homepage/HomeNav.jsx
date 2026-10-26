@@ -8,7 +8,7 @@ import { adminHomePath, isStaffAdmin } from "../../utils/adminRoles";
 import { businessAPI } from "../../services/api";
 import "./homepage.css";
 
-export default function HomeNav({ variant = "page" }) {
+export default function HomeNav({ variant = "page", sidebarOffset = false }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { user, loading } = useAuth();
@@ -103,6 +103,7 @@ export default function HomeNav({ variant = "page" }) {
     isOverlay ? "home-nav-overlay" : "home-nav-page",
     isOverlay && scrolled ? "is-scrolled" : "",
     menuOpen ? "is-open" : "",
+    sidebarOffset ? "home-nav-sidebar-offset" : "",
   ]
     .filter(Boolean)
     .join(" ");

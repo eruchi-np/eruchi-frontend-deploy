@@ -85,6 +85,7 @@ function AppChrome({ children }) {
   const isSurveyComplete = pathname === '/survey-complete';
   const isBusiness = pathname.startsWith('/business');
   const isBrand = pathname.startsWith('/brand');
+  const isAdminBrands = pathname === '/admin/brands' || pathname.startsWith('/admin/brands/');
   const isProfileCompletion =
     pathname === '/complete-basic-info' ||
     pathname === '/complete-profile' ||
@@ -111,7 +112,7 @@ function AppChrome({ children }) {
 
   return (
     <>
-      {!isBusiness && !isBrand && !hideNav && <HomeNav variant={navVariant} />}
+      {!isBusiness && !isBrand && !hideNav && <HomeNav variant={navVariant} sidebarOffset={isAdminBrands} />}
       <BusinessAccessGuard />
       <div className={`min-w-0 max-w-full ${overlayNav ? 'overflow-x-clip' : 'overflow-x-hidden'}`}>
         {children}

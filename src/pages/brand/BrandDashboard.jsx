@@ -476,7 +476,7 @@ export default function BrandDashboard({ client, viewer = null }) {
 
   return (
     <div className="brand-dashboard min-h-screen bg-[#f4f7fb] text-gray-900">
-      <div className={`sticky z-50 flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 lg:hidden ${viewer ? 'top-[4.75rem]' : 'top-0'}`}>
+      <div className={`sticky z-50 flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 lg:hidden ${viewer ? 'top-[5.5rem]' : 'top-0'}`}>
         <button type="button" className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-2 text-sm text-gray-700" onClick={() => setNavOpen(true)}>
           <Menu className="h-4 w-4" /> Menu
         </button>
@@ -489,7 +489,7 @@ export default function BrandDashboard({ client, viewer = null }) {
       {navOpen ? (
         <div className="fixed inset-0 z-[70] lg:hidden">
           <button type="button" className="absolute inset-0 bg-black/40" aria-label="Close menu" onClick={() => setNavOpen(false)} />
-          <aside className={`absolute left-0 top-0 flex h-full w-[min(20rem,90vw)] flex-col gap-5 overflow-y-auto bg-white px-4 py-4 shadow-xl ${viewer ? 'pt-6' : ''}`}>
+          <aside className="absolute left-0 top-0 flex h-full w-[min(20rem,90vw)] flex-col gap-5 overflow-y-auto bg-white px-4 py-4 shadow-xl">
             <div className="flex items-center justify-between">
               <p className="text-sm font-semibold text-gray-900">Sections</p>
               <button type="button" className="rounded-full p-2 text-gray-500 hover:bg-gray-100" onClick={() => setNavOpen(false)} aria-label="Close">
@@ -501,21 +501,35 @@ export default function BrandDashboard({ client, viewer = null }) {
         </div>
       ) : null}
 
-      <aside className={`hidden w-full flex-col gap-5 border-b border-gray-200 bg-white px-4 py-4 lg:fixed lg:left-0 lg:z-40 lg:flex lg:w-72 lg:overflow-y-auto lg:border-b-0 lg:border-r ${viewer ? 'lg:top-[4.75rem] lg:bottom-0' : 'lg:inset-y-0'}`}>
-        {sideNav}
-      </aside>
+      {viewer ? (
+        <aside className="hidden border-b border-gray-200 bg-white px-4 py-4 lg:fixed lg:inset-y-0 lg:left-0 lg:z-[65] lg:flex lg:w-72 lg:flex-col lg:gap-5 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+          {sideNav}
+        </aside>
+      ) : null}
 
-      <main ref={panelRef} className="min-w-0 space-y-8 px-4 py-6 lg:ml-72">
-        <div className="hidden items-center justify-end lg:flex">
-          <button
-            type="button"
-            onClick={exportView}
-            disabled={!pageReady || booting}
-            className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-slate-50 disabled:opacity-40"
-          >
-            <Download className="h-4 w-4" /> Export CSV
-          </button>
-        </div>
+      <div className={viewer ? '' : 'lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start'}>
+        {viewer ? null : (
+          <aside className="hidden border-b border-gray-200 bg-white px-4 py-4 lg:flex lg:flex-col lg:gap-5 lg:border-b-0 lg:border-r">
+            {sideNav}
+          </aside>
+        )}
+
+        <main ref={panelRef} className={`min-w-0 space-y-8 px-4 py-6 ${viewer ? 'lg:ml-72' : ''}`}>
+          {viewer?.toolbar ? (
+            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
+              {viewer.toolbar}
+            </div>
+          ) : null}
+          <div className="hidden items-center justify-end lg:flex">
+            <button
+              type="button"
+              onClick={exportView}
+              disabled={!pageReady || booting}
+              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-slate-50 disabled:opacity-40"
+            >
+              <Download className="h-4 w-4" /> Export CSV
+            </button>
+          </div>
 
         {showTip ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-950 sm:flex-row sm:items-center sm:justify-between">
@@ -682,7 +696,8 @@ export default function BrandDashboard({ client, viewer = null }) {
             <li>Functional Beverages and Personal Care are never mixed. Comparing stays inside the category.</li>
           </ul>
         </section>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

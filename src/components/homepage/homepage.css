@@ -48,6 +48,13 @@
   -webkit-backdrop-filter: blur(18px);
 }
 
+@media (min-width: 1024px) {
+  .home-nav-sidebar-offset {
+    left: 18rem;
+    width: auto;
+  }
+}
+
 .home-nav-overlay {
   position: fixed;
   background: transparent;
