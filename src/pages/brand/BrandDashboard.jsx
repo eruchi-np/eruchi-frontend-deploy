@@ -38,6 +38,7 @@ import {
   BrandBars,
   ChartCard,
   COMPARE_COLORS,
+  GroupedBars,
   HorizontalBars,
   LOW,
   SensoryRadar,
@@ -184,15 +185,35 @@ export default function BrandDashboard({ client, viewer = null }) {
   const kpi = (metric, item = null) => ({
     current: shown(findRow(rows, metric, focusBrand, wave, item)),
     previous: previousWave ? shown(findRow(rows, metric, focusBrand, previousWave, item)) : null,
+    peers: peerBrands.map((name, index) => ({
+      name,
+      value: shown(findRow(rows, metric, name, wave, item)),
+      color: peerMode ? colorForBrand(index + 1) : COMPARE_COLORS[index % COMPARE_COLORS.length],
+    })),
   });
 
-  const occasionData = itemsAt(rows, 'occasion_usage', 'ALL')
+  const occasionItems = [...new Set([
+    ...itemsAt(rows, 'occasion_usage', 'ALL'),
+    ...itemsAt(rows, 'occasion_usage', focusBrand),
+    ...peerBrands.flatMap((name) => itemsAt(rows, 'occasion_usage', name)),
+  ])];
+  const occasionData = occasionItems
     .map((item) => {
       const row = findRow(rows, 'occasion_usage', 'ALL', wave, item);
       return { name: item, value: shown(row), low: row?.status === 'low_base' };
     })
     .filter((row) => row.value != null)
     .sort((a, b) => b.value - a.value);
+  const occasionCompareData = occasionItems.map((item) => {
+    const point = {
+      name: item,
+      you: shown(findRow(rows, 'occasion_usage', focusBrand, wave, item)),
+    };
+    peerBrands.forEach((name, index) => {
+      point[`c${index}`] = shown(findRow(rows, 'occasion_usage', name, wave, item));
+    });
+    return point;
+  }).filter((point) => point.you != null || peerBrands.some((_, index) => point[`c${index}`] != null));
 
   const reasonData = itemsAt(rows, 'switch_reason', 'ALL')
     .map((item) => {
@@ -201,6 +222,21 @@ export default function BrandDashboard({ client, viewer = null }) {
     })
     .filter((row) => row.value != null)
     .sort((a, b) => b.value - a.value);
+  const reasonItems = [...new Set([
+    ...itemsAt(rows, 'switch_reason', 'ALL'),
+    ...itemsAt(rows, 'switch_reason', focusBrand),
+    ...peerBrands.flatMap((name) => itemsAt(rows, 'switch_reason', name)),
+  ])];
+  const reasonCompareData = reasonItems.map((item) => {
+    const point = {
+      name: item,
+      you: shown(findRow(rows, 'switch_reason', focusBrand, wave, item)),
+    };
+    peerBrands.forEach((name, index) => {
+      point[`c${index}`] = shown(findRow(rows, 'switch_reason', name, wave, item));
+    });
+    return point;
+  }).filter((point) => point.you != null || peerBrands.some((_, index) => point[`c${index}`] != null));
 
   const attributes = itemsAt(rows, 'sensory_mean', focusBrand);
   const sensorySeries = peerMode
@@ -501,20 +537,12 @@ export default function BrandDashboard({ client, viewer = null }) {
         </div>
       ) : null}
 
-      {viewer ? (
-        <aside className="hidden border-b border-gray-200 bg-white px-4 py-4 lg:fixed lg:inset-y-0 lg:left-0 lg:z-[65] lg:flex lg:w-72 lg:flex-col lg:gap-5 lg:overflow-y-auto lg:border-b-0 lg:border-r">
+      <div className={`lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start ${viewer ? 'lg:-mt-[5.5rem]' : ''}`}>
+        <aside className={`hidden border-b border-gray-200 bg-white px-4 py-4 lg:flex lg:flex-col lg:gap-5 lg:border-b-0 lg:border-r ${viewer ? 'lg:relative lg:z-[65]' : ''}`}>
           {sideNav}
         </aside>
-      ) : null}
 
-      <div className={viewer ? '' : 'lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start'}>
-        {viewer ? null : (
-          <aside className="hidden border-b border-gray-200 bg-white px-4 py-4 lg:flex lg:flex-col lg:gap-5 lg:border-b-0 lg:border-r">
-            {sideNav}
-          </aside>
-        )}
-
-        <main ref={panelRef} className={`min-w-0 space-y-8 px-4 py-6 ${viewer ? 'lg:ml-72' : ''}`}>
+        <main ref={panelRef} className={`min-w-0 space-y-8 px-4 py-6 ${viewer ? 'lg:pt-[5.5rem]' : ''}`}>
           {viewer?.toolbar ? (
             <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
               {viewer.toolbar}
@@ -541,6 +569,16 @@ export default function BrandDashboard({ client, viewer = null }) {
         {meta?.source === 'sample' ? (
           <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
             These figures are a sample, so you can click through the dashboard before live metrics arrive.
+          </p>
+        ) : null}
+        {meta?.source === 'live' ? (
+          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Showing live brand metrics for this category.
+          </p>
+        ) : null}
+        {meta?.source === 'mixed' ? (
+          <p className="rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-900">
+            Some metrics are live; the rest still use sample figures until you import them.
           </p>
         ) : null}
 
@@ -598,18 +636,24 @@ export default function BrandDashboard({ client, viewer = null }) {
           <h2 className="text-xl font-semibold">Occasions</h2>
           <p className="text-sm text-gray-500">People can pick more than one, so these can add up past 100%.</p>
           {occasionData.length ? (
-            <ChartCard title={wave ? weekLabel(wave) : 'Occasions'} wide>
+            <ChartCard title={`Category · ${wave ? weekLabel(wave) : 'Occasions'}`} wide>
               <HorizontalBars data={occasionData} metric="occasion_usage" fill />
             </ChartCard>
-          ) : (
+          ) : null}
+          {occasionCompareData.length ? (
+            <ChartCard title={`By brand · ${wave ? weekLabel(wave) : 'Occasions'}`} note={chartBrands.join(', ')} wide>
+              <GroupedBars data={occasionCompareData} metric="occasion_usage" series={chartSeries} fill />
+            </ChartCard>
+          ) : null}
+          {!occasionData.length && !occasionCompareData.length ? (
             <p className="rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500">No occasion data for this week.</p>
-          )}
+          ) : null}
         </div>}
 
         {pageReady && pageId === 'switching' && <div className="space-y-3" data-reveal>
           <h2 className="text-xl font-semibold">Switching</h2>
           <p className="text-sm text-gray-500">These two shares will not add up to 100%.</p>
-          <ChartCard title="Over the weeks" wide>
+          <ChartCard title="Category over the weeks" wide>
             <SeriesChart
               kind="area"
               data={wavesOf(rows).filter((item) => inSpan(item, fromMonth, toMonth)).map((item) => ({
@@ -624,13 +668,40 @@ export default function BrandDashboard({ client, viewer = null }) {
               ]}
             />
           </ChartCard>
-          <ChartCard title="Why people switched" note="Share of switchers. These should add up to about 100%." wide>
-            {reasonData.length ? (
-              <SharePie data={reasonData} metric="switch_reason" />
-            ) : (
-              <p className="py-8 text-center text-sm text-gray-500">No switch reasons for this week.</p>
-            )}
+          <ChartCard title="Switched brand by brand" note={chartBrands.join(', ')} wide>
+            <SeriesChart
+              kind="area"
+              data={trend(rows, 'brand_switching', focusBrand, peerBrands, 'switched_brand', fromMonth, toMonth)}
+              metric="brand_switching"
+              item="switched_brand"
+              series={chartSeries}
+            />
           </ChartCard>
+          <ChartCard title="Reduced or stopped by brand" note={chartBrands.join(', ')} wide>
+            <SeriesChart
+              kind="area"
+              data={trend(rows, 'brand_switching', focusBrand, peerBrands, 'lapsed_reduced_or_stopped', fromMonth, toMonth)}
+              metric="brand_switching"
+              item="lapsed_reduced_or_stopped"
+              series={chartSeries}
+            />
+          </ChartCard>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <ChartCard title="Why people switched" note="Category share of switchers.">
+              {reasonData.length ? (
+                <SharePie data={reasonData} metric="switch_reason" />
+              ) : (
+                <p className="py-8 text-center text-sm text-gray-500">No switch reasons for this week.</p>
+              )}
+            </ChartCard>
+            <ChartCard title="Reasons by brand" note={chartBrands.join(', ')}>
+              {reasonCompareData.length ? (
+                <GroupedBars data={reasonCompareData} metric="switch_reason" series={chartSeries} />
+              ) : (
+                <p className="py-8 text-center text-sm text-gray-500">No brand-level switch reasons for this week.</p>
+              )}
+            </ChartCard>
+          </div>
         </div>}
 
         {pageReady && pageId === 'loyalty' && <div className="space-y-3" data-reveal>

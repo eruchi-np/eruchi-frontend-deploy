@@ -78,6 +78,55 @@ function Dot({ cx, cy, payload, dataKey, color }) {
   return <circle cx={cx} cy={cy} r={low ? 5 : 3.5} fill={low ? LOW : color} stroke="#fff" strokeWidth={1} />;
 }
 
+function useSoloSeries(series) {
+  const [soloKey, setSoloKey] = React.useState(null);
+  const signature = (series || []).map((entry) => entry.key).join('|');
+  React.useEffect(() => setSoloKey(null), [signature]);
+  const visible = soloKey
+    ? (series || []).filter((entry) => entry.key === soloKey)
+    : (series || []);
+  const onLegendClick = (payload) => {
+    const key = payload?.dataKey
+      || (series || []).find((entry) => entry.name === payload?.value)?.key
+      || null;
+    if (!key) return;
+    setSoloKey((current) => (current === key ? null : key));
+  };
+  return { visible, soloKey, onLegendClick, setSoloKey };
+}
+
+function SoloHint({ active, label, onClear }) {
+  if (!active) {
+    return <p className="mt-2 text-[11px] text-gray-400">Click a brand name to show only that brand.</p>;
+  }
+  return (
+    <p className="mt-2 text-[11px] text-gray-500">
+      Showing <span className="font-medium text-gray-800">{label}</span>
+      {' · '}
+      <button type="button" className="underline hover:text-gray-800" onClick={onClear}>Show all</button>
+    </p>
+  );
+}
+
+function BrandAxisTick({ x, y, payload, soloName, onPick }) {
+  const active = soloName === payload.value;
+  const muted = soloName && !active;
+  return (
+    <text
+      x={x}
+      y={y + 12}
+      textAnchor="middle"
+      fill={muted ? '#94a3b8' : '#334155'}
+      fontSize={11}
+      fontWeight={active ? 600 : 400}
+      style={{ cursor: 'pointer' }}
+      onClick={() => onPick(payload.value)}
+    >
+      {payload.value}
+    </text>
+  );
+}
+
 export function ChartCard({ title, note, children, tall = false, fit = false, wide = false }) {
   const frame = fit
     ? 'mt-4'
@@ -98,48 +147,119 @@ export function ChartCard({ title, note, children, tall = false, fit = false, wi
 export function SeriesChart({ data, metric, item, series, kind = 'line' }) {
   const Chart = kind === 'area' ? AreaChart : LineChart;
   const Mark = kind === 'area' ? Area : Line;
+  const { visible, soloKey, onLegendClick, setSoloKey } = useSoloSeries(series);
+  const soloLabel = (series || []).find((entry) => entry.key === soloKey)?.name;
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <Chart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid stroke="#eef2f7" vertical={false} />
-        <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
-        <YAxis tick={{ fontSize: 11 }} width={36} />
-        <Tooltip content={<Tip metric={metric} item={item} />} />
-        <Legend />
-        {series.map((entry) => (
-          <Mark
-            key={entry.key}
-            type="monotone"
-            dataKey={entry.key}
-            name={entry.name}
-            stroke={entry.color}
-            fill={entry.color}
-            fillOpacity={0.18}
-            strokeWidth={2.5}
-            connectNulls={false}
-            dot={kind === 'line' ? (props) => <Dot {...props} color={entry.color} /> : false}
-          />
-        ))}
-      </Chart>
-    </ResponsiveContainer>
+    <div className="flex h-full flex-col">
+      <div className="min-h-0 flex-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <Chart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+            <CartesianGrid stroke="#eef2f7" vertical={false} />
+            <XAxis dataKey="label" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+            <YAxis tick={{ fontSize: 11 }} width={36} />
+            <Tooltip content={<Tip metric={metric} item={item} />} />
+            <Legend onClick={onLegendClick} wrapperStyle={{ cursor: 'pointer' }} />
+            {visible.map((entry) => (
+              <Mark
+                key={entry.key}
+                type="monotone"
+                dataKey={entry.key}
+                name={entry.name}
+                stroke={entry.color}
+                fill={entry.color}
+                fillOpacity={0.18}
+                strokeWidth={2.5}
+                connectNulls={false}
+                dot={kind === 'line' ? (props) => <Dot {...props} color={entry.color} /> : false}
+              />
+            ))}
+          </Chart>
+        </ResponsiveContainer>
+      </div>
+      {(series || []).length > 1 ? (
+        <SoloHint active={Boolean(soloKey)} label={soloLabel} onClear={() => setSoloKey(null)} />
+      ) : null}
+    </div>
   );
 }
 
 export function BrandBars({ data, metric, item }) {
+  const [soloName, setSoloName] = React.useState(null);
+  const signature = (data || []).map((row) => row.name).join('|');
+  React.useEffect(() => setSoloName(null), [signature]);
+  const shown = soloName ? (data || []).filter((row) => row.name === soloName) : (data || []);
+  const pick = (name) => setSoloName((current) => (current === name ? null : name));
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid stroke="#eef2f7" vertical={false} />
-        <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} />
-        <YAxis tick={{ fontSize: 11 }} width={36} />
-        <Tooltip content={<Tip metric={metric} item={item} />} />
-        <Bar dataKey="value" name="This week" radius={[8, 8, 0, 0]}>
-          {data.map((entry) => (
-            <Cell key={entry.name} fill={entry.low ? LOW : entry.fill} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
+    <div className="flex h-full flex-col">
+      <div className="min-h-0 flex-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={shown} margin={{ top: 8, right: 8, left: 0, bottom: 8 }}>
+            <CartesianGrid stroke="#eef2f7" vertical={false} />
+            <XAxis
+              dataKey="name"
+              interval={0}
+              tick={<BrandAxisTick soloName={soloName} onPick={pick} />}
+              height={36}
+            />
+            <YAxis tick={{ fontSize: 11 }} width={36} />
+            <Tooltip content={<Tip metric={metric} item={item} />} />
+            <Bar
+              dataKey="value"
+              name="This week"
+              radius={[8, 8, 0, 0]}
+              cursor="pointer"
+              onClick={(entry) => pick(entry?.name)}
+            >
+              {shown.map((entry) => (
+                <Cell key={entry.name} fill={entry.low ? LOW : entry.fill} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      {(data || []).length > 1 ? (
+        <SoloHint active={Boolean(soloName)} label={soloName} onClear={() => setSoloName(null)} />
+      ) : null}
+    </div>
+  );
+}
+
+export function GroupedBars({ data, metric, series, pageSize = 5, fill = false }) {
+  const [page, setPage] = React.useState(0);
+  const { visible, soloKey, onLegendClick, setSoloKey } = useSoloSeries(series);
+  const soloLabel = (series || []).find((entry) => entry.key === soloKey)?.name;
+  const signature = `${(data || []).map((row) => row.name).join('|')}|${(series || []).map((entry) => entry.key).join('|')}`;
+  React.useEffect(() => setPage(0), [signature]);
+  const pages = Math.max(1, Math.ceil((data?.length || 0) / pageSize));
+  const safePage = Math.min(page, pages - 1);
+  const slice = (data || []).slice(safePage * pageSize, safePage * pageSize + pageSize);
+  return (
+    <div className={fill ? 'flex h-full flex-col' : ''}>
+      <div className={fill ? 'min-h-0 flex-1' : 'h-72'}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={slice} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+            <CartesianGrid stroke="#eef2f7" vertical={false} />
+            <XAxis dataKey="name" tick={{ fontSize: 11 }} interval={0} angle={slice.length > 3 ? -20 : 0} textAnchor={slice.length > 3 ? 'end' : 'middle'} height={slice.length > 3 ? 56 : 30} />
+            <YAxis tick={{ fontSize: 11 }} />
+            <Tooltip content={<Tip metric={metric} />} />
+            <Legend onClick={onLegendClick} wrapperStyle={{ cursor: 'pointer' }} />
+            {visible.map((entry) => (
+              <Bar key={entry.key} dataKey={entry.key} name={entry.name} fill={entry.color} radius={[6, 6, 0, 0]} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      {(series || []).length > 1 ? (
+        <SoloHint active={Boolean(soloKey)} label={soloLabel} onClear={() => setSoloKey(null)} />
+      ) : null}
+      {pages > 1 ? (
+        <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+          <button type="button" className="rounded-full px-3 py-1 hover:bg-slate-100 disabled:opacity-40" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>Previous</button>
+          <span>{safePage + 1} of {pages}</span>
+          <button type="button" className="rounded-full px-3 py-1 hover:bg-slate-100 disabled:opacity-40" disabled={safePage >= pages - 1} onClick={() => setPage(safePage + 1)}>Next</button>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -199,18 +319,27 @@ export function SharePie({ data, metric }) {
 }
 
 export function SensoryRadar({ data, series }) {
+  const { visible, soloKey, onLegendClick, setSoloKey } = useSoloSeries(series);
+  const soloLabel = (series || []).find((entry) => entry.key === soloKey)?.name;
   return (
-    <ResponsiveContainer width="100%" height="100%">
-      <RadarChart data={data} outerRadius="70%">
-        <PolarGrid />
-        <PolarAngleAxis dataKey="name" tick={{ fontSize: 11 }} />
-        <PolarRadiusAxis domain={[1, 5]} tick={{ fontSize: 10 }} />
-        <Tooltip content={<Tip metric="sensory_mean" />} />
-        <Legend />
-        {series.map((entry) => (
-          <Radar key={entry.key} dataKey={entry.key} name={entry.name} stroke={entry.color} fill={entry.color} fillOpacity={0.18} />
-        ))}
-      </RadarChart>
-    </ResponsiveContainer>
+    <div className="flex h-full flex-col">
+      <div className="min-h-0 flex-1">
+        <ResponsiveContainer width="100%" height="100%">
+          <RadarChart data={data} outerRadius="70%">
+            <PolarGrid />
+            <PolarAngleAxis dataKey="name" tick={{ fontSize: 11 }} />
+            <PolarRadiusAxis domain={[1, 5]} tick={{ fontSize: 10 }} />
+            <Tooltip content={<Tip metric="sensory_mean" />} />
+            <Legend onClick={onLegendClick} wrapperStyle={{ cursor: 'pointer' }} />
+            {visible.map((entry) => (
+              <Radar key={entry.key} dataKey={entry.key} name={entry.name} stroke={entry.color} fill={entry.color} fillOpacity={0.18} />
+            ))}
+          </RadarChart>
+        </ResponsiveContainer>
+      </div>
+      {(series || []).length > 1 ? (
+        <SoloHint active={Boolean(soloKey)} label={soloLabel} onClear={() => setSoloKey(null)} />
+      ) : null}
+    </div>
   );
 }

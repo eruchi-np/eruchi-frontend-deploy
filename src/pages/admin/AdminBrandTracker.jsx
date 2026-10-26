@@ -22,6 +22,7 @@ export default function AdminBrandTracker() {
   const [status, setStatus] = useState(null);
   const [importMsg, setImportMsg] = useState('');
   const [importBusy, setImportBusy] = useState(false);
+  const [reloadToken, setReloadToken] = useState(0);
 
   const refreshStatus = () => {
     adminAPI.getBrandMetricsStatus({ skipErrorToast: true })
@@ -133,6 +134,7 @@ export default function AdminBrandTracker() {
       const { data } = await adminAPI.importBrandMetricsCsv(formData, { skipErrorToast: true });
       setImportMsg(data.message || 'Import complete');
       refreshStatus();
+      setReloadToken((value) => value + 1);
     } catch (err) {
       setImportMsg(err.response?.data?.message || 'Import failed');
     } finally {
@@ -165,7 +167,7 @@ export default function AdminBrandTracker() {
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="text-sm text-gray-700">
         <p className="font-medium text-gray-900">
-          Data source: {usingLive ? 'Live' : 'Sample'}
+          Data source: {usingLive ? 'Live available' : 'Sample only'}
         </p>
         <p className="text-xs text-gray-500">
           Live {liveForCategory?.rows || 0} rows · Sample {sampleForCategory?.rows || 0} rows for {current.label}
@@ -195,7 +197,7 @@ export default function AdminBrandTracker() {
 
   return (
     <BrandDashboard
-      key={`${category}:${mode}:${mode === 'one' ? brand : 'multi'}`}
+      key={`${category}:${mode}:${mode === 'one' ? brand : 'multi'}:${reloadToken}`}
       viewer={{
         mode,
         modes: MODES,
