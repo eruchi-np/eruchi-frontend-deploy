@@ -23,8 +23,11 @@ api.interceptors.response.use(
       const url = error.config?.url || '';
       const isBrandRequest = url.includes('/brand/');
       const isBusinessRequest = url.includes('/business');
+      // Brand 401 only redirects brand clients. Do not clear staff/user tokens.
       if (isBrandRequest) {
-        window.location.href = '/brand/login';
+        if (window.location.pathname.startsWith('/brand')) {
+          window.location.href = '/brand/login';
+        }
       } else if (isBusinessRequest) {
         localStorage.removeItem('is_business');
         localStorage.removeItem('business_name');
@@ -153,6 +156,11 @@ export const adminAPI = {
     ...config,
     params: { category, brand, metrics },
   }),
+  getBrandMetricsStatus: (config = {}) => api.get('/admin/brand-metrics/status', config),
+  importBrandMetricsCsv: (formData, config = {}) => api.post('/admin/brand-metrics/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    ...config,
+  }),
 };
 
 export const faqAPI = {
@@ -274,6 +282,9 @@ export const brandAPI = {
   catalog: (options = {}) => getRequest('/brand/catalog', options),
   signup: (data, config = {}) => api.post('/brand/auth/signup', data, config),
   login: (data, config = {}) => api.post('/brand/auth/login', data, config),
+  forgotPassword: (data, config = {}) => api.post('/brand/auth/forgot-password', data, config),
+  resetPassword: (resetToken, data, config = {}) => api.put(`/brand/auth/reset-password/${resetToken}`, data, config),
+  changePassword: (data, config = {}) => api.post('/brand/auth/change-password', data, config),
   logout: (config = {}) => api.post('/brand/auth/logout', {}, config),
   me: (config = {}) => api.get('/brand/auth/me', config),
   metrics: (metrics, config = {}) => api.get('/brand/metrics', {

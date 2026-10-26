@@ -5,7 +5,7 @@ import {
   weekLabel,
   wavesOf,
 } from './brandMetrics';
-import { COMPARE_COLORS, YOU } from './BrandCharts';
+import { COMPARE_COLORS, YOU, colorForBrand } from './BrandCharts';
 
 export const GROUPS = [
   { id: 'awareness', label: 'Awareness', metrics: ['awareness_prompted', 'awareness_unprompted'] },
@@ -45,14 +45,14 @@ export function trend(rows, metric, brand, compares, item = null, fromMonth = ''
   });
 }
 
-export function snapshot(rows, metric, brand, compares, wave, item = null) {
+export function snapshot(rows, metric, brand, compares, wave, item = null, peerMode = false) {
   return [brand, ...compares].filter(Boolean).map((name, index) => {
     const row = findRow(rows, metric, name, wave, item);
     return {
       name,
       value: shown(row),
       low: row?.status === 'low_base',
-      fill: index === 0 ? YOU : COMPARE_COLORS[index - 1],
+      fill: peerMode ? colorForBrand(index) : (index === 0 ? YOU : COMPARE_COLORS[(index - 1) % COMPARE_COLORS.length]),
     };
   });
 }

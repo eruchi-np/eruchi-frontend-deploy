@@ -25,28 +25,28 @@ import { identifyClarity, installClarity } from './utils/clarity';
 import { useAuth } from './context/AuthContext';
 import { isProfileOnboardingLocked } from './utils/onboardingGate';
 
-const Homepage = lazy(() => import('./pages/Homepage'));
-const ForBusiness = lazy(() => import('./pages/ForBusiness.jsx'));
-const FAQs = lazy(() => import('./pages/FAQs.jsx'));
-const Signup = lazy(() => import('./pages/Signup'));
-const Login = lazy(() => import('./pages/Login'));
-const LoginSuccess = lazy(() => import('./pages/LoginSuccess'));
-const Profile = lazy(() => import('./pages/Profile'));
-const CompleteProfile = lazy(() => import('./pages/CompleteProfile'));
-const CompleteBasicInfo = lazy(() => import('./pages/CompleteBasicInfo'));
-const EmailVerificationPending = lazy(() => import('./pages/EmailVerificationPending'));
-const VerifyEmail = lazy(() => import('./pages/VerifyEmail'));
-const StandaloneSurvey = lazy(() => import('./pages/StandaloneSurvey.jsx'));
-const StandaloneSurveys = lazy(() => import('./pages/StandaloneSurveys.jsx'));
-const SurveyComplete = lazy(() => import('./pages/SurveyComplete.jsx'));
-const SurveyHistory = lazy(() => import('./pages/SurveyHistory.jsx'));
-const Shop = lazy(() => import('./pages/Shop.jsx'));
-const Vouchers = lazy(() => import('./pages/Vouchers'));
-const VoucherDetail = lazy(() => import('./pages/VoucherDetail'));
-const EditProfile = lazy(() => import('./pages/EditProfile'));
-const Terms = lazy(() => import('./pages/Terms'));
-const PrivacyPolicy = lazy(() => import('./pages/LegalNotice'));
-const CompleteAdditionalProfile = lazy(() => import('./pages/CompleteAdditionalProfile'));
+const Homepage = lazy(() => import('./pages/public/Homepage'));
+const ForBusiness = lazy(() => import('./pages/public/ForBusiness.jsx'));
+const FAQs = lazy(() => import('./pages/public/FAQs.jsx'));
+const Signup = lazy(() => import('./pages/auth/Signup'));
+const Login = lazy(() => import('./pages/auth/Login'));
+const LoginSuccess = lazy(() => import('./pages/auth/LoginSuccess'));
+const Profile = lazy(() => import('./pages/user/Profile'));
+const CompleteProfile = lazy(() => import('./pages/user/CompleteProfile'));
+const CompleteBasicInfo = lazy(() => import('./pages/user/CompleteBasicInfo'));
+const EmailVerificationPending = lazy(() => import('./pages/auth/EmailVerificationPending'));
+const VerifyEmail = lazy(() => import('./pages/auth/VerifyEmail'));
+const StandaloneSurvey = lazy(() => import('./pages/survey/StandaloneSurvey.jsx'));
+const StandaloneSurveys = lazy(() => import('./pages/survey/StandaloneSurveys.jsx'));
+const SurveyComplete = lazy(() => import('./pages/survey/SurveyComplete.jsx'));
+const SurveyHistory = lazy(() => import('./pages/user/SurveyHistory.jsx'));
+const Shop = lazy(() => import('./pages/user/Shop.jsx'));
+const Vouchers = lazy(() => import('./pages/user/Vouchers'));
+const VoucherDetail = lazy(() => import('./pages/user/VoucherDetail'));
+const EditProfile = lazy(() => import('./pages/user/EditProfile'));
+const Terms = lazy(() => import('./pages/public/Terms'));
+const PrivacyPolicy = lazy(() => import('./pages/public/LegalNotice'));
+const CompleteAdditionalProfile = lazy(() => import('./pages/user/CompleteAdditionalProfile'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const CreateSepSurvey = lazy(() => import('./pages/admin/sep-survey/CreateSepSurvey.jsx'));
 const FifteenDaySurveyAdmin = lazy(() => import('./pages/admin/FifteenDaySurveyAdmin.jsx'));
@@ -58,15 +58,18 @@ const BusinessScan = lazy(() => import('./pages/business/BusinessScan'));
 const BusinessDashboard = lazy(() => import('./pages/business/BusinessDashboard'));
 const BrandLogin = lazy(() => import('./pages/brand/BrandLogin'));
 const BrandSignup = lazy(() => import('./pages/brand/BrandSignup'));
+const BrandForgotPassword = lazy(() => import('./pages/brand/BrandForgotPassword'));
+const BrandResetPassword = lazy(() => import('./pages/brand/BrandResetPassword'));
+const BrandAccount = lazy(() => import('./pages/brand/BrandAccount'));
 const BrandDashboard = lazy(() => import('./pages/brand/BrandDashboard'));
 const BrandProtectedRoute = lazy(() => import('./pages/brand/BrandProtectedRoute'));
 const BusinessProfile = lazy(() => import('./pages/business/BusinessProfile'));
 const BusinessVouchers = lazy(() => import('./pages/business/BusinessVouchers'));
-const MerchantPublicProfile = lazy(() => import('./pages/MerchantPublicProfile'));
-const ResetPassword = lazy(() => import('./pages/ResetPassword'));
-const ResetPasswordToken = lazy(() => import('./pages/ResetPasswordToken'));
-const Unsubscribe = lazy(() => import('./pages/Unsubscribe'));
-const NotFound = lazy(() => import('./pages/NotFound'));
+const MerchantPublicProfile = lazy(() => import('./pages/public/MerchantPublicProfile'));
+const ResetPassword = lazy(() => import('./pages/auth/ResetPassword'));
+const ResetPasswordToken = lazy(() => import('./pages/auth/ResetPasswordToken'));
+const Unsubscribe = lazy(() => import('./pages/user/Unsubscribe'));
+const NotFound = lazy(() => import('./pages/public/NotFound'));
 
 import { AnimationProvider } from './components/animations/AnimationContext';
 import PageTransition from './components/animations/PageTransition';
@@ -110,7 +113,7 @@ function AppChrome({ children }) {
     <>
       {!isBusiness && !isBrand && !hideNav && <HomeNav variant={navVariant} />}
       <BusinessAccessGuard />
-      <div className={`min-w-0 max-w-full ${isBrand || pathname === '/admin/brands' ? 'overflow-visible' : overlayNav ? 'overflow-x-clip' : 'overflow-x-hidden'}`}>
+      <div className={`min-w-0 max-w-full ${overlayNav ? 'overflow-x-clip' : 'overflow-x-hidden'}`}>
         {children}
         {!isHome && !isProfile && !isShop && !isSurveys && !isSurveyTake && !isSurveyComplete && !isBusiness && !isBrand && !isOnboarding && <Footer />}
       </div>
@@ -384,6 +387,16 @@ function App() {
 
             <Route path="/brand/login" element={<BrandLogin />} />
             <Route path="/brand/signup" element={<BrandSignup />} />
+            <Route path="/brand/forgot-password" element={<BrandForgotPassword />} />
+            <Route path="/brand/reset-password/:resetToken" element={<BrandResetPassword />} />
+            <Route
+              path="/brand/account"
+              element={
+                <BrandProtectedRoute>
+                  <BrandAccount />
+                </BrandProtectedRoute>
+              }
+            />
             <Route
               path="/brand/dashboard"
               element={

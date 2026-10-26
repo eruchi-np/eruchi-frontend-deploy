@@ -1,0 +1,460 @@
+import React, { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { ChevronDown, SearchX } from "lucide-react";
+import toast from "react-hot-toast";
+import { sepSurveyAPI, fifteenDaySurveyAPI, userAPI } from "../../services/api";
+import { StreakArc, pageWindow } from "../../components/shop/CreditArc";
+import HomeFooter from "../../components/homepage/HomeFooter";
+import { flipShopCatalog, initShopCinema, scrollShopToCatalog } from "../../components/shop/shopCinema";
+import FirstSurveyNudge from "../../components/survey/FirstSurveyNudge";
+import { useAuth } from "../../context/AuthContext";
+import { parsePage, writeSearchParams } from "../../utils/searchParams";
+import { trackEvent } from "../../utils/visitorEvents";
+import { trackSurveyCards } from "../../utils/healthEvents";
+import { PROFILE_REFRESH_BLOCKED, PROFILE_REFRESH_BODY, PROFILE_REFRESH_TITLE } from "../../utils/profileRefreshCopy";
+import { AnimationContext } from "../../components/animations/AnimationContext";
+import SurveyRow, { isSurveyOpen } from "../../components/survey/SurveyRow";
+import skyBg from "../../assets/home/sky.jpg";
+import "../../components/homepage/homepage.css";
+import "../../components/shop/shop.css";
+
+const SURVEY_PAGE_SIZE = 8;
+
+function sortSurveys(items, sortOrder) {
+  if (sortOrder === "credits-desc") {
+    return [...items].sort((a, b) => (b.credits || 0) - (a.credits || 0));
+  }
+  if (sortOrder === "credits-asc") {
+    return [...items].sort((a, b) => (a.credits || 0) - (b.credits || 0));
+  }
+  return [...items].sort((a, b) =>
+    String(a.createdAt || "").localeCompare(String(b.createdAt || ""))
+  );
+}
+
+export default function StandaloneSurveys() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { setOverride, clearOverride } = useContext(AnimationContext);
+  const pageRef = useRef(null);
+  const listRef = useRef(null);
+  const rectsRef = useRef(new Map());
+  const lastCatalogPage = useRef(null);
+  const nudgeHandledRef = useRef(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sortOrder = searchParams.get("sort") || "oldest";
+  const catalogPage = parsePage(searchParams.get("page"));
+  const [surveys, setSurveys] = useState([]);
+  const [sprintSurveys, setSprintSurveys] = useState([]);
+  const [streak, setStreak] = useState(Number(user?.streakCount) || 0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [retryTick, setRetryTick] = useState(0);
+  const [showFirstSurveyNudge, setShowFirstSurveyNudge] = useState(false);
+
+  const setListParams = useCallback(
+    (patch) =>
+      writeSearchParams(setSearchParams, patch, {
+        sort: "oldest",
+        page: 1,
+      }),
+    [setSearchParams]
+  );
+
+  useEffect(() => {
+    if (!searchParams.get("q")) return;
+    setListParams({ q: "" });
+  }, [searchParams, setListParams]);
+
+  useEffect(() => {
+    trackSurveyCards(surveys);
+  }, [surveys]);
+
+  useEffect(() => {
+    trackSurveyCards(sprintSurveys);
+  }, [sprintSurveys]);
+
+  useEffect(() => {
+    trackEvent("page_view", "/standalone-surveys");
+    const html = document.documentElement;
+    const prevHtmlOverflow = html.style.overflowX;
+    const prevBodyOverflow = document.body.style.overflowX;
+    const rootEl = document.getElementById("root");
+    const prevRootOverflow = rootEl ? rootEl.style.overflowX : "";
+    html.style.overflowX = "clip";
+    document.body.style.overflowX = "clip";
+    if (rootEl) rootEl.style.overflowX = "clip";
+
+    const revert = initShopCinema(pageRef.current);
+    return () => {
+      revert();
+      html.style.overflowX = prevHtmlOverflow;
+      document.body.style.overflowX = prevBodyOverflow;
+      if (rootEl) rootEl.style.overflowX = prevRootOverflow;
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (window.location.hash) {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    }
+    if (location.state?.scrollToCatalog) {
+      setOverride({ skip: true });
+      scrollShopToCatalog(pageRef.current, { behavior: "auto" });
+      return () => clearOverride();
+    }
+    window.scrollTo(0, 0);
+    return undefined;
+  }, [location.state]);
+
+  useEffect(() => {
+    if (nudgeHandledRef.current) return undefined;
+    if (!location.state?.firstSurveyNudge) return undefined;
+    if (!user) return undefined;
+    if (user.first_survey_completed) {
+      nudgeHandledRef.current = true;
+      return undefined;
+    }
+    nudgeHandledRef.current = true;
+    const timer = window.setTimeout(() => setShowFirstSurveyNudge(true), 500);
+    return () => window.clearTimeout(timer);
+  }, [location.state, user]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchData = async () => {
+      if (user?.profileSurveyBlocked) {
+        setSurveys([]);
+        setSprintSurveys([]);
+        setLoading(false);
+        setError(null);
+        return;
+      }
+      setLoading(true);
+      setError(null);
+      try {
+        const [surveysResult, profileResult, sprintResult] = await Promise.allSettled([
+          sepSurveyAPI.getAvailable({
+            page: 1,
+            limit: 200,
+            skipErrorToast: true,
+          }),
+          userAPI.getProfile({ skipAuthRedirect: true, skipErrorToast: true }),
+          fifteenDaySurveyAPI.getMine({ skipErrorToast: true }),
+        ]);
+
+        if (cancelled) return;
+
+        if (surveysResult.status !== "fulfilled") {
+          setSurveys([]);
+          setError("Could not load available surveys. Please try again later.");
+          toast.error("Failed to load surveys");
+          return;
+        }
+
+        const res = surveysResult.value;
+        setSurveys(res.data.data || []);
+        if (sprintResult.status === "fulfilled") {
+          setSprintSurveys(sprintResult.value.data?.data || []);
+        } else {
+          setSprintSurveys([]);
+        }
+
+        if (profileResult.status === "fulfilled" && profileResult.value) {
+          const nextUser =
+            profileResult.value.data?.data?.user || profileResult.value.data?.user;
+          setStreak(nextUser?.streakCount ?? user?.streakCount ?? 0);
+        } else {
+          setStreak(user?.streakCount || 0);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.error("Failed to load standalone surveys:", err);
+        setSurveys([]);
+        setError("Could not load available surveys. Please try again later.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, retryTick]);
+
+  const filteredCatalog = useMemo(() => {
+    const items = surveys.filter(isSurveyOpen).filter((survey) => survey.kind !== "daily");
+    return sortSurveys(items, sortOrder);
+  }, [sortOrder, surveys]);
+
+  const dailyCatalog = useMemo(() => {
+    const items = surveys.filter(isSurveyOpen).filter((survey) => survey.kind === "daily");
+    return sortSurveys(items, sortOrder);
+  }, [sortOrder, surveys]);
+
+  const listPage = catalogPage;
+  const catalogTotal = filteredCatalog.length;
+  const catalogPages = Math.max(1, Math.ceil(catalogTotal / SURVEY_PAGE_SIZE) || 1);
+  const safePage = Math.min(listPage, catalogPages);
+  const rangeStart = catalogTotal === 0 ? 0 : (safePage - 1) * SURVEY_PAGE_SIZE;
+  const pagedCatalog = filteredCatalog.slice(rangeStart, rangeStart + SURVEY_PAGE_SIZE);
+  const rangeEnd = rangeStart + pagedCatalog.length;
+
+  useEffect(() => {
+    if (lastCatalogPage.current == null) {
+      lastCatalogPage.current = catalogPage;
+      return;
+    }
+    if (lastCatalogPage.current === catalogPage) return;
+    lastCatalogPage.current = catalogPage;
+    scrollShopToCatalog(pageRef.current, { behavior: "smooth" });
+  }, [catalogPage]);
+
+  const pageIds = pagedCatalog.map((survey) => survey._id).join();
+  useLayoutEffect(() => {
+    if (loading) {
+      rectsRef.current = new Map();
+      return;
+    }
+    flipShopCatalog(listRef.current, rectsRef);
+  }, [loading, pageIds, error, sortOrder]);
+
+  const goCatalog = () => {
+    scrollShopToCatalog(pageRef.current, { behavior: "smooth" });
+  };
+
+  const openSurvey = (survey) => {
+    if (survey.isDailySprint) {
+      const wave = Number(survey.wave) >= 1 ? Number(survey.wave) : 1;
+      navigate(`/standalone-survey/${survey._id}?sprint=1&wave=${wave}`);
+      return;
+    }
+    if (!isSurveyOpen(survey)) return;
+    navigate(`/standalone-survey/${survey._id}`);
+  };
+
+  return (
+    <div className="home-page shop-page" ref={pageRef}>
+      <div className="home-stage">
+        <div className="home-hero-pin">
+          <section className="home-hero shop-hero" style={{ "--sky": `url(${skyBg})` }}>
+            <div className="home-hero-sky" aria-hidden="true" />
+            <div className="home-hero-motion shop-hero-motion">
+              <div className="shop-hero-inner">
+                <div className="shop-hero-copy">
+                  <h1>
+                    <span className="shop-hero-line-wrap">
+                      <span className="shop-hero-line">Your path to rewards.</span>
+                    </span>
+                    <span className="shop-hero-line-wrap">
+                      <span className="shop-hero-line">Little bit every day.</span>
+                    </span>
+                  </h1>
+                  <p>
+                    Surveys earn Ruchi Credits. Use Ruchi Credits to buy discount vouchers to your
+                    favorite cafe, restaurant, sports venue, and more!
+                  </p>
+                  <button type="button" className="home-pill home-pill-lg home-pill-white" onClick={goCatalog}>
+                    Surveys
+                  </button>
+                </div>
+                <StreakArc streak={streak} />
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <div className="home-sheet shop-sheet">
+          <div className="shop-catalog">
+            {user?.profileSurveyBlocked || user?.profileOutdated ? (
+              <div className="shop-status">
+                <h3>{PROFILE_REFRESH_TITLE}</h3>
+                <p>
+                  {PROFILE_REFRESH_BODY}
+                  {user?.profileSurveyBlocked ? ` ${PROFILE_REFRESH_BLOCKED}` : ""}
+                </p>
+                <button
+                  type="button"
+                  className="home-pill home-pill-sm home-pill-navy"
+                  onClick={() => navigate("/refresh-profile")}
+                >
+                  Update profile
+                </button>
+              </div>
+            ) : null}
+            {!user?.profileSurveyBlocked && !loading && sprintSurveys.length > 0 ? (
+              <div className="mb-12">
+                <div className="shop-head mb-6">
+                  <div>
+                    <div className="shop-title-row">
+                      <span className="shop-dots" aria-hidden="true">
+                        {Array.from({ length: 16 }, (_, i) => (
+                          <i key={i} style={{ "--i": i }} />
+                        ))}
+                      </span>
+                      <h2>Daily Sprint</h2>
+                    </div>
+                    <p className="shop-head-copy">
+                      These stay here until you finish them. The rest of the app still works.
+                    </p>
+                  </div>
+                </div>
+                <div className="surveys-list">
+                  {sprintSurveys.map((survey) => (
+                    <SurveyRow key={`${survey._id}-${survey.wave}`} survey={survey} onView={openSurvey} />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            {!user?.profileSurveyBlocked && <>
+            <div className="shop-head">
+              <div>
+                <div className="shop-title-row">
+                  <span className="shop-dots" aria-hidden="true">
+                    {Array.from({ length: 16 }, (_, i) => (
+                      <i key={i} style={{ "--i": i }} />
+                    ))}
+                  </span>
+                  <h2>Available Surveys</h2>
+                </div>
+              </div>
+            </div>
+
+            <div className="shop-toolbar">
+              <p className="shop-showing">
+                {loading
+                  ? "Loading surveys"
+                  : catalogTotal === 0
+                    ? "Showing 0 surveys"
+                    : `Showing ${rangeStart + 1}-${rangeEnd} of ${catalogTotal} surveys`}
+              </p>
+              <label className="shop-sort">
+                <span>Sort by:</span>
+                <select
+                  value={sortOrder === "default" || sortOrder === "latest" ? "oldest" : sortOrder}
+                  onChange={(event) => setListParams({ sort: event.target.value, page: 1 })}
+                >
+                  <option value="oldest">Oldest surveys</option>
+                  <option value="credits-desc">Credits: High to Low</option>
+                  <option value="credits-asc">Credits: Low to High</option>
+                </select>
+                <ChevronDown size={14} />
+              </label>
+            </div>
+
+            {error ? (
+              <div className="shop-status">
+                <SearchX className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <h3>Couldn’t load surveys</h3>
+                <p>{error}</p>
+                <button
+                  type="button"
+                  className="home-pill home-pill-sm home-pill-navy"
+                  onClick={() => setRetryTick((n) => n + 1)}
+                >
+                  Retry
+                </button>
+              </div>
+            ) : loading ? (
+              <div className="shop-spinner" aria-label="Loading surveys" />
+            ) : filteredCatalog.length > 0 ? (
+              <>
+                <div className="surveys-list" ref={listRef}>
+                  {pagedCatalog.map((survey) => (
+                    <SurveyRow key={survey._id} survey={survey} onView={openSurvey} />
+                  ))}
+                </div>
+                <div className="shop-foot">
+                  <p className="shop-soon">More surveys coming soon</p>
+                  {catalogPages > 1 && (
+                    <nav className="shop-pager" aria-label="surveys pagination">
+                      <button
+                        type="button"
+                        className="shop-page-prev"
+                        onClick={() => setListParams({ page: safePage - 1 })}
+                        disabled={safePage === 1}
+                      >
+                        Previous
+                      </button>
+                      {pageWindow(safePage, catalogPages).map((pageNum) => (
+                        <button
+                          key={pageNum}
+                          type="button"
+                          className={`shop-page-num ${safePage === pageNum ? "is-active" : ""}`}
+                          onClick={() => setListParams({ page: pageNum })}
+                        >
+                          {pageNum}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        className="shop-page-next"
+                        onClick={() => setListParams({ page: safePage + 1 })}
+                        disabled={safePage === catalogPages}
+                      >
+                        Next
+                      </button>
+                    </nav>
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="shop-status">
+                <SearchX className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                <h3>No surveys right now</h3>
+                <p>
+                  {dailyCatalog.length > 0
+                    ? "No regular surveys right now — check daily surveys below for extra credits."
+                    : "New surveys tailored to your profile will appear here when they’re published."}
+                </p>
+                <button
+                  type="button"
+                  className="home-pill home-pill-sm home-pill-navy"
+                  onClick={() => navigate("/profile")}
+                >
+                  Return to profile
+                </button>
+              </div>
+            )}
+
+            {!loading && !error && dailyCatalog.length > 0 ? (
+              <div className="mt-12 pt-10 border-t border-gray-200">
+                <div className="shop-head mb-6">
+                  <div>
+                    <div className="shop-title-row">
+                      <span className="shop-dots" aria-hidden="true">
+                        {Array.from({ length: 16 }, (_, i) => (
+                          <i key={i} style={{ "--i": i }} />
+                        ))}
+                      </span>
+                      <h2>Want to earn more credits?</h2>
+                    </div>
+                    <p className="shop-head-copy">
+                      Quick daily surveys — credits only, no streak.
+                    </p>
+                  </div>
+                </div>
+                <div className="surveys-list">
+                  {dailyCatalog.map((survey) => (
+                    <SurveyRow key={survey._id} survey={survey} onView={openSurvey} />
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            </>}
+          </div>
+        </div>
+      </div>
+
+      <HomeFooter />
+
+      <FirstSurveyNudge
+        open={showFirstSurveyNudge}
+        onClose={() => setShowFirstSurveyNudge(false)}
+      />
+    </div>
+  );
+}

@@ -27,18 +27,34 @@ export const YOU = '#2563eb';
 export const ALL = '#14b8a6';
 export const LOW = '#4d7c0f';
 export const COMPARE_COLORS = ['#64748b', '#0f766e', '#7c3aed', '#0891b2', '#db2777'];
+export const BRAND_COLORS = [
+  '#2563eb', '#0f766e', '#7c3aed', '#0891b2', '#db2777',
+  '#4f46e5', '#65a30d', '#be185d', '#64748b', '#9333ea',
+];
 const PIE_COLORS = ['#7c3aed', '#0f766e', '#db2777', '#0891b2', '#65a30d', '#4f46e5', '#be185d'];
 const BAR_PALETTE = ['#7c3aed', '#0f766e', '#db2777', '#0891b2', '#65a30d', '#4f46e5', '#9333ea', '#be185d', '#0e7490', '#64748b'];
 
-export function seriesFor(compares) {
+export function colorForBrand(index) {
+  return BRAND_COLORS[index % BRAND_COLORS.length];
+}
+
+export function seriesFor(compares, focusLabel = 'You') {
   return [
-    { key: 'you', name: 'You', color: YOU },
+    { key: 'you', name: focusLabel, color: YOU },
     ...compares.slice(0, 5).map((name, index) => ({
       key: `c${index}`,
       name,
       color: COMPARE_COLORS[index],
     })),
   ];
+}
+
+export function seriesForBrands(brands) {
+  return (brands || []).map((name, index) => ({
+    key: index === 0 ? 'you' : `c${index - 1}`,
+    name,
+    color: colorForBrand(index),
+  }));
 }
 
 function Tip({ active, payload, label, metric, item }) {
