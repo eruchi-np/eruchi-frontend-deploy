@@ -40,8 +40,13 @@ export function findRow(rows, metric, brand, wave, item = null) {
 }
 
 export function shown(row) {
-  if (!row || row.status === 'suppressed') return null;
+  if (!row || row.value == null || Number.isNaN(Number(row.value))) return null;
+  // Show suppressed early-wave figures; charts mark them as low-base / directional.
   return row.value;
+}
+
+export function isLowBase(row) {
+  return row?.status === 'low_base' || row?.status === 'suppressed';
 }
 
 export function pointsDelta(current, previous) {
@@ -64,6 +69,43 @@ export function formatValue(metric, item, value) {
   return `${number.toFixed(1)}%`;
 }
 
+const ROLLUP_BRANDS = new Set([
+  'ALL',
+  'Others',
+  'Other',
+  'Local / unbranded',
+  '(no main brand)',
+  '(unassigned)',
+]);
+
+export function isSelectableBrand(name) {
+  if (typeof name !== 'string') return false;
+  const brand = name.trim();
+  if (!brand) return false;
+  if (ROLLUP_BRANDS.has(brand)) return false;
+  if (brand.startsWith('(') && brand.endsWith(')')) return false;
+  return true;
+}
+
+export function uniqueBrands(list) {
+  const seen = new Set();
+  const out = [];
+  (list || []).forEach((name) => {
+    if (!isSelectableBrand(name) || seen.has(name)) return;
+    seen.add(name);
+    out.push(name);
+  });
+  return out.sort();
+}
+
+export function brandsOf(rows) {
+  return uniqueBrands(
+    (rows || [])
+      .filter((row) => row.is_brand)
+      .map((row) => row.brand),
+  );
+}
+
 export function peersOf(rows, brand) {
-  return [...new Set(rows.filter((row) => row.is_brand && row.brand !== brand).map((row) => row.brand))].sort();
+  return brandsOf(rows).filter((name) => name !== brand);
 }

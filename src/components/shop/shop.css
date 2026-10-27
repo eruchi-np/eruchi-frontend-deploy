@@ -627,6 +627,46 @@
   font-size: 14px;
 }
 
+.shop-surveys-done {
+  padding: 64px 16px 40px;
+}
+
+.shop-surveys-done-ic {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 24px;
+  border-radius: 50%;
+  background: #d7f3ff;
+  color: var(--navy, #0c1520);
+}
+
+.shop-surveys-done-ic svg {
+  width: 34px;
+  height: 34px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.shop-surveys-done h3 {
+  margin: 0 auto;
+  max-width: 620px;
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.03em;
+}
+
+.shop-surveys-done p {
+  margin: 12px auto 0;
+  max-width: 460px;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
 .shop-status-link {
   border: 0;
   padding: 0;

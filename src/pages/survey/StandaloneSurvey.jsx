@@ -6,6 +6,7 @@ import SurveySubmitConfirm from "../../components/survey/SurveySubmitConfirm";
 import { SurveyRichText } from "../../components/survey/SurveyTextField";
 import { plainSurveyText } from "../../utils/surveyMarkup";
 import skyBg from "../../assets/home/sky.jpg";
+import eruchiLogo from "../../assets/eruchi-logo-horizontal.png";
 import "../../components/survey/surveyFlow.css";
 import { ArrowIcon, CheckIcon, WarnIcon } from "./surveyTake/icons";
 import SliderField from "./surveyTake/SliderField";
@@ -107,8 +108,7 @@ export default function StandaloneSurvey() {
         <div className="veil" />
         <div className="band-in">
           <div className="hdr">
-            <span className="sr">eRuchi survey</span>
-            <span aria-hidden="true" />
+            <img src={eruchiLogo} alt="eRuchi" />
             <button type="button" className="hbtn" onClick={exitSurvey}>
               <svg
                 width="16"

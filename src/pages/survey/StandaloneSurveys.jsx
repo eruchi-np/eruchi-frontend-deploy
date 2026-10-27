@@ -401,22 +401,24 @@ export default function StandaloneSurveys() {
                   )}
                 </div>
               </>
-            ) : (
+            ) : dailyCatalog.length > 0 ? (
               <div className="shop-status">
                 <SearchX className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h3>No surveys right now</h3>
+                <h3>No regular surveys right now</h3>
+                <p>Check daily surveys below for extra credits.</p>
+              </div>
+            ) : (
+              <div className="shop-status shop-surveys-done">
+                <span className="shop-surveys-done-ic" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M5 12.5l4.5 4.5L19 7.5" />
+                  </svg>
+                </span>
+                <h3>You completed all your surveys!</h3>
                 <p>
-                  {dailyCatalog.length > 0
-                    ? "No regular surveys right now — check daily surveys below for extra credits."
-                    : "New surveys tailored to your profile will appear here when they’re published."}
+                  Come back tomorrow for more surveys. New ones are added every
+                  day!
                 </p>
-                <button
-                  type="button"
-                  className="home-pill home-pill-sm home-pill-navy"
-                  onClick={() => navigate("/profile")}
-                >
-                  Return to profile
-                </button>
               </div>
             )}
 

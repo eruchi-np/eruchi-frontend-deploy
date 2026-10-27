@@ -1,3 +1,6 @@
+import { readAcquisition } from "./acquisition";
+import { ensureVisitorId } from "./healthEvents";
+
 const ATTEMPT_KEY = "eruchi_google_oauth_attempt";
 
 const API_BASE_URL =
@@ -14,7 +17,17 @@ export const getGoogleRedirectUrl = () => {
 /** Full-page Google OAuth redirect (primary sign-in path). */
 export const startGoogleRedirectOAuth = () => {
   markGoogleOAuthAttempt();
-  window.location.assign(getGoogleRedirectUrl());
+  const params = new URLSearchParams();
+  const visitorId = ensureVisitorId();
+  const acquisition = readAcquisition();
+  if (visitorId) params.set("visitorId", visitorId);
+  if (acquisition?.source) params.set("utm_source", acquisition.source);
+  if (acquisition?.medium) params.set("utm_medium", acquisition.medium);
+  if (acquisition?.campaign) params.set("utm_campaign", acquisition.campaign);
+  if (acquisition?.content) params.set("utm_content", acquisition.content);
+  if (acquisition?.term) params.set("utm_term", acquisition.term);
+  const qs = params.toString();
+  window.location.assign(`${getGoogleRedirectUrl()}${qs ? `?${qs}` : ""}`);
 };
 
 export const markGoogleOAuthAttempt = () => {

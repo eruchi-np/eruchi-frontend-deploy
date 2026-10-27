@@ -6,6 +6,7 @@ import SurveyRow from "../../components/survey/SurveyRow";
 import { readSurveyCompleteState } from "../../utils/surveyComplete";
 import { trackHealthEvent } from "../../utils/healthEvents";
 import skyBg from "../../assets/home/sky.jpg";
+import eruchiLogo from "../../assets/eruchi-logo-horizontal.png";
 import CreditArc from "./surveyComplete/CreditArc.jsx";
 import StreakChip from "./surveyComplete/StreakChip.jsx";
 import CompleteRewardCard from "./surveyComplete/CompleteRewardCard.jsx";
@@ -63,6 +64,7 @@ export default function SurveyComplete() {
   }
 
   const earned = completion.creditsEarned || 0;
+  const surveysDone = !loading && !nextSurvey;
 
   return (
     <div className="sf-page pg is-complete">
@@ -70,6 +72,33 @@ export default function SurveyComplete() {
         <img className="sky" src={skyBg} alt="" />
         <div className="veil" />
         <div className="band-in">
+          <div className="hdr">
+            <Link to="/" onClick={() => trackAction("home")}>
+              <img src={eruchiLogo} alt="eRuchi" />
+            </Link>
+            <div className="hdr-r">
+              <nav className="nav" aria-label="Main">
+                <Link
+                  to="/standalone-surveys"
+                  state={{ scrollToCatalog: true }}
+                  onClick={() => trackAction("surveys")}
+                >
+                  Surveys
+                </Link>
+                <Link to="/shop" onClick={() => trackAction("shop")}>
+                  Shop
+                </Link>
+                <Link to="/profile" onClick={() => trackAction("profile")}>
+                  Profile
+                </Link>
+              </nav>
+              <span className="bal">
+                <i aria-hidden="true" />
+                {Number(credits || 0).toLocaleString()} Ruchi Credits
+              </span>
+            </div>
+          </div>
+
           <div className="cp-hero sf-enter">
             <div className="cp-l">
               <div className="hero-h">
@@ -106,21 +135,7 @@ export default function SurveyComplete() {
                     actionLabel="Next survey"
                   />
                 </div>
-              ) : (
-                <div className="cp-act">
-                  <Link
-                    to="/standalone-surveys"
-                    state={{ scrollToCatalog: true }}
-                    onClick={() => trackAction("next_survey")}
-                    className="btn wline"
-                  >
-                    Back to surveys
-                    <svg viewBox="0 0 24 24" aria-hidden="true">
-                      <path d="M5 12h14M13 6l6 6-6 6" />
-                    </svg>
-                  </Link>
-                </div>
-              )}
+              ) : null}
             </div>
             <CreditArc amount={earned} />
           </div>
@@ -129,6 +144,34 @@ export default function SurveyComplete() {
 
       <main className="sheet" style={{ paddingTop: 56, paddingBottom: 96 }}>
         <div className="band-in">
+          {surveysDone && !showingSearch ? (
+            <section className="cp-done" aria-labelledby="surveys-done-h">
+              <div className="rw-h">
+                <div>
+                  <div className="hero-h">
+                    <span className="dots dk" aria-hidden="true" />
+                    <h2 id="surveys-done-h">You completed all your surveys!</h2>
+                  </div>
+                  <p>
+                    Come back tomorrow for more surveys. New ones are added every
+                    day!
+                  </p>
+                  <p className="sub2">
+                    In the meantime, check out the rewards picked for you below, or{" "}
+                    <Link
+                      to={shopLink}
+                      className="lnk"
+                      onClick={() => trackAction("shop")}
+                    >
+                      browse all rewards
+                    </Link>
+                    .
+                  </p>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
           <div className="rw-h">
             <div>
               <div className="hero-h">

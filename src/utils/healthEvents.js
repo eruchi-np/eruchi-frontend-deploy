@@ -227,6 +227,11 @@ export function readVisitorId() {
   }
 }
 
+/** Create and store a visitor id if the browser does not have one yet. */
+export function ensureVisitorId() {
+  return visitorId() || null;
+}
+
 function visitorId() {
   try {
     let id = localStorage.getItem(VISITOR_KEY);

@@ -1,0 +1,24 @@
+{
+  "name": "eRuchi",
+  "short_name": "eRuchi",
+  "description": "Earn Ruchi Credits by sharing feedback through surveys, then redeem them at partner cafes, gyms, and shops in Nepal.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1f3a",
+  "theme_color": "#16365c",
+  "icons": [
+    {
+      "src": "/icon.png",
+      "sizes": "500x500",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.png",
+      "sizes": "500x500",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

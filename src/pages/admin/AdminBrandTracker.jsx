@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { adminAPI, brandAPI } from '../../services/api';
+import { adminAPI } from '../../services/api';
 import BrandDashboard from '../brand/BrandDashboard';
 import { readAdminPrefs, writeAdminPrefs } from '../brand/brandViewState';
 
@@ -24,27 +24,67 @@ export default function AdminBrandTracker() {
   const [importBusy, setImportBusy] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
 
+  const applyCategoryBrands = (list, nextCategory, currentBrand, currentSelected) => {
+    const saved = list.find((item) => item.category === nextCategory) || list[0];
+    if (!saved) return null;
+    const nextBrand = saved.brands.includes(currentBrand) ? currentBrand : (saved.brands[0] || '');
+    const nextSelected = (currentSelected.length ? currentSelected : [nextBrand])
+      .filter((name) => saved.brands.includes(name));
+    return {
+      category: saved.category,
+      brand: nextBrand,
+      selected: nextSelected.length ? nextSelected : (nextBrand ? [nextBrand] : []),
+    };
+  };
+
   const refreshStatus = () => {
     adminAPI.getBrandMetricsStatus({ skipErrorToast: true })
-      .then(({ data }) => setStatus(data))
+      .then(({ data }) => {
+        setStatus(data);
+        const sampleList = (data.sample || []).map((item) => ({
+          category: item.category,
+          label: item.label,
+          brands: [...new Set(item.brands || [])],
+        })).filter((item) => item.brands.length);
+        const list = (data.categories?.length ? data.categories : sampleList) || [];
+        if (!list.length) return;
+        setCategories(list);
+        const applied = applyCategoryBrands(list, category, brand, selected);
+        if (!applied) return;
+        setCategory(applied.category);
+        setBrand(applied.brand);
+        setSelected(applied.selected);
+        setReloadToken((value) => value + 1);
+      })
       .catch(() => setStatus(null));
   };
 
   useEffect(() => {
-    brandAPI.catalog({ skipErrorToast: true })
+    adminAPI.getBrandMetricsStatus({ skipErrorToast: true })
       .then(({ data }) => {
-        const list = data.categories || [];
+        setStatus(data);
+        // Prefer sample brands from status; categories is already sample-primary on the API.
+        const sampleList = (data.sample || []).map((item) => ({
+          category: item.category,
+          label: item.label,
+          brands: [...new Set(item.brands || [])],
+        })).filter((item) => item.brands.length);
+        const list = (data.categories?.length ? data.categories : sampleList) || [];
         setCategories(list);
         const saved = list.find((item) => item.category === category) || list.find((item) => item.category === 'FB') || list[0];
-        if (!saved) return;
+        if (!saved) {
+          setError('No brands found in the sample metrics database for this category.');
+          return;
+        }
         setCategory(saved.category);
         const nextBrand = saved.brands.includes(brand) ? brand : (saved.brands[0] || '');
         setBrand(nextBrand);
         const nextSelected = (selected.length ? selected : [nextBrand]).filter((name) => saved.brands.includes(name));
         setSelected(nextSelected.length ? nextSelected : (nextBrand ? [nextBrand] : []));
+        // Remount dashboard so cached live rows are dropped.
+        setReloadToken((value) => value + 1);
       })
       .catch(() => setError('Could not load the brand list.'));
-    refreshStatus();
   }, []);
 
   useEffect(() => {
@@ -52,7 +92,29 @@ export default function AdminBrandTracker() {
   }, [category, mode, brand, selected]);
 
   const current = categories.find((item) => item.category === category);
-  const brands = current?.brands || [];
+  // Sample store only — never pull live import names into the admin pickers.
+  const brands = (() => {
+    const sampleBrands = status?.sample?.find((item) => item.category === category)?.brands;
+    if (sampleBrands?.length) return [...new Set(sampleBrands)];
+    if (current?.brands?.length) return [...new Set(current.brands)];
+    return [];
+  })();
+
+  const brandsKey = brands.join('|');
+  useEffect(() => {
+    if (!brands.length) return;
+    setBrand((currentBrand) => (brands.includes(currentBrand) ? currentBrand : brands[0]));
+    setSelected((currentSelected) => {
+      const next = currentSelected.filter((name) => brands.includes(name));
+      if (next.length) {
+        if (next.length === currentSelected.length && next.every((name, index) => name === currentSelected[index])) {
+          return currentSelected;
+        }
+        return next;
+      }
+      return brands[0] ? [brands[0]] : [];
+    });
+  }, [category, brandsKey]);
 
   const onCategory = (next) => {
     const found = categories.find((item) => item.category === next);
@@ -76,6 +138,7 @@ export default function AdminBrandTracker() {
   };
 
   const onBrand = (name) => {
+    if (!brands.includes(name)) return;
     setBrand(name);
     if (mode === 'selected' && !selected.includes(name)) {
       setSelected((currentSelected) => [...currentSelected, name]);
@@ -83,11 +146,11 @@ export default function AdminBrandTracker() {
   };
 
   const toggleSelected = (name) => {
+    if (!brands.includes(name) && !selected.includes(name)) return;
     setSelected((currentSelected) => {
       if (currentSelected.includes(name)) {
-        if (currentSelected.length <= 1) return currentSelected;
         const next = currentSelected.filter((item) => item !== name);
-        if (!next.includes(brand)) setBrand(next[0] || '');
+        setBrand(next[0] || '');
         return next;
       }
       return [...currentSelected, name];
@@ -145,7 +208,7 @@ export default function AdminBrandTracker() {
   if (error) {
     return <p className="py-24 text-center text-sm text-rose-600">{error}</p>;
   }
-  if (!brand || !current) {
+  if (!current || (mode === 'one' && !brand)) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f4f7fb]">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
@@ -156,21 +219,25 @@ export default function AdminBrandTracker() {
   const selectedBrands = mode === 'all'
     ? [brand, ...brands.filter((name) => name !== brand)]
     : mode === 'selected'
-      ? (selected.includes(brand) ? [brand, ...selected.filter((name) => name !== brand)] : selected)
+      ? [...new Set(
+        (selected.includes(brand) ? [brand, ...selected.filter((name) => name !== brand)] : selected)
+          .filter((name) => brands.includes(name)),
+      )]
       : null;
   const apiBrand = mode === 'one' ? brand : (selectedBrands?.[0] || brand);
   const liveForCategory = status?.live?.find((item) => item.category === category);
   const sampleForCategory = status?.sample?.find((item) => item.category === category);
-  const usingLive = Boolean(liveForCategory?.rows);
+  const primaryRows = sampleForCategory?.rows || 0;
+  const importRows = liveForCategory?.rows || 0;
 
   const toolbar = (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="text-sm text-gray-700">
         <p className="font-medium text-gray-900">
-          Data source: {usingLive ? 'Live available' : 'Sample only'}
+          Charts use sample DB ({primaryRows ? `${primaryRows} rows` : 'loading…'})
         </p>
         <p className="text-xs text-gray-500">
-          Live {liveForCategory?.rows || 0} rows · Sample {sampleForCategory?.rows || 0} rows for {current.label}
+          brand_tracker_metrics_sample for {current.label}. Live CSV import ({importRows} rows) is stored but not shown.
         </p>
         {importMsg ? <p className="mt-1 text-xs text-blue-700">{importMsg}</p> : null}
       </div>
@@ -197,7 +264,7 @@ export default function AdminBrandTracker() {
 
   return (
     <BrandDashboard
-      key={`${category}:${mode}:${mode === 'one' ? brand : 'multi'}:${reloadToken}`}
+      key={`${category}:${mode}:${mode === 'one' ? brand : 'multi'}:${reloadToken}:sample`}
       viewer={{
         mode,
         modes: MODES,
@@ -213,6 +280,7 @@ export default function AdminBrandTracker() {
         onToggleSelected: toggleSelected,
         onFocusSelected: focusSelected,
         toolbar,
+        dataSource: 'sample',
         fetchMetrics: (metrics) => adminAPI.getBrandMetrics(category, apiBrand, metrics, { skipErrorToast: true }),
       }}
     />

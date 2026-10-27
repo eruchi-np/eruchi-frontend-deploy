@@ -19,6 +19,7 @@ const TYPE_META = {
   streak_lost: { label: 'Streak lost', Icon: Flame, tone: 'red' },
   streak_guard: { label: 'Streak Guard', Icon: Shield, tone: 'navy' },
   referral: { label: 'Referral', Icon: Gift, tone: 'green' },
+  admin_credit: { label: 'Credit adjustment', Icon: Gift, tone: 'navy' },
 };
 
 const toneClass = {

@@ -63,6 +63,11 @@ export const healthAPI = {
     skipAuthRedirect: true,
     ...config,
   }),
+  trackVisitor: (data, config = {}) => api.post('/signals/visitor', data, {
+    skipErrorToast: true,
+    skipAuthRedirect: true,
+    ...config,
+  }),
   visit: (data, config = {}) => api.post('/signals/visit', data, {
     skipErrorToast: true,
     skipAuthRedirect: true,

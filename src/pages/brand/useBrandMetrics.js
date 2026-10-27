@@ -45,8 +45,25 @@ export default function useBrandMetrics(viewer) {
             return next;
           });
           setRows(Object.values(cacheRef.current).flat());
-          setMeta((current) => current || data);
-          setWave((current) => current || wavesOf(data.rows || []).at(-1) || '');
+          setMeta((current) => {
+            const waves = (data.waves?.length ? data.waves : current?.waves) || [];
+            const brands = (data.brands?.length ? data.brands : current?.brands) || [];
+            if (!current) return { ...data, waves, brands };
+            return {
+              ...current,
+              waves: current.waves?.length ? current.waves : waves,
+              brands: current.brands?.length ? current.brands : brands,
+            };
+          });
+          const waveList = data.waves?.length ? data.waves : wavesOf(data.rows || []);
+          setWave((current) => {
+            if (current && waveList.includes(current)) return current;
+            if (current && !waveList.length) return current;
+            if (current && waveList.length && !waveList.includes(current)) {
+              return waveList.at(-1) || '';
+            }
+            return waveList.at(-1) || '';
+          });
         })
         .catch(() => setError('Could not load this section.'))
         .finally(() => {
@@ -91,6 +108,12 @@ export default function useBrandMetrics(viewer) {
     ? Boolean(loaded.nps)
     : group.metrics.every((metric) => loaded[metric]);
 
+  const preloadAll = () => Promise.all(GROUPS.map((group) => (
+    group.id === 'loyalty'
+      ? ensure(['nps']).then(() => ensure(['cross_purchase_affinity', 'cross_purchase_lift']))
+      : ensure(group.metrics)
+  )));
+
   return {
     rows,
     meta,
@@ -103,5 +126,6 @@ export default function useBrandMetrics(viewer) {
     setWave,
     error,
     pageReady,
+    preloadAll,
   };
 }

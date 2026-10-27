@@ -129,8 +129,41 @@ export default function useStandaloneSurvey() {
     questions.length === 0 ? 0 : (answeredCount / questions.length) * 100;
   const nextUnanswered = answeredFlags.findIndex((done) => !done);
 
+  const scrollToQuestion = (index) => {
+    const el = document.getElementById(`sf-q${index + 1}`);
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+    setActiveIndex(index);
+  };
+
+  const maybeAdvanceAfter = (qText, nextResponses) => {
+    const index = questions.findIndex((item) => item.questionText === qText);
+    if (index < 0) return;
+    const question = questions[index];
+    const value = nextResponses[qText];
+    if (!isQuestionAnswered(question, value)) return;
+
+    const type = question.questionType;
+    if (type === "text_short" || type === "text_long") return;
+    if (type === "multiple_checkbox") {
+      const max = Math.max(1, Number(question.maxSelections) || 1);
+      const picked = Array.isArray(value) ? value.length : 0;
+      if (picked < max) return;
+    }
+
+    const nextIndex = questions.findIndex(
+      (item, i) =>
+        i > index && !isQuestionAnswered(item, nextResponses[item.questionText])
+    );
+    if (nextIndex < 0) return;
+    window.setTimeout(() => scrollToQuestion(nextIndex), 180);
+  };
+
   const handleChange = (qText, value) => {
-    setResponses((prev) => ({ ...prev, [qText]: value }));
+    setResponses((prev) => {
+      const next = { ...prev, [qText]: value };
+      maybeAdvanceAfter(qText, next);
+      return next;
+    });
     setMissed((prev) => {
       if (!prev.has(qText)) return prev;
       const next = new Set(prev);
@@ -151,9 +184,13 @@ export default function useStandaloneSurvey() {
     }
     setResponses((prev) => {
       const arr = Array.isArray(prev[qText]) ? prev[qText] : [];
-      if (!checked) return { ...prev, [qText]: arr.filter((v) => v !== option) };
-      if (arr.includes(option) || arr.length >= max) return prev;
-      return { ...prev, [qText]: [...arr, option] };
+      let nextVal = arr;
+      if (!checked) nextVal = arr.filter((v) => v !== option);
+      else if (!arr.includes(option) && arr.length < max) nextVal = [...arr, option];
+      else return prev;
+      const next = { ...prev, [qText]: nextVal };
+      maybeAdvanceAfter(qText, next);
+      return next;
     });
     setMissed((prev) => {
       if (!prev.has(qText)) return prev;
@@ -165,12 +202,6 @@ export default function useStandaloneSurvey() {
 
   const handleQuestionFocus = (questionText, index) => {
     startQuestion(questionText);
-    setActiveIndex(index);
-  };
-
-  const scrollToQuestion = (index) => {
-    const el = document.getElementById(`sf-q${index + 1}`);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
     setActiveIndex(index);
   };
 
