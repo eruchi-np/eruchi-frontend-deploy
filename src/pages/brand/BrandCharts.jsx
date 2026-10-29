@@ -7,6 +7,7 @@ import {
   CartesianGrid,
   Cell,
   Label,
+  LabelList,
   Legend,
   Line,
   LineChart,
@@ -17,6 +18,7 @@ import {
   PolarRadiusAxis,
   Radar,
   RadarChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -119,55 +121,6 @@ function Dot({ cx, cy, payload, dataKey, color }) {
   return <circle cx={cx} cy={cy} r={low ? 5 : 3.5} fill={low ? LOW : color} stroke="#fff" strokeWidth={1} />;
 }
 
-function useSoloSeries(series) {
-  const [soloKey, setSoloKey] = React.useState(null);
-  const signature = (series || []).map((entry) => entry.key).join('|');
-  React.useEffect(() => setSoloKey(null), [signature]);
-  const visible = soloKey
-    ? (series || []).filter((entry) => entry.key === soloKey)
-    : (series || []);
-  const onLegendClick = (payload) => {
-    const key = payload?.dataKey
-      || (series || []).find((entry) => entry.name === payload?.value)?.key
-      || null;
-    if (!key) return;
-    setSoloKey((current) => (current === key ? null : key));
-  };
-  return { visible, soloKey, onLegendClick, setSoloKey };
-}
-
-function SoloHint({ active, label, onClear }) {
-  if (!active) {
-    return <p className="mt-2 text-[11px] text-gray-400">Click a brand name to show only that brand.</p>;
-  }
-  return (
-    <p className="mt-2 text-[11px] text-gray-500">
-      Showing <span className="font-medium text-gray-800">{label}</span>
-      {' · '}
-      <button type="button" className="underline hover:text-gray-800" onClick={onClear}>Show all</button>
-    </p>
-  );
-}
-
-function BrandAxisTick({ x, y, payload, soloName, onPick }) {
-  const active = soloName === payload.value;
-  const muted = soloName && !active;
-  return (
-    <text
-      x={x}
-      y={y + 12}
-      textAnchor="middle"
-      fill={muted ? '#94a3b8' : '#334155'}
-      fontSize={11}
-      fontWeight={active ? 600 : 400}
-      style={{ cursor: 'pointer' }}
-      onClick={() => onPick(payload.value)}
-    >
-      {payload.value}
-    </text>
-  );
-}
-
 function resolveHeight({ tall = false, wide = false, fit = false }) {
   if (fit) return HEIGHT.sm;
   if (wide && tall) return HEIGHT.xl;
@@ -176,7 +129,7 @@ function resolveHeight({ tall = false, wide = false, fit = false }) {
   return HEIGHT.sm;
 }
 
-export function ChartCard({ title, note, children, tall = false, fit = false, wide = false, exportKey = null }) {
+export function ChartCard({ title, note, howToRead = '', children, tall = false, fit = false, wide = false, exportKey = null }) {
   const height = resolveHeight({ tall, wide, fit });
   const content = React.Children.map(children, (child) => {
     if (!React.isValidElement(child)) return child;
@@ -191,19 +144,25 @@ export function ChartCard({ title, note, children, tall = false, fit = false, wi
     >
       <h3 className="text-base font-semibold text-gray-900">{title}</h3>
       {note ? <p className="mt-1 text-sm text-gray-500">{note}</p> : null}
+      {howToRead ? (
+        <details className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-gray-600">
+          <summary className="cursor-pointer font-medium text-gray-700">How to read this</summary>
+          <p className="mt-1.5 leading-relaxed">{howToRead}</p>
+        </details>
+      ) : null}
       <div className="mt-4 w-full min-w-0 max-w-full">{content}</div>
     </section>
   );
 }
 
-export function SeriesChart({ data, metric, item, series, kind = 'line', height = HEIGHT.lg }) {
+export function SeriesChart({ data, metric, item, series, kind = 'line', height = HEIGHT.lg, onBrandClick = null }) {
   const Chart = kind === 'area' ? AreaChart : LineChart;
   const Mark = kind === 'area' ? Area : Line;
-  const { visible, soloKey, onLegendClick, setSoloKey } = useSoloSeries(series);
-  const soloLabel = (series || []).find((entry) => entry.key === soloKey)?.name;
-  const multi = (series || []).length > 1;
+  const visible = series || [];
+  const multi = visible.length > 1;
   const plot = multi ? Math.max(180, height - 28) : height;
   const yTitle = yAxisTitle(metric, item);
+  const clickable = typeof onBrandClick === 'function';
   return (
     <div className="w-full min-w-0 max-w-full">
       <ResponsiveContainer width="100%" height={plot} debounce={50}>
@@ -220,8 +179,11 @@ export function SeriesChart({ data, metric, item, series, kind = 'line', height 
             <Legend
               verticalAlign="top"
               height={28}
-              onClick={onLegendClick}
-              wrapperStyle={{ cursor: 'pointer', fontSize: 12 }}
+              wrapperStyle={{ fontSize: 12, cursor: clickable ? 'pointer' : undefined }}
+              onClick={clickable ? (entry) => {
+                const name = entry?.value;
+                if (name && name !== 'Category') onBrandClick(name);
+              } : undefined}
             />
           ) : null}
           {visible.map((entry) => (
@@ -236,82 +198,288 @@ export function SeriesChart({ data, metric, item, series, kind = 'line', height 
               strokeWidth={2.5}
               connectNulls={false}
               isAnimationActive={false}
+              cursor={clickable && entry.name !== 'Category' ? 'pointer' : 'default'}
+              onClick={clickable && entry.name !== 'Category' ? () => onBrandClick(entry.name) : undefined}
               dot={kind === 'line' ? (props) => <Dot {...props} color={entry.color} /> : false}
             />
           ))}
         </Chart>
       </ResponsiveContainer>
-      {multi ? (
-        <SoloHint active={Boolean(soloKey)} label={soloLabel} onClear={() => setSoloKey(null)} />
-      ) : null}
     </div>
   );
 }
 
-export function BrandBars({ data, metric, item, height = HEIGHT.sm }) {
-  const [soloName, setSoloName] = React.useState(null);
-  const signature = (data || []).map((row) => row.name).join('|');
-  React.useEffect(() => setSoloName(null), [signature]);
-  const shown = soloName ? (data || []).filter((row) => row.name === soloName) : (data || []);
-  const pick = (name) => setSoloName((current) => (current === name ? null : name));
-  const multi = (data || []).length > 1;
-  const plot = multi ? Math.max(180, height - 28) : height;
-  const barSize = shown.length <= 1 ? 56 : shown.length <= 3 ? 48 : 36;
-  const yTitle = yAxisTitle(metric, item);
+function NpsEndLabel({ x, y, width, height: barH, value }) {
+  if (value == null || !Number.isFinite(Number(value))) return null;
+  const left = (Number(x) || 0) + (Number(width) || 0) + 8;
+  const top = (Number(y) || 0) + (Number(barH) || 0) / 2;
+  return (
+    <text x={left} y={top} dy={4} fill="#0f172a" fontSize={12} fontWeight={600}>
+      {`NPS ${Math.round(Number(value))}`}
+    </text>
+  );
+}
+
+/** Horizontal 100% stack: promoters / passives / detractors, with Net NPS at the bar end. */
+export function NpsStackedBars({ data, height = HEIGHT.lg, onBrandClick = null }) {
+  const rows = data || [];
+  const plot = Math.max(180, Math.min(520, 56 + rows.length * 44));
+  const chartH = height != null ? Math.max(plot, height - 28) : plot;
+  const clickable = typeof onBrandClick === 'function';
+  const pick = (payload) => {
+    const name = payload?.name || payload?.payload?.name;
+    if (name) onBrandClick(name);
+  };
   return (
     <div className="w-full min-w-0 max-w-full">
-      <ResponsiveContainer width="100%" height={plot} debounce={50}>
-        <BarChart data={shown} margin={{ top: 12, right: 16, left: 28, bottom: 28 }} barCategoryGap="28%">
-          <CartesianGrid stroke="#eef2f7" vertical={false} />
-          <XAxis
-            dataKey="name"
-            interval={0}
-            tick={multi ? <BrandAxisTick soloName={soloName} onPick={pick} /> : { fontSize: 11 }}
-            height={44}
-          >
-            <XAxisLabel value="Brand" />
+      <ResponsiveContainer width="100%" height={chartH} debounce={50}>
+        <BarChart
+          data={rows}
+          layout="vertical"
+          margin={{ top: 8, right: 72, left: 8, bottom: 28 }}
+          barCategoryGap="22%"
+        >
+          <CartesianGrid stroke="#eef2f7" horizontal={false} />
+          <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} height={36}>
+            <XAxisLabel value="% of buyers" />
           </XAxis>
-          <YAxis tick={{ fontSize: 11 }} width={48}>
-            <YAxisLabel value={yTitle} />
-          </YAxis>
-          <Tooltip content={<Tip metric={metric} item={item} />} />
-          <Bar
-            dataKey="value"
-            name="This week"
-            barSize={barSize}
-            maxBarSize={64}
-            radius={[8, 8, 0, 0]}
-            cursor={multi ? 'pointer' : 'default'}
-            isAnimationActive={false}
-            onClick={multi ? (entry) => pick(entry?.name) : undefined}
-          >
-            {shown.map((entry) => (
-              <Cell key={entry.name} fill={entry.low ? LOW : entry.fill} />
-            ))}
+          <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
+          <Tooltip
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null;
+              const row = payload[0]?.payload;
+              return (
+                <div className="rounded-xl border border-gray-100 bg-white px-3 py-2 text-xs shadow-lg">
+                  <p className="mb-1 font-medium text-gray-900">{label}</p>
+                  {payload.map((entry) => (
+                    <p key={entry.dataKey} style={{ color: entry.color || entry.fill }}>
+                      {entry.name}: {entry.value == null ? '—' : `${Math.round(entry.value)}%`}
+                    </p>
+                  ))}
+                  <p className="mt-1 font-semibold text-gray-900">
+                    NPS: {row?.nps == null ? '—' : Math.round(row.nps)}
+                    {row?.low ? ' · low base (directional)' : ''}
+                  </p>
+                </div>
+              );
+            }}
+          />
+          <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} />
+          <Bar dataKey="promoters" name="Promoters" stackId="nps" fill="#059669" maxBarSize={28} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined} />
+          <Bar dataKey="passives" name="Passives" stackId="nps" fill="#94a3b8" maxBarSize={28} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined} />
+          <Bar dataKey="detractors" name="Detractors" stackId="nps" fill="#e11d48" maxBarSize={28} radius={[0, 6, 6, 0]} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined}>
+            <LabelList dataKey="nps" content={<NpsEndLabel />} />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
-      {multi ? (
-        <SoloHint active={Boolean(soloName)} label={soloName} onClear={() => setSoloName(null)} />
-      ) : null}
     </div>
   );
 }
 
-export function GroupedBars({ data, metric, series, pageSize = 5, height = HEIGHT.lg }) {
+/** Diverging bars: lost (left) vs won (right), net label at the end. */
+export function NetGainsBars({ data, height = HEIGHT.lg, onBrandClick = null }) {
+  const rows = data || [];
+  const max = Math.max(1, ...rows.flatMap((row) => [row.won || 0, row.lost || 0]));
+  const plot = Math.max(180, Math.min(480, 48 + rows.length * 40));
+  const chartH = height != null ? Math.max(plot, height - 28) : plot;
+  const clickable = typeof onBrandClick === 'function';
+  const pick = (payload) => {
+    const name = payload?.name || payload?.payload?.name;
+    if (name) onBrandClick(name);
+  };
+  return (
+    <div className="w-full min-w-0 max-w-full">
+      <ResponsiveContainer width="100%" height={chartH} debounce={50}>
+        <BarChart
+          data={rows}
+          layout="vertical"
+          stackOffset="sign"
+          margin={{ top: 8, right: 64, left: 8, bottom: 28 }}
+          barCategoryGap="22%"
+        >
+          <CartesianGrid stroke="#eef2f7" horizontal={false} />
+          <XAxis
+            type="number"
+            domain={[-max, max]}
+            tick={{ fontSize: 11 }}
+            tickFormatter={(value) => `${Math.abs(value)}`}
+            height={36}
+          >
+            <XAxisLabel value="% of panel" />
+          </XAxis>
+          <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
+          <ReferenceLine x={0} stroke="#cbd5e1" />
+          <Tooltip
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null;
+              const row = payload[0]?.payload;
+              return (
+                <div className="rounded-xl border border-gray-100 bg-white px-3 py-2 text-xs shadow-lg">
+                  <p className="mb-1 font-medium text-gray-900">{label}</p>
+                  <p style={{ color: '#f87171' }}>Lost to: {row?.lost ?? 0}%</p>
+                  <p style={{ color: '#3b82f6' }}>Won from: {row?.won ?? 0}%</p>
+                  <p className="mt-1 font-semibold text-gray-900">
+                    Net: {row?.net > 0 ? '+' : ''}{row?.net ?? 0} pts
+                  </p>
+                </div>
+              );
+            }}
+          />
+          <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} />
+          <Bar dataKey="lostNeg" name="Lost to" fill="#f87171" stackId="net" maxBarSize={22} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined} />
+          <Bar dataKey="won" name="Won from" fill="#3b82f6" stackId="net" maxBarSize={22} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined}>
+            <LabelList
+              dataKey="net"
+              position="right"
+              formatter={(value) => (value == null ? '' : `net ${value > 0 ? '+' : ''}${value}`)}
+              style={{ fill: '#0f172a', fontSize: 11, fontWeight: 600 }}
+            />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+/** Opposing reasons: focus brand (right) vs category ALL (left). */
+export function SwitchReasonBars({ data, focusLabel = 'This brand', height = HEIGHT.lg }) {
+  const rows = (data || []).map((row) => ({
+    name: row.name,
+    focus: row.focus,
+    all: row.all,
+    focusPlot: row.focus == null ? 0 : row.focus,
+    allNeg: row.all == null ? 0 : -row.all,
+  }));
+  const max = Math.max(1, ...rows.flatMap((row) => [row.focusPlot || 0, Math.abs(row.allNeg) || 0]));
+  const plot = Math.max(180, Math.min(520, 48 + rows.length * 42));
+  const chartH = height != null ? Math.max(plot, height - 28) : plot;
+  return (
+    <div className="w-full min-w-0 max-w-full">
+      <ResponsiveContainer width="100%" height={chartH} debounce={50}>
+        <BarChart
+          data={rows}
+          layout="vertical"
+          stackOffset="sign"
+          margin={{ top: 8, right: 24, left: 8, bottom: 28 }}
+          barCategoryGap="18%"
+        >
+          <CartesianGrid stroke="#eef2f7" horizontal={false} />
+          <XAxis
+            type="number"
+            domain={[-max, max]}
+            tick={{ fontSize: 11 }}
+            tickFormatter={(value) => `${Math.abs(value)}`}
+            height={36}
+          >
+            <XAxisLabel value="% of switchers" />
+          </XAxis>
+          <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11 }} />
+          <ReferenceLine x={0} stroke="#cbd5e1" />
+          <Tooltip
+            content={({ active, payload, label }) => {
+              if (!active || !payload?.length) return null;
+              const row = payload[0]?.payload;
+              return (
+                <div className="rounded-xl border border-gray-100 bg-white px-3 py-2 text-xs shadow-lg">
+                  <p className="mb-1 font-medium text-gray-900">{label}</p>
+                  <p style={{ color: '#f87171' }}>
+                    Category: {row?.all == null ? '—' : `${Math.round(row.all)}%`}
+                  </p>
+                  <p style={{ color: '#3b82f6' }}>
+                    {focusLabel}: {row?.focus == null ? '—' : `${Math.round(row.focus)}%`}
+                  </p>
+                </div>
+              );
+            }}
+          />
+          <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} />
+          <Bar dataKey="allNeg" name="Category" fill="#f87171" stackId="reason" maxBarSize={18} isAnimationActive={false} />
+          <Bar dataKey="focusPlot" name={focusLabel} fill="#3b82f6" stackId="reason" maxBarSize={18} isAnimationActive={false} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+export function BrandBars({ data, metric, item, height = HEIGHT.sm, onBrandClick = null }) {
+  const shown = data || [];
+  const multi = shown.length > 1;
+  const crowded = shown.length > 6;
+  const plot = multi ? Math.max(180, height - 28) : height;
+  const barSize = shown.length <= 1 ? 56 : shown.length <= 3 ? 48 : crowded ? 28 : 36;
+  const yTitle = yAxisTitle(metric, item);
+  const clickable = typeof onBrandClick === 'function';
+  const chart = (
+    <ResponsiveContainer width="100%" height={plot} debounce={50}>
+      <BarChart
+        data={shown}
+        margin={{ top: 12, right: 16, left: 28, bottom: crowded ? 48 : 28 }}
+        barCategoryGap={crowded ? '12%' : '28%'}
+      >
+        <CartesianGrid stroke="#eef2f7" vertical={false} />
+        <XAxis
+          dataKey="name"
+          interval={0}
+          tick={{ fontSize: crowded ? 10 : 11 }}
+          height={crowded ? 64 : 44}
+          angle={crowded ? -28 : 0}
+          textAnchor={crowded ? 'end' : 'middle'}
+        >
+          <XAxisLabel value="Brand" />
+        </XAxis>
+        <YAxis tick={{ fontSize: 11 }} width={48}>
+          <YAxisLabel value={yTitle} />
+        </YAxis>
+        <Tooltip content={<Tip metric={metric} item={item} />} />
+        <Bar
+          dataKey="value"
+          name="This week"
+          barSize={barSize}
+          maxBarSize={crowded ? 40 : 64}
+          radius={[8, 8, 0, 0]}
+          isAnimationActive={false}
+          cursor={clickable ? 'pointer' : 'default'}
+          onClick={clickable ? (payload) => {
+            const name = payload?.name || payload?.payload?.name;
+            if (name) onBrandClick(name);
+          } : undefined}
+        >
+          {shown.map((entry, index) => (
+            <Cell
+              key={entry.name}
+              fill={entry.low ? LOW : (entry.fill || (metric === 'cross_purchase_lift'
+                ? (entry.value < 1 ? '#e11d48' : '#059669')
+                : BAR_PALETTE[index % BAR_PALETTE.length]))}
+            />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+  if (!crowded) {
+    return <div className="w-full min-w-0 max-w-full">{chart}</div>;
+  }
+  return (
+    <div className="w-full min-w-0 max-w-full overflow-x-auto">
+      <div style={{ minWidth: Math.max(640, shown.length * 56) }}>{chart}</div>
+    </div>
+  );
+}
+
+export function GroupedBars({ data, metric, series, pageSize = 5, height = HEIGHT.lg, onBrandClick = null }) {
   const [page, setPage] = React.useState(0);
-  const { visible, soloKey, onLegendClick, setSoloKey } = useSoloSeries(series);
-  const soloLabel = (series || []).find((entry) => entry.key === soloKey)?.name;
-  const signature = `${(data || []).map((row) => row.name).join('|')}|${(series || []).map((entry) => entry.key).join('|')}`;
+  const visible = series || [];
+  const signature = `${(data || []).map((row) => row.name).join('|')}|${visible.map((entry) => entry.key).join('|')}`;
   React.useEffect(() => setPage(0), [signature]);
   const pages = Math.max(1, Math.ceil((data?.length || 0) / pageSize));
   const safePage = Math.min(page, pages - 1);
   const slice = (data || []).slice(safePage * pageSize, safePage * pageSize + pageSize);
-  const multi = (series || []).length > 1;
+  const multi = visible.length > 1;
   const footer = (multi ? 28 : 0) + (pages > 1 ? 36 : 0);
   const plot = Math.max(180, height - footer);
   const yTitle = yAxisTitle(metric);
-  const xTitle = metric === 'occasion_usage' ? 'Occasion' : metric === 'switch_reason' ? 'Reason' : 'Category';
+  const xTitle = metric === 'occasion_usage' ? 'Occasion' : metric === 'switch_reason' ? 'Reason' : 'Brand';
+  const clickable = typeof onBrandClick === 'function' && metric !== 'occasion_usage' && metric !== 'switch_reason';
   return (
     <div className="w-full min-w-0 max-w-full">
       <ResponsiveContainer width="100%" height={plot} debounce={50}>
@@ -331,14 +499,7 @@ export function GroupedBars({ data, metric, series, pageSize = 5, height = HEIGH
             <YAxisLabel value={yTitle} />
           </YAxis>
           <Tooltip content={<Tip metric={metric} />} />
-          {multi ? (
-            <Legend
-              verticalAlign="top"
-              height={28}
-              onClick={onLegendClick}
-              wrapperStyle={{ cursor: 'pointer', fontSize: 12 }}
-            />
-          ) : null}
+          {multi ? <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} /> : null}
           {visible.map((entry) => (
             <Bar
               key={entry.key}
@@ -348,13 +509,15 @@ export function GroupedBars({ data, metric, series, pageSize = 5, height = HEIGH
               maxBarSize={48}
               radius={[6, 6, 0, 0]}
               isAnimationActive={false}
+              cursor={clickable ? 'pointer' : 'default'}
+              onClick={clickable ? (payload) => {
+                const name = payload?.name || payload?.payload?.name;
+                if (name) onBrandClick(name);
+              } : undefined}
             />
           ))}
         </BarChart>
       </ResponsiveContainer>
-      {multi ? (
-        <SoloHint active={Boolean(soloKey)} label={soloLabel} onClear={() => setSoloKey(null)} />
-      ) : null}
       {pages > 1 ? (
         <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
           <button type="button" className="rounded-full px-3 py-1 hover:bg-slate-100 disabled:opacity-40" disabled={safePage === 0} onClick={() => setPage(safePage - 1)}>Previous</button>
@@ -362,6 +525,40 @@ export function GroupedBars({ data, metric, series, pageSize = 5, height = HEIGH
           <button type="button" className="rounded-full px-3 py-1 hover:bg-slate-100 disabled:opacity-40" disabled={safePage >= pages - 1} onClick={() => setPage(safePage + 1)}>Next</button>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+export function HorizontalGroupedBars({ data, metric, series, height = HEIGHT.lg }) {
+  const visible = series || [];
+  const rows = data || [];
+  const multi = visible.length > 1;
+  const plot = Math.max(200, height - (multi ? 28 : 0));
+  const valueTitle = yAxisTitle(metric);
+  return (
+    <div className="w-full min-w-0 max-w-full">
+      <ResponsiveContainer width="100%" height={plot} debounce={50}>
+        <BarChart data={rows} layout="vertical" margin={{ top: multi ? 8 : 12, right: 24, left: 8, bottom: 28 }} barCategoryGap="18%">
+          <CartesianGrid stroke="#eef2f7" horizontal={false} />
+          <XAxis type="number" tick={{ fontSize: 11 }} domain={[0, 'auto']} height={36}>
+            <XAxisLabel value={valueTitle} />
+          </XAxis>
+          <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
+          <Tooltip content={<Tip metric={metric} />} />
+          {multi ? <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} /> : null}
+          {visible.map((entry) => (
+            <Bar
+              key={entry.key}
+              dataKey={entry.key}
+              name={entry.name}
+              fill={entry.color}
+              maxBarSize={22}
+              radius={[0, 6, 6, 0]}
+              isAnimationActive={false}
+            />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }
@@ -487,9 +684,8 @@ export function SharePie({ data, metric, prominent = false, height = HEIGHT.lg }
 }
 
 export function SensoryRadar({ data, series, height = HEIGHT.lg }) {
-  const { visible, soloKey, onLegendClick, setSoloKey } = useSoloSeries(series);
-  const soloLabel = (series || []).find((entry) => entry.key === soloKey)?.name;
-  const multi = (series || []).length > 1;
+  const visible = series || [];
+  const multi = visible.length > 1;
   const plot = multi ? Math.max(200, height - 28) : height;
   return (
     <div className="w-full min-w-0 max-w-full overflow-hidden">
@@ -499,14 +695,7 @@ export function SensoryRadar({ data, series, height = HEIGHT.lg }) {
           <PolarAngleAxis dataKey="name" tick={{ fontSize: 11 }} />
           <PolarRadiusAxis domain={[1, 5]} tick={{ fontSize: 10 }} />
           <Tooltip content={<Tip metric="sensory_mean" />} />
-          {multi ? (
-            <Legend
-              verticalAlign="top"
-              height={28}
-              onClick={onLegendClick}
-              wrapperStyle={{ cursor: 'pointer', fontSize: 12 }}
-            />
-          ) : null}
+          {multi ? <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} /> : null}
           {visible.map((entry) => (
             <Radar
               key={entry.key}
@@ -520,9 +709,6 @@ export function SensoryRadar({ data, series, height = HEIGHT.lg }) {
           ))}
         </RadarChart>
       </ResponsiveContainer>
-      {multi ? (
-        <SoloHint active={Boolean(soloKey)} label={soloLabel} onClear={() => setSoloKey(null)} />
-      ) : null}
     </div>
   );
 }

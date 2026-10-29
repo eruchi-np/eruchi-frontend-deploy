@@ -121,6 +121,63 @@ export function buildSwitchFlow(rows, wave, onlyBrands = null) {
   };
 }
 
+/** Won-from / lost-to by competitor for one focus brand, from the flow matrix. */
+export function buildNetGains(rows, wave, focusBrand, onlyBrands = null) {
+  if (!focusBrand) return null;
+  const flowRows = (rows || []).filter((row) => (
+    row.metric === 'brand_switch_flow'
+    && (!wave || row.wave_start === wave)
+  ));
+  if (!flowRows.length) return null;
+
+  const waves = [...new Set(flowRows.map((row) => row.wave_start))].sort();
+  const useWave = wave && waves.includes(wave) ? wave : waves[waves.length - 1];
+  let matrixRows = flowRows.filter((row) => row.wave_start === useWave);
+  const allow = Array.isArray(onlyBrands) && onlyBrands.length
+    ? new Set(onlyBrands.filter(Boolean))
+    : null;
+  if (allow) {
+    if (!allow.has(focusBrand)) return null;
+    matrixRows = mergeMatrixRows(
+      matrixRows
+        .map((row) => {
+          const from = allow.has(row.brand) ? row.brand : 'Others';
+          const to = allow.has(row.item) ? row.item : 'Others';
+          return { ...row, brand: from, item: to };
+        })
+        .filter((row) => !(row.brand === 'Others' && row.item === 'Others')),
+    );
+  }
+
+  const competitors = [...new Set([
+    ...matrixRows.map((row) => row.brand),
+    ...matrixRows.map((row) => row.item),
+  ])]
+    .filter((name) => name && name !== focusBrand);
+
+  const data = competitors.map((name) => {
+    const won = Number(matrixRows.find((row) => row.brand === name && row.item === focusBrand)?.value) || 0;
+    const lost = Number(matrixRows.find((row) => row.brand === focusBrand && row.item === name)?.value) || 0;
+    return {
+      name,
+      won: Math.round(won * 10) / 10,
+      lost: Math.round(lost * 10) / 10,
+      lostNeg: -Math.round(lost * 10) / 10,
+      net: Math.round((won - lost) * 10) / 10,
+    };
+  })
+    .filter((row) => row.won > 0 || row.lost > 0)
+    .sort((a, b) => (Math.abs(b.net) - Math.abs(a.net)) || ((b.won + b.lost) - (a.won + a.lost)));
+
+  if (!data.length) return null;
+  return {
+    wave: useWave,
+    focusBrand,
+    base: matrixRows[0]?.base || null,
+    data,
+  };
+}
+
 function linkColor(link, focus) {
   if (!focus) {
     return link.from === link.to ? KEPT : OTHER;
@@ -235,7 +292,14 @@ function FlowTip({ active, payload }) {
   );
 }
 
-export default function BrandSwitchFlow({ rows, wave, defaultFocus = '', onlyBrands = null, height = 420 }) {
+export default function BrandSwitchFlow({
+  rows,
+  wave,
+  defaultFocus = '',
+  onlyBrands = null,
+  height = 420,
+  onBrandClick = null,
+}) {
   const brandKey = Array.isArray(onlyBrands) ? onlyBrands.filter(Boolean).join('|') : '';
   const scopedBrands = brandKey ? brandKey.split('|') : null;
   const flow = useMemo(
@@ -269,7 +333,12 @@ export default function BrandSwitchFlow({ rows, wave, defaultFocus = '', onlyBra
   const fromLabel = weekLabel(flow.wave).replace('Week of ', 'Main brand before ');
   const toLabel = weekLabel(flow.wave).replace('Week of ', 'Main brand in ');
 
-  const toggleFocus = (brand) => {
+  const onNodeBrand = (brand) => {
+    if (brand === 'Others') return;
+    if (typeof onBrandClick === 'function') {
+      onBrandClick(brand);
+      return;
+    }
     setFocusBrand((current) => (current === brand ? '' : brand));
   };
 
@@ -301,7 +370,7 @@ export default function BrandSwitchFlow({ rows, wave, defaultFocus = '', onlyBra
             <FlowNode
               {...props}
               focusBrand={activeFocus}
-              onFocus={toggleFocus}
+              onFocus={onNodeBrand}
               fromShare={flow.fromShare}
               toShare={flow.toShare}
             />
@@ -312,9 +381,11 @@ export default function BrandSwitchFlow({ rows, wave, defaultFocus = '', onlyBra
         </Sankey>
       </ResponsiveContainer>
       <p className="mt-2 text-[11px] text-gray-400">
-        {activeFocus
-          ? `Focusing ${activeFocus}. Blue bands are gains; coral bands are losses. Click the brand again to clear.`
-          : 'Click a brand name to highlight its won, lost, and kept flows.'}
+        {typeof onBrandClick === 'function'
+          ? 'Click a brand name to open that brand alone.'
+          : activeFocus
+            ? `Focusing ${activeFocus}. Blue bands are gains; coral bands are losses. Click the brand again to clear.`
+            : 'Click a brand name to highlight its won, lost, and kept flows.'}
       </p>
     </div>
   );

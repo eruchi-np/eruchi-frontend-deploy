@@ -1,7 +1,6 @@
 import {
   findRow,
   isLowBase,
-  monthKey,
   shown,
   weekLabel,
   wavesOf,
@@ -10,41 +9,90 @@ import { COMPARE_COLORS, YOU, colorForBrand } from './BrandCharts';
 
 export const GROUPS = [
   { id: 'awareness', label: 'Awareness', metrics: ['awareness_prompted', 'awareness_unprompted'] },
-  { id: 'buying', label: 'Buying', metrics: ['penetration', 'trial', 'purchase_frequency', 'spend_per_trip', 'share_of_wallet'] },
+  { id: 'buying', label: 'Penetration and Purchase', metrics: ['penetration', 'trial', 'purchase_frequency', 'spend_per_trip', 'share_of_wallet', 'cross_purchase_affinity', 'cross_purchase_lift'] },
   { id: 'occasions', label: 'Occasions', metrics: ['occasion_usage'] },
   { id: 'switching', label: 'Switching', metrics: ['brand_switching', 'switch_reason', 'brand_switch_flow'] },
-  { id: 'loyalty', label: 'Loyalty', metrics: ['nps', 'cross_purchase_affinity', 'cross_purchase_lift'] },
+  { id: 'loyalty', label: 'Loyalty', metrics: ['nps'] },
   { id: 'sensory', label: 'Sensory', metrics: ['sensory_mean'] },
 ];
 
 export const KPI_METRICS = ['awareness_prompted', 'penetration', 'trial', 'nps'];
+
+/** Grouped awareness bars: Top of mind → Unprompted → Prompted. */
+export const AWARENESS_TYPE_SERIES = [
+  { key: 'top', name: 'Top of mind', color: '#0f766e' },
+  { key: 'unprompted', name: 'Unprompted', color: '#2563eb' },
+  { key: 'prompted', name: 'Prompted', color: '#7c3aed' },
+];
+
+export function awarenessTypeSnapshot(rows, brands, wave) {
+  return (brands || []).filter(Boolean).map((name) => {
+    const top = shown(findRow(rows, 'awareness_unprompted', name, wave, 'first_mention'));
+    const any = shown(findRow(rows, 'awareness_unprompted', name, wave, 'any_mention'));
+    const prompted = shown(findRow(rows, 'awareness_prompted', name, wave, null));
+    // Unprompted (not first) ≈ any mention minus top of mind when both exist.
+    let unprompted = null;
+    if (any != null && top != null) unprompted = Math.max(0, Math.round((any - top) * 10) / 10);
+    else if (any != null) unprompted = any;
+    return {
+      name,
+      top,
+      unprompted,
+      prompted,
+    };
+  });
+}
+
+export const MARKET_PEN_SERIES = [
+  { key: 'awareness', name: 'Awareness', color: '#2563eb' },
+  { key: 'penetration', name: 'Penetration', color: '#0f766e' },
+];
+
+/** Prompted + unprompted (any mention) when available; else prompted only. */
+export function marketPenetrationSnapshot(rows, brands, wave) {
+  return (brands || []).filter(Boolean).map((name) => {
+    const prompted = shown(findRow(rows, 'awareness_prompted', name, wave, null));
+    const any = shown(findRow(rows, 'awareness_unprompted', name, wave, 'any_mention'));
+    let awareness = null;
+    if (prompted != null && any != null) awareness = Math.round((prompted + any) * 10) / 10;
+    else if (prompted != null) awareness = prompted;
+    else if (any != null) awareness = any;
+    return {
+      name,
+      awareness,
+      penetration: shown(findRow(rows, 'penetration', name, wave, null)),
+    };
+  });
+}
 
 /** Stable chart keys for PDF picker (must match data-export-chart). */
 export const EXPORT_CHART_CATALOG = [
   {
     section: 'Awareness',
     charts: [
-      { id: 'This week', label: 'This week' },
-      { id: 'First mention', label: 'First mention' },
+      { id: 'Awareness this week', label: 'Awareness this week' },
+      { id: 'Unprompted awareness over the weeks', label: 'Unprompted awareness over the weeks' },
       { id: 'Prompted awareness over the weeks', label: 'Prompted awareness over the weeks' },
-      { id: 'Any mention', label: 'Any mention' },
     ],
   },
   {
-    section: 'Buying',
+    section: 'Penetration and Purchase',
     charts: [
-      { id: 'Penetration', label: 'Penetration' },
+      { id: 'Market Penetration', label: 'Market Penetration' },
+      { id: 'Penetration over the weeks', label: 'Penetration over the weeks' },
       { id: 'Trial this week', label: 'Trial this week' },
-      { id: 'Purchases per month', label: 'Purchases per month' },
+      { id: 'Purchase Frequency', label: 'Purchase Frequency' },
       { id: 'Rupees per trip', label: 'Rupees per trip' },
       { id: 'Share of wallet', label: 'Share of wallet' },
+      { id: 'Share of wallet, by buyer type', label: 'Share of wallet, by buyer type' },
+      { id: 'Also bought share', label: 'Cross purchase share' },
+      { id: 'Also bought lift', label: 'Cross purchase lift' },
     ],
   },
   {
     section: 'Occasions',
     charts: [
-      { id: 'Category occasions', label: 'Category occasions' },
-      { id: 'By brand occasions', label: 'By brand occasions' },
+      { id: 'Occasion matrix', label: 'Occasion matrix' },
     ],
   },
   {
@@ -52,19 +100,15 @@ export const EXPORT_CHART_CATALOG = [
     charts: [
       { id: 'Main brand flow', label: 'Main brand flow' },
       { id: 'Category over the weeks', label: 'Category over the weeks' },
-      { id: 'Switched brand by brand', label: 'Switched brand by brand' },
-      { id: 'Reduced or stopped by brand', label: 'Reduced or stopped by brand' },
-      { id: 'Why people switched', label: 'Why people switched' },
-      { id: 'Reasons by brand', label: 'Reasons by brand' },
+      { id: 'Brand switching tracker', label: 'Brand switching tracker' },
+      { id: 'Brand switching reasons', label: 'Brand switching reasons' },
     ],
   },
   {
     section: 'Loyalty',
     charts: [
       { id: 'NPS this week', label: 'NPS this week' },
-      { id: 'Promoters, passives, detractors', label: 'Promoters, passives, detractors' },
-      { id: 'Also bought share', label: 'Also bought share' },
-      { id: 'Also bought lift', label: 'Also bought lift' },
+      { id: 'NPS over the weeks', label: 'NPS over the weeks' },
     ],
   },
   {
@@ -75,18 +119,18 @@ export const EXPORT_CHART_CATALOG = [
   },
 ];
 
-export function inSpan(wave, fromMonth, toMonth) {
-  const month = monthKey(wave);
-  const start = fromMonth && toMonth && fromMonth > toMonth ? toMonth : fromMonth;
-  const end = fromMonth && toMonth && fromMonth > toMonth ? fromMonth : toMonth;
-  if (start && month < start) return false;
-  if (end && month > end) return false;
+/** Inclusive week range on wave_start (YYYY-MM-DD). */
+export function inSpan(wave, fromWave = '', toWave = '') {
+  const start = fromWave && toWave && fromWave > toWave ? toWave : fromWave;
+  const end = fromWave && toWave && fromWave > toWave ? fromWave : toWave;
+  if (start && wave < start) return false;
+  if (end && wave > end) return false;
   return true;
 }
 
-export function trend(rows, metric, brand, compares, item = null, fromMonth = '', toMonth = '', waves = null) {
+export function trend(rows, metric, brand, compares, item = null, fromWave = '', toWave = '', waves = null) {
   const waveList = Array.isArray(waves) && waves.length ? waves : wavesOf(rows);
-  return waveList.filter((wave) => inSpan(wave, fromMonth, toMonth)).map((wave) => {
+  return waveList.filter((wave) => inSpan(wave, fromWave, toWave)).map((wave) => {
     const you = findRow(rows, metric, brand, wave, item);
     const point = {
       label: weekLabel(wave).replace('Week of ', ''),

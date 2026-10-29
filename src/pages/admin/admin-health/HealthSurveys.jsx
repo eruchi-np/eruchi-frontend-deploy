@@ -217,23 +217,25 @@ function SurveyQuality({ data }) {
   const impact = useMemo(() => {
     const weights = standardizedImpactWeights(
       data.S8.surveys,
-      ['questions', 'avgMinutes', 'credits'],
+      ['questions', 'avgMinutes', 'reportedMinutes', 'credits'],
       'ratePct'
     );
     if (!weights) return null;
     const labels = {
       questions: 'Questions',
       avgMinutes: 'Avg. time taken',
+      reportedMinutes: 'Reported time',
       credits: 'Credits',
     };
     return weights.map((row) => ({ ...row, variable: labels[row.variable] || row.variable }));
   }, [data.S8.surveys]);
   return (
     <>
-      <Card metricId="S8" title="Survey traits" summary="How response rate relates to questions, time, and credits." note={data.S8.note}>
-        <div className="grid sm:grid-cols-3 gap-3 mb-4">
+      <Card metricId="S8" title="Survey traits" summary="How first-72h response rate relates to questions, observed time, reported time, and credits." note={data.S8.note}>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
           {[
-            ['Length', data.S8.byLength],
+            ['Length (observed/estimate)', data.S8.byLength],
+            ['Reported length', data.S8.byReportedLength || []],
             ['Reward', data.S8.byReward],
             ['Days open', data.S8.byDaysOpen],
           ].map(([label, rows]) => (
@@ -247,11 +249,11 @@ function SurveyQuality({ data }) {
         </div>
         {impact ? (
           <div className="mb-4">
-            <p className="text-xs text-gray-500 mb-2">Relative Impact Weight on response rate</p>
+            <p className="text-xs text-gray-500 mb-2">Relative Impact Weight on first-72h response rate</p>
             <ImpactWeightChart rows={impact} />
           </div>
         ) : (
-          <p className="text-xs text-gray-500 mb-3">Not enough surveys with complete questions, avg time, credits, and response rate for regression yet.</p>
+          <p className="text-xs text-gray-500 mb-3">Not enough surveys with complete questions, avg time, reported time, credits, and response rate for regression yet.</p>
         )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -262,7 +264,7 @@ function SurveyQuality({ data }) {
                 <th className="py-2 pr-3 font-medium">Avg time</th>
                 <th className="py-2 pr-3 font-medium">Reported min</th>
                 <th className="py-2 pr-3 font-medium">Credits</th>
-                <th className="py-2 pr-3 font-medium">Responses</th>
+                <th className="py-2 pr-3 font-medium">Responses (72h)</th>
                 <th className="py-2 font-medium">Response %</th>
               </tr>
             </thead>

@@ -13,12 +13,22 @@ import {
 function LandingConversion({ metric }) {
   if (!metric || metric.available === false) return <Missing metric={metric} />;
   return (
-    <Card metricId={metric.id} title={metric.title} summary="Of the people who opened a tagged landing page, how many registered within 24 hours." note={metric.note}>
+    <Card metricId={metric.id} title={metric.title} summary="Of tagged landing visits, how many registered within 24 hours — and among linked customers, who surveyed, bought, referred, or redeemed." note={metric.note}>
       {!metric.visitors ? (
         <p className="text-sm text-gray-500">No landing visits stored yet.</p>
       ) : (
         <>
           <p className="text-sm text-gray-800 mb-3">Registered within 24 hours · {shareText(metric.converted)}</p>
+          {metric.linked ? (
+            <div className="grid sm:grid-cols-2 gap-3 mb-3">
+              <Mini label="Linked customers" value={int(metric.linked)} />
+              <Mini label="Any engagement (24h)" value={shareText(metric.engaged?.any)} />
+              <Mini label="Survey" value={shareText(metric.engaged?.survey)} />
+              <Mini label="Voucher purchase" value={shareText(metric.engaged?.voucherPurchase)} />
+              <Mini label="Referral" value={shareText(metric.engaged?.referral)} />
+              <Mini label="Voucher redeem" value={shareText(metric.engaged?.voucherRedeem)} />
+            </div>
+          ) : null}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -29,7 +39,9 @@ function LandingConversion({ metric }) {
                   <th className="py-2 pr-3 font-medium">Content</th>
                   <th className="py-2 pr-3 font-medium">Term</th>
                   <th className="py-2 pr-3 font-medium">Visitors</th>
-                  <th className="py-2 font-medium">Registered within 24 hours</th>
+                  <th className="py-2 pr-3 font-medium">Registered</th>
+                  <th className="py-2 pr-3 font-medium">Linked</th>
+                  <th className="py-2 font-medium">Engaged</th>
                 </tr>
               </thead>
               <tbody>
@@ -41,7 +53,9 @@ function LandingConversion({ metric }) {
                     <td className="py-2 pr-3">{group.content}</td>
                     <td className="py-2 pr-3">{group.term}</td>
                     <td className="py-2 pr-3">{int(group.visitors)}</td>
-                    <td className="py-2">{shareText(group.converted)}</td>
+                    <td className="py-2 pr-3">{shareText(group.converted)}</td>
+                    <td className="py-2 pr-3">{int(group.linked)}</td>
+                    <td className="py-2">{shareText(group.engaged?.any)}</td>
                   </tr>
                 ))}
               </tbody>

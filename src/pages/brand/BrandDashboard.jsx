@@ -7,17 +7,20 @@ import {
   hasMetric,
   isLowBase,
   monthKey,
-  monthsOf,
   shown,
   uniqueBrands,
   weekLabel,
   wavesOf,
 } from './brandMetrics';
 import {
+  AWARENESS_TYPE_SERIES,
   EXPORT_CHART_CATALOG,
   GROUPS,
+  MARKET_PEN_SERIES,
+  awarenessTypeSnapshot,
   inSpan,
   itemsAt,
+  marketPenetrationSnapshot,
   nearestWave,
   ranked,
   snapshot,
@@ -25,12 +28,11 @@ import {
 } from './brandDashboardMetrics';
 import BrandKpiRow from './BrandKpiRow';
 import { BrandSearch, CompareSearch, MultiBrandSearch } from './BrandPicker';
-import BrandSwitchFlow from './BrandSwitchFlow';
+import BrandSwitchFlow, { buildNetGains } from './BrandSwitchFlow';
 import useBrandMetrics from './useBrandMetrics';
 import {
   exportElementsPdf,
   exportPanelPdf,
-  focusedBrandList,
   markTipSeen,
   parseDashboardSearch,
   tipSeen,
@@ -42,17 +44,16 @@ import {
   ChartCard,
   COMPARE_COLORS,
   GroupedBars,
-  HorizontalBars,
   LOW,
+  NetGainsBars,
+  NpsStackedBars,
   SensoryRadar,
   SeriesChart,
-  SharePie,
+  SwitchReasonBars,
   colorForBrand,
   seriesFor,
   seriesForBrands,
 } from './BrandCharts';
-
-const ALL_SERIES_CAP = 5;
 
 export default function BrandDashboard({ client, viewer = null }) {
   const navigate = useNavigate();
@@ -71,11 +72,10 @@ export default function BrandDashboard({ client, viewer = null }) {
     preloadAll,
   } = useBrandMetrics(viewer);
   const [compares, setCompares] = useState(urlSeed.current.compare || []);
-  const [fromMonth, setFromMonth] = useState(urlSeed.current.from || '');
-  const [toMonth, setToMonth] = useState(urlSeed.current.to || '');
+  const [fromWave, setFromWave] = useState(urlSeed.current.from || '');
+  const [toWave, setToWave] = useState(urlSeed.current.to || '');
   const [navOpen, setNavOpen] = useState(false);
   const [showTip, setShowTip] = useState(() => !viewer && !tipSeen());
-  const [allOffset, setAllOffset] = useState(0);
   const [showTop, setShowTop] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -84,6 +84,7 @@ export default function BrandDashboard({ client, viewer = null }) {
   const [exportAll, setExportAll] = useState(false);
   const seededPage = useRef(false);
   const seededWave = useRef(false);
+  const seededCompares = useRef(Boolean(urlSeed.current.compare?.length));
 
   useEffect(() => {
     if (seededPage.current) return;
@@ -102,16 +103,38 @@ export default function BrandDashboard({ client, viewer = null }) {
       : [brand, ...compares].filter(Boolean);
   const needsBrandPick = mode === 'selected' && !rawPeerBrands.length;
   const focusBrand = rawPeerBrands[0] || brand;
-  const chartBrands = mode === 'all'
-    ? focusedBrandList(rawPeerBrands, focusBrand, ALL_SERIES_CAP, allOffset)
+  // All = every brand; Selected stays capped by the picker (max 5).
+  const chartBrands = mode === 'all' && focusBrand && rawPeerBrands.includes(focusBrand)
+    ? [focusBrand, ...rawPeerBrands.filter((name) => name !== focusBrand)]
     : rawPeerBrands;
   const peerBrands = chartBrands.slice(1);
   const chartSeries = peerMode ? seriesForBrands(chartBrands) : seriesFor(compares, focusBrand || 'You');
+  const stackCharts = mode === 'all';
+  const chartGrid = stackCharts
+    ? 'grid min-w-0 grid-cols-1 gap-4'
+    : 'grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2';
+  const brandPageSize = stackCharts ? Math.max(chartBrands.length, 1) : 5;
+  const drillBrand = viewer?.onSelectOneBrand
+    ? (name) => {
+      if (!name || name === 'Category' || name === 'ALL' || name === 'Others') return;
+      viewer.onSelectOneBrand(name);
+    }
+    : null;
   const waves = useMemo(
     () => (meta?.waves?.length ? meta.waves : wavesOf(rows)),
     [meta?.waves, rows],
   );
-  const months = useMemo(() => monthsOf(waves), [waves]);
+
+  const resolveWeekParam = (value, list) => {
+    if (!value || !list.length) return '';
+    if (list.includes(value)) return value;
+    // Legacy month key (YYYY-MM) → nearest wave in that month.
+    if (/^\d{4}-\d{2}$/.test(value)) {
+      const hit = list.find((item) => monthKey(item) === value);
+      return hit || '';
+    }
+    return nearestWave(list, value) || '';
+  };
 
   useEffect(() => {
     if (!waves.length || !wave) return;
@@ -119,18 +142,18 @@ export default function BrandDashboard({ client, viewer = null }) {
   }, [waves, wave, setWave]);
 
   useEffect(() => {
-    if (!months.length) return;
-    const start = waves.length > 16 ? monthKey(waves[waves.length - 12]) : months[0];
-    const end = months[months.length - 1];
-    setFromMonth((current) => {
-      if (!current || !months.includes(current)) return start;
-      return current;
+    if (!waves.length) return;
+    const startDefault = waves.length > 16 ? waves[waves.length - 12] : waves[0];
+    const endDefault = waves[waves.length - 1];
+    setFromWave((current) => {
+      const resolved = resolveWeekParam(current, waves);
+      return resolved || startDefault;
     });
-    setToMonth((current) => {
-      if (!current || !months.includes(current)) return end;
-      return current;
+    setToWave((current) => {
+      const resolved = resolveWeekParam(current, waves);
+      return resolved || endDefault;
     });
-  }, [months, waves]);
+  }, [waves]);
 
   useEffect(() => {
     if (!waves.length || seededWave.current) return;
@@ -143,28 +166,24 @@ export default function BrandDashboard({ client, viewer = null }) {
     writeDashboardSearch({
       page,
       wave,
-      from: fromMonth,
-      to: toMonth,
+      from: fromWave,
+      to: toWave,
       compare: peerMode ? [] : compares,
     }, true);
-  }, [page, wave, fromMonth, toMonth, compares, peerMode]);
+  }, [page, wave, fromWave, toWave, compares, peerMode]);
 
   useEffect(() => {
     const onPop = () => {
       const next = parseDashboardSearch(window.location.search);
       setPage(next.page);
       if (next.wave) setWave(next.wave);
-      if (next.from) setFromMonth(next.from);
-      if (next.to) setToMonth(next.to);
+      if (next.from) setFromWave(resolveWeekParam(next.from, waves) || next.from);
+      if (next.to) setToWave(resolveWeekParam(next.to, waves) || next.to);
       if (!peerMode) setCompares(next.compare);
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, [setPage, setWave, peerMode]);
-
-  useEffect(() => {
-    setAllOffset(0);
-  }, [mode, viewer?.category, brand]);
 
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 360);
@@ -173,7 +192,7 @@ export default function BrandDashboard({ client, viewer = null }) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Unique brands from the active metrics store (sample is primary for now).
+  // Unique brands from the active metrics store (live when present).
   const allowedBrands = useMemo(() => {
     if (viewer?.brands?.length) return uniqueBrands(viewer.brands);
     if (meta?.brands?.length) return uniqueBrands(meta.brands);
@@ -192,11 +211,29 @@ export default function BrandDashboard({ client, viewer = null }) {
     });
   }, [peers]);
 
+  // Brand portal: default up to 3 top peers on the section lead metric (once).
+  useEffect(() => {
+    if (viewer || peerMode || seededCompares.current) return;
+    if (!focusBrand || !wave || !rows.length || !peers.length) return;
+    const leadMetric = GROUPS[page]?.metrics?.[0] || 'awareness_prompted';
+    const rankedPeers = peers
+      .map((name) => ({
+        name,
+        value: shown(findRow(rows, leadMetric, name, wave)),
+      }))
+      .filter((row) => row.value != null)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 3)
+      .map((row) => row.name);
+    if (!rankedPeers.length) return;
+    seededCompares.current = true;
+    setCompares(rankedPeers);
+  }, [viewer, peerMode, focusBrand, wave, rows, peers, page]);
+
   const waveIndex = waves.indexOf(wave);
   const previousWave = waveIndex > 0 ? waves[waveIndex - 1] : null;
   const pageId = GROUPS[page].id;
   const allCount = (viewer?.selectedBrands || []).length;
-  const allPages = mode === 'all' ? Math.max(1, Math.ceil(Math.max(0, allCount - 1) / (ALL_SERIES_CAP - 1))) : 1;
 
   const goTo = (next) => {
     const index = Math.min(GROUPS.length - 1, Math.max(0, next));
@@ -233,60 +270,88 @@ export default function BrandDashboard({ client, viewer = null }) {
     ...itemsAt(rows, 'occasion_usage', 'ALL'),
     ...itemsAt(rows, 'occasion_usage', focusBrand),
     ...peerBrands.flatMap((name) => itemsAt(rows, 'occasion_usage', name)),
+    ...chartBrands.flatMap((name) => itemsAt(rows, 'occasion_usage', name)),
   ])];
-  const occasionData = occasionItems
-    .map((item) => {
-      const row = findRow(rows, 'occasion_usage', 'ALL', wave, item);
-      return { name: item, value: shown(row), low: isLowBase(row) };
-    })
-    .filter((row) => row.value != null)
-    .sort((a, b) => b.value - a.value);
-  const occasionCompareData = occasionItems.map((item) => {
+  const occasionMatrixSeries = [
+    ...(peerMode ? seriesForBrands(chartBrands) : seriesFor(compares, focusBrand || 'You')),
+    ...(mode === 'selected' ? [] : [{ key: 'all', name: 'Category', color: ALL }]),
+  ];
+  const occasionMatrixData = occasionItems.map((item) => {
     const point = {
       name: item,
       you: shown(findRow(rows, 'occasion_usage', focusBrand, wave, item)),
+      all: shown(findRow(rows, 'occasion_usage', 'ALL', wave, item)),
     };
     peerBrands.forEach((name, index) => {
       point[`c${index}`] = shown(findRow(rows, 'occasion_usage', name, wave, item));
     });
     return point;
-  }).filter((point) => point.you != null || peerBrands.some((_, index) => point[`c${index}`] != null));
-
-  const reasonData = itemsAt(rows, 'switch_reason', 'ALL')
-    .map((item) => {
-      const row = findRow(rows, 'switch_reason', 'ALL', wave, item);
-      return { name: item, value: shown(row), low: isLowBase(row) };
-    })
-    .filter((row) => row.value != null)
-    .sort((a, b) => b.value - a.value);
-  const reasonItems = [...new Set([
-    ...itemsAt(rows, 'switch_reason', 'ALL'),
-    ...itemsAt(rows, 'switch_reason', focusBrand),
-    ...peerBrands.flatMap((name) => itemsAt(rows, 'switch_reason', name)),
-  ])];
-  const reasonCompareData = reasonItems.map((item) => {
-    const point = {
-      name: item,
-      you: shown(findRow(rows, 'switch_reason', focusBrand, wave, item)),
-    };
-    peerBrands.forEach((name, index) => {
-      point[`c${index}`] = shown(findRow(rows, 'switch_reason', name, wave, item));
-    });
-    return point;
-  }).filter((point) => point.you != null || peerBrands.some((_, index) => point[`c${index}`] != null));
+  }).filter((point) => (
+    point.you != null
+    || point.all != null
+    || peerBrands.some((_, index) => point[`c${index}`] != null)
+  ));
 
   const attributes = itemsAt(rows, 'sensory_mean', focusBrand);
+  // Keep sensory readable: focus + up to 2 peers; category only when under three brands.
+  const sensoryBrands = chartBrands.slice(0, 3);
+  const sensoryPeerBrands = sensoryBrands.slice(1);
   const sensorySeries = [
-    ...(peerMode ? seriesForBrands(chartBrands) : seriesFor(compares, focusBrand || 'You')),
-    ...(mode === 'selected' ? [] : [{ key: 'all', name: 'Category', color: ALL }]),
+    ...(peerMode
+      ? seriesForBrands(sensoryBrands)
+      : seriesFor(compares.slice(0, 2), focusBrand || 'You')),
+    ...(mode === 'selected' || sensoryBrands.length >= 3
+      ? []
+      : [{ key: 'all', name: 'Category', color: ALL }]),
   ];
+
+  const flowOnlyBrands = mode === 'selected' || mode === 'all'
+    ? chartBrands
+    : (compares.length ? [focusBrand, ...compares].filter(Boolean) : null);
+  const netGains = buildNetGains(rows, wave, focusBrand, flowOnlyBrands);
+
+  const switchReasonItems = [...new Set([
+    ...itemsAt(rows, 'switch_reason', focusBrand),
+    ...itemsAt(rows, 'switch_reason', 'ALL'),
+  ])];
+  const switchReasonData = switchReasonItems
+    .map((item) => ({
+      name: item,
+      focus: shown(findRow(rows, 'switch_reason', focusBrand, wave, item)),
+      all: shown(findRow(rows, 'switch_reason', 'ALL', wave, item)),
+    }))
+    .filter((row) => row.focus != null || row.all != null)
+    .sort((a, b) => ((b.focus || 0) + (b.all || 0)) - ((a.focus || 0) + (a.all || 0)));
+
+  const npsStackBrands = peerMode
+    ? chartBrands
+    : [focusBrand, ...peerBrands].filter(Boolean);
+  const npsStackData = npsStackBrands.map((name) => {
+    const npsRow = findRow(rows, 'nps', name, wave, 'NPS');
+    const promotersRow = findRow(rows, 'nps', name, wave, 'promoters_pct');
+    const passivesRow = findRow(rows, 'nps', name, wave, 'passives_pct');
+    const detractorsRow = findRow(rows, 'nps', name, wave, 'detractors_pct');
+    const promoters = shown(promotersRow);
+    const passives = shown(passivesRow);
+    const detractors = shown(detractorsRow);
+    const nps = shown(npsRow);
+    if (promoters == null && passives == null && detractors == null && nps == null) return null;
+    return {
+      name,
+      promoters: promoters ?? 0,
+      passives: passives ?? 0,
+      detractors: detractors ?? 0,
+      nps,
+      low: isLowBase(npsRow) || isLowBase(promotersRow) || isLowBase(passivesRow) || isLowBase(detractorsRow),
+    };
+  }).filter(Boolean);
   const sensoryData = attributes.map((item) => {
     const point = {
       name: item,
       you: shown(findRow(rows, 'sensory_mean', focusBrand, wave, item)),
       all: shown(findRow(rows, 'sensory_mean', 'ALL', wave, item)),
     };
-    peerBrands.forEach((name, index) => {
+    sensoryPeerBrands.forEach((name, index) => {
       point[`c${index}`] = shown(findRow(rows, 'sensory_mean', name, wave, item));
     });
     return point;
@@ -361,26 +426,31 @@ export default function BrandDashboard({ client, viewer = null }) {
 
   const firstWave = waves[0] || '';
   const lastWave = waves[waves.length - 1] || '';
-  const firstMonth = months[0] || '';
-  const lastMonth = months[months.length - 1] || '';
 
   const sideNav = (
     <>
       <div className="min-w-0">
         {viewer ? (
           <div className="mb-3 flex flex-col gap-2">
-            <button type="button" onClick={() => navigate('/admin')} className="self-start rounded-full px-3 py-1 text-sm text-gray-600 hover:bg-gray-100">
-              Admin
-            </button>
             <div className="flex rounded-full bg-slate-100 p-1">
-              {viewer.categories.map((item) => (
+              {(viewer.categories?.length
+                ? viewer.categories
+                : [
+                  { category: 'FB', label: 'Functional Beverages' },
+                  { category: 'PC', label: 'Personal Care' },
+                ]
+              ).map((item) => (
                 <button
                   key={item.category}
                   type="button"
                   onClick={() => viewer.onCategory(item.category)}
                   className={`flex-1 rounded-full px-2 py-1 text-xs font-medium ${item.category === viewer.category ? 'bg-white text-gray-900 shadow' : 'text-gray-600'}`}
                 >
-                  {item.label === 'Functional Beverages' ? 'FB' : item.label === 'Personal Care' ? 'PC' : item.label}
+                  {item.label === 'Functional Beverages' || item.category === 'FB'
+                    ? 'FB'
+                    : item.label === 'Personal Care' || item.category === 'PC'
+                      ? 'PC'
+                      : item.label}
                 </button>
               ))}
             </div>
@@ -416,7 +486,7 @@ export default function BrandDashboard({ client, viewer = null }) {
           ) : (
             <div>
               <h1 className="text-2xl font-bold">All brands</h1>
-              <p className="mt-1 text-xs text-gray-500">{allCount} in this category � charts show {Math.min(ALL_SERIES_CAP, chartBrands.length)} at a time</p>
+              <p className="mt-1 text-xs text-gray-500">{allCount} in this category — charts show every brand (full width)</p>
             </div>
           )
         ) : (
@@ -465,77 +535,56 @@ export default function BrandDashboard({ client, viewer = null }) {
           </div>
         </div>
         <label>
-          From
-          <input
-            type="month"
+          From week
+          <select
             className="mt-1 block w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
-            value={fromMonth}
-            min={firstMonth || undefined}
-            max={(toMonth && toMonth < lastMonth ? toMonth : lastMonth) || undefined}
+            value={fromWave}
             onChange={(event) => {
               const next = event.target.value;
-              if (!next || (firstMonth && next < firstMonth) || (lastMonth && next > lastMonth)) return;
-              setFromMonth(next);
+              if (!next || !waves.includes(next)) return;
+              setFromWave(next);
+              if (toWave && next > toWave) setToWave(next);
             }}
-          />
+          >
+            {waves.map((item) => (
+              <option key={`from-${item}`} value={item}>{weekLabel(item).replace('Week of ', '')}</option>
+            ))}
+          </select>
         </label>
         <label>
-          To
-          <input
-            type="month"
+          To week
+          <select
             className="mt-1 block w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900"
-            value={toMonth}
-            min={(fromMonth && fromMonth > firstMonth ? fromMonth : firstMonth) || undefined}
-            max={lastMonth || undefined}
+            value={toWave}
             onChange={(event) => {
               const next = event.target.value;
-              if (!next || (firstMonth && next < firstMonth) || (lastMonth && next > lastMonth)) return;
-              setToMonth(next);
+              if (!next || !waves.includes(next)) return;
+              setToWave(next);
+              if (fromWave && next < fromWave) setFromWave(next);
             }}
-          />
+          >
+            {waves.map((item) => (
+              <option key={`to-${item}`} value={item}>{weekLabel(item).replace('Week of ', '')}</option>
+            ))}
+          </select>
         </label>
         {peerMode ? (
           mode === 'all' ? (
-            <div className="space-y-2">
-              <div className="max-h-28 overflow-y-auto">
-                <div className="flex flex-wrap gap-1">
-                  {chartBrands.map((name, index) => (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => viewer.onFocusSelected?.(name)}
-                      className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-white"
-                      style={{ backgroundColor: colorForBrand(index) }}
-                      title="Set focus for headlines"
-                    >
-                      {name}
-                    </button>
-                  ))}
-                </div>
+            <div className="max-h-36 overflow-y-auto">
+              <div className="flex flex-wrap gap-1">
+                {chartBrands.map((name, index) => (
+                  <button
+                    key={name}
+                    type="button"
+                    onClick={() => (viewer.onSelectOneBrand || viewer.onFocusSelected)?.(name)}
+                    className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium text-white"
+                    style={{ backgroundColor: colorForBrand(index) }}
+                    title="Open this brand alone"
+                  >
+                    {name}
+                  </button>
+                ))}
               </div>
-              {allCount > ALL_SERIES_CAP ? (
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    className="rounded-lg border border-gray-200 px-2 py-1 text-xs disabled:opacity-40"
-                    disabled={allOffset <= 0}
-                    onClick={() => setAllOffset((value) => Math.max(0, value - (ALL_SERIES_CAP - 1)))}
-                  >
-                    Prev brands
-                  </button>
-                  <span className="text-[11px] text-gray-400">
-                    {Math.floor(allOffset / (ALL_SERIES_CAP - 1)) + 1}/{allPages}
-                  </span>
-                  <button
-                    type="button"
-                    className="rounded-lg border border-gray-200 px-2 py-1 text-xs disabled:opacity-40"
-                    disabled={allOffset + (ALL_SERIES_CAP - 1) >= Math.max(0, allCount - 1)}
-                    onClick={() => setAllOffset((value) => value + (ALL_SERIES_CAP - 1))}
-                  >
-                    Next brands
-                  </button>
-                </div>
-              ) : null}
             </div>
           ) : null
         ) : (
@@ -619,52 +668,46 @@ export default function BrandDashboard({ client, viewer = null }) {
       ) : null}
 
       <div className={`lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start ${viewer ? 'lg:-mt-[5.5rem]' : ''}`}>
-        <aside className={`hidden border-b border-gray-200 bg-white px-4 py-4 lg:flex lg:flex-col lg:gap-5 lg:border-b-0 lg:border-r ${viewer ? 'lg:relative lg:z-[65]' : ''}`}>
+        <aside className={`hidden border-b border-gray-200 bg-white px-4 py-4 lg:flex lg:flex-col lg:gap-5 lg:border-b-0 lg:border-r ${viewer ? 'lg:relative lg:z-[65] lg:pt-[5.5rem]' : ''}`}>
           {sideNav}
         </aside>
 
-        <main ref={panelRef} className={`min-w-0 space-y-8 px-4 py-6 ${viewer ? 'lg:pt-[5.5rem]' : ''}`}>
+        <main ref={panelRef} className={`min-w-0 px-4 ${viewer ? 'space-y-4 py-4 lg:pt-[5.5rem]' : 'space-y-8 py-6'}`}>
           {viewer?.toolbar ? (
-            <div className="rounded-2xl border border-gray-200 bg-white px-4 py-3">
-              {viewer.toolbar}
+            <div className="flex flex-col gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0 flex-1">{viewer.toolbar}</div>
+              <button
+                type="button"
+                onClick={openExport}
+                disabled={!pageReady || booting || exporting}
+                className="hidden shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-slate-50 disabled:opacity-40 lg:inline-flex"
+              >
+                <Download className="h-4 w-4" /> {exporting ? 'Exporting PDF...' : 'Export PDF'}
+              </button>
             </div>
-          ) : null}
-          <div className="hidden items-center justify-end lg:flex">
-            <button
-              type="button"
-              onClick={openExport}
-              disabled={!pageReady || booting || exporting}
-              className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-slate-50 disabled:opacity-40"
-            >
-              <Download className="h-4 w-4" /> {exporting ? 'Exporting PDF...' : 'Export PDF'}
-            </button>
-          </div>
+          ) : (
+            <div className="hidden items-center justify-end lg:flex">
+              <button
+                type="button"
+                onClick={openExport}
+                disabled={!pageReady || booting || exporting}
+                className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-slate-50 disabled:opacity-40"
+              >
+                <Download className="h-4 w-4" /> {exporting ? 'Exporting PDF...' : 'Export PDF'}
+              </button>
+            </div>
+          )}
 
         {showTip ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-950 sm:flex-row sm:items-center sm:justify-between">
-            <p>Use the week arrows and From/To months to move through the charts. Open Compare to line up peers.</p>
+            <p>Use the week arrows and From/To weeks to move through the charts. Open Compare to line up peers.</p>
             <button type="button" className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-blue-800" onClick={dismissTip}>Got it</button>
           </div>
         ) : null}
 
-        {meta?.source === 'sample' || meta?.store === 'brand_tracker_metrics_sample' ? (
-          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-            Showing brand metrics from the sample database for this category.
-          </p>
-        ) : null}
-        {meta?.source === 'live' ? (
-          <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-            Showing brand metrics from the database for this category.
-          </p>
-        ) : null}
-        {meta?.source === 'mixed' ? (
-          <p className="rounded-2xl bg-sky-50 px-4 py-3 text-sm text-sky-900">
-            Some metrics came from a CSV import; the rest are from the main metrics store.
-          </p>
-        ) : null}
         {!booting && rows.some((row) => row.status === 'suppressed' || row.status === 'low_base') ? (
           <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Some figures are low-base (under 50 people). They show as directional only ? use them for early shape, not precise comparison.
+            Some figures are low-base (under 50 people). They show as directional only — use them for early shape, not precise comparison.
           </p>
         ) : null}
 
@@ -685,195 +728,281 @@ export default function BrandDashboard({ client, viewer = null }) {
           </div>
         ) : null}
 
-        {!needsBrandPick && showSection('awareness') && <div className="space-y-3">
+        {!needsBrandPick && showSection('awareness') && <div className="space-y-3" data-export-section="Awareness">
           <h2 className="text-xl font-semibold">Awareness</h2>
-          <p className="text-sm text-gray-500">People who selected the brand when shown the list.</p>
-          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-            <ChartCard title="This week" note={chartBrands.join(', ')}>
-              <BrandBars data={snapshot(rows, 'awareness_prompted', focusBrand, peerBrands, wave, null, peerMode)} metric="awareness_prompted" />
-            </ChartCard>
-            <ChartCard title="First mention" note="The first brand they named, this week.">
-              <BrandBars data={snapshot(rows, 'awareness_unprompted', focusBrand, peerBrands, wave, 'first_mention', peerMode)} metric="awareness_unprompted" item="first_mention" />
-            </ChartCard>
-          </div>
-          <ChartCard title="Prompted awareness over the weeks" wide>
-            <SeriesChart data={trend(rows, 'awareness_prompted', focusBrand, peerBrands, null, fromMonth, toMonth, waves)} metric="awareness_prompted" series={chartSeries} />
-          </ChartCard>
-          {hasMetric(rows, 'awareness_unprompted') ? (
-            <ChartCard title="Any mention" note="Named the brand without a list." wide>
-              <SeriesChart kind="area" data={trend(rows, 'awareness_unprompted', focusBrand, peerBrands, 'any_mention', fromMonth, toMonth, waves)} metric="awareness_unprompted" series={chartSeries} />
-            </ChartCard>
-          ) : null}
-        </div>}
-
-        {!needsBrandPick && showSection('buying') && <div className="space-y-3">
-          <h2 className="text-xl font-semibold">Buying</h2>
-          <ChartCard title="Penetration" note="Bought in the past 3 months." wide>
-            <SeriesChart kind="area" data={trend(rows, 'penetration', focusBrand, peerBrands, null, fromMonth, toMonth, waves)} metric="penetration" series={chartSeries} />
-          </ChartCard>
-          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-            <ChartCard title="Trial this week" note="Ever tried the brand.">
-              <BrandBars data={snapshot(rows, 'trial', focusBrand, peerBrands, wave, null, peerMode)} metric="trial" />
-            </ChartCard>
-            <ChartCard title="Purchases per month" note="Among people whose main brand is this one.">
-              <BrandBars data={snapshot(rows, 'purchase_frequency', focusBrand, peerBrands, wave, null, peerMode)} metric="purchase_frequency" />
-            </ChartCard>
-            <ChartCard title="Rupees per trip" note={wave ? weekLabel(wave) : ''} wide>
-              <BrandBars data={snapshot(rows, 'spend_per_trip', focusBrand, peerBrands, wave, null, peerMode)} metric="spend_per_trip" />
-            </ChartCard>
-          </div>
-          <ChartCard title="Share of wallet" note="Share of their category spend that goes to this brand." wide>
-            <SeriesChart kind="area" data={trend(rows, 'share_of_wallet', focusBrand, peerBrands, null, fromMonth, toMonth, waves)} metric="share_of_wallet" series={chartSeries} />
-          </ChartCard>
-        </div>}
-
-        {!needsBrandPick && showSection('occasions') && <div className="space-y-3">
-          <h2 className="text-xl font-semibold">Occasions</h2>
-          <p className="text-sm text-gray-500">People can pick more than one, so these can add up past 100%.</p>
-          {occasionData.length && mode !== 'selected' ? (
-            <ChartCard title="Category occasions" note={wave ? weekLabel(wave) : ''} exportKey="Category occasions" wide>
-              <HorizontalBars data={occasionData} metric="occasion_usage" fill />
-            </ChartCard>
-          ) : null}
-          {occasionCompareData.length ? (
-            <ChartCard title="By brand occasions" note={[wave ? weekLabel(wave) : null, chartBrands.join(', ')].filter(Boolean).join(' � ')} exportKey="By brand occasions" wide>
-              <GroupedBars data={occasionCompareData} metric="occasion_usage" series={chartSeries} fill />
-            </ChartCard>
-          ) : null}
-          {!occasionCompareData.length && (mode === 'selected' || !occasionData.length) ? (
-            <p className="rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500">No occasion data for this week.</p>
-          ) : null}
-        </div>}
-
-        {!needsBrandPick && showSection('switching') && <div className="space-y-3">
-          <h2 className="text-xl font-semibold">Switching</h2>
-          <p className="text-sm text-gray-500">These two shares will not add up to 100%.</p>
+          <p className="text-sm text-gray-500">
+            Top of mind is first mention. Unprompted is named without a list (not first). Prompted is when shown the list.
+          </p>
           <ChartCard
-            title="Main brand flow"
-            note="Same panelists across waves. Blue bands are gains; coral bands are losses. Click a brand to focus."
-            tall
+            title="Awareness this week"
+            note={chartBrands.join(', ')}
+            exportKey="Awareness this week"
             wide
           >
-            <BrandSwitchFlow
-              rows={rows}
-              wave={wave}
-              defaultFocus={focusBrand}
-              onlyBrands={
-                mode === 'selected' || mode === 'all'
-                  ? chartBrands
-                  : (compares.length ? [focusBrand, ...compares].filter(Boolean) : null)
-              }
+            <GroupedBars
+              data={awarenessTypeSnapshot(rows, chartBrands, wave)}
+              metric="awareness_prompted"
+              series={AWARENESS_TYPE_SERIES}
+              pageSize={brandPageSize}
+              onBrandClick={drillBrand}
             />
           </ChartCard>
-          {mode !== 'selected' ? (
-            <ChartCard title="Category over the weeks" wide>
+          {hasMetric(rows, 'awareness_unprompted') ? (
+            <ChartCard
+              title="Unprompted awareness over the weeks"
+              note="Named the brand unprompted (any mention)."
+              exportKey="Unprompted awareness over the weeks"
+              wide
+            >
               <SeriesChart
                 kind="area"
-                data={waves.filter((item) => inSpan(item, fromMonth, toMonth)).map((item) => ({
-                  label: weekLabel(item).replace('Week of ', ''),
-                  switched: shown(findRow(rows, 'brand_switching', 'ALL', item, 'switched_brand')),
-                  reduced: shown(findRow(rows, 'brand_switching', 'ALL', item, 'lapsed_reduced_or_stopped')),
-                }))}
-                metric="brand_switching"
-                series={[
-                  { key: 'switched', name: 'Switched brand', color: '#7c3aed' },
-                  { key: 'reduced', name: 'Reduced or stopped', color: '#0891b2' },
-                ]}
+                data={trend(rows, 'awareness_unprompted', focusBrand, peerBrands, 'any_mention', fromWave, toWave, waves)}
+                metric="awareness_unprompted"
+                item="any_mention"
+                series={chartSeries}
+                onBrandClick={drillBrand}
               />
             </ChartCard>
-          ) : null}
-          <ChartCard title="Switched brand by brand" note={chartBrands.join(', ')} wide>
+          ) : (
+            <p className="rounded-2xl border border-dashed border-amber-200 bg-amber-50 px-4 py-6 text-center text-sm text-amber-900">
+              Unprompted awareness — data currently being gathered for this category.
+            </p>
+          )}
+          <ChartCard title="Prompted awareness over the weeks" note="Selected when shown the list." wide>
             <SeriesChart
-              kind="area"
-              data={trend(rows, 'brand_switching', focusBrand, peerBrands, 'switched_brand', fromMonth, toMonth, waves)}
-              metric="brand_switching"
-              item="switched_brand"
+              data={trend(rows, 'awareness_prompted', focusBrand, peerBrands, null, fromWave, toWave, waves)}
+              metric="awareness_prompted"
               series={chartSeries}
+              onBrandClick={drillBrand}
             />
-          </ChartCard>
-          <ChartCard title="Reduced or stopped by brand" note={chartBrands.join(', ')} wide>
-            <SeriesChart
-              kind="area"
-              data={trend(rows, 'brand_switching', focusBrand, peerBrands, 'lapsed_reduced_or_stopped', fromMonth, toMonth, waves)}
-              metric="brand_switching"
-              item="lapsed_reduced_or_stopped"
-              series={chartSeries}
-            />
-          </ChartCard>
-          {mode !== 'selected' ? (
-            <ChartCard title="Why people switched" note="Category share of switchers. These should add up to about 100%." tall wide>
-              {reasonData.length ? (
-                <SharePie data={reasonData} metric="switch_reason" prominent />
-              ) : (
-                <p className="py-8 text-center text-sm text-gray-500">No switch reasons for this week.</p>
-              )}
-            </ChartCard>
-          ) : null}
-          <ChartCard title="Reasons by brand" note={chartBrands.join(', ')} wide>
-            {reasonCompareData.length ? (
-              <GroupedBars data={reasonCompareData} metric="switch_reason" series={chartSeries} fill />
-            ) : (
-              <p className="py-8 text-center text-sm text-gray-500">No brand-level switch reasons for this week.</p>
-            )}
           </ChartCard>
         </div>}
 
-        {!needsBrandPick && showSection('loyalty') && <div className="space-y-3">
-          <h2 className="text-xl font-semibold">Loyalty</h2>
-          <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-            <ChartCard title="NPS this week" note={wave ? weekLabel(wave) : ''}>
-              <BrandBars data={snapshot(rows, 'nps', focusBrand, peerBrands, wave, 'NPS', peerMode)} metric="nps" item="NPS" />
-            </ChartCard>
-            <ChartCard title="Promoters, passives, detractors" note={`${focusBrand} buyers this week.`}>
-              <SharePie
-                metric="nps"
-                data={[
-                  { name: 'Promoters', value: shown(findRow(rows, 'nps', focusBrand, wave, 'promoters_pct')), fill: '#059669' },
-                  { name: 'Passives', value: shown(findRow(rows, 'nps', focusBrand, wave, 'passives_pct')), fill: '#94a3b8' },
-                  { name: 'Detractors', value: shown(findRow(rows, 'nps', focusBrand, wave, 'detractors_pct')), fill: '#e11d48' },
-                ]}
+        {!needsBrandPick && showSection('buying') && <div className="space-y-3" data-export-section="Penetration and Purchase">
+          <h2 className="text-xl font-semibold">Penetration and Purchase</h2>
+          <div className={chartGrid}>
+            <ChartCard
+              title="Market Penetration"
+              note={wave ? weekLabel(wave) : 'Awareness (prompted + unprompted) beside penetration.'}
+              exportKey="Market Penetration"
+              wide={stackCharts}
+            >
+              <GroupedBars
+                data={marketPenetrationSnapshot(rows, chartBrands, wave)}
+                metric="penetration"
+                series={MARKET_PEN_SERIES}
+                pageSize={brandPageSize}
+                onBrandClick={drillBrand}
               />
+            </ChartCard>
+            <ChartCard
+              title="Penetration over the weeks"
+              note={fromWave && toWave && fromWave !== toWave
+                ? `Weeks ${weekLabel(fromWave).replace('Week of ', '')} – ${weekLabel(toWave).replace('Week of ', '')}`
+                : (wave ? weekLabel(wave) : 'Bought recently')}
+              exportKey="Penetration over the weeks"
+              wide={stackCharts}
+            >
+              <SeriesChart kind="area" data={trend(rows, 'penetration', focusBrand, peerBrands, null, fromWave, toWave, waves)} metric="penetration" series={chartSeries} onBrandClick={drillBrand} />
+            </ChartCard>
+          </div>
+          <div className={chartGrid}>
+            <ChartCard title="Trial this week" note="Ever tried the brand." wide={stackCharts}>
+              <BrandBars data={snapshot(rows, 'trial', focusBrand, peerBrands, wave, null, peerMode)} metric="trial" onBrandClick={drillBrand} />
+            </ChartCard>
+            <ChartCard title="Purchase Frequency" note="Purchases per month among people whose main brand is this one." exportKey="Purchase Frequency" wide={stackCharts}>
+              <BrandBars data={snapshot(rows, 'purchase_frequency', focusBrand, peerBrands, wave, null, peerMode)} metric="purchase_frequency" onBrandClick={drillBrand} />
+            </ChartCard>
+            <ChartCard title="Rupees per trip" note={wave ? weekLabel(wave) : ''} wide>
+              <BrandBars data={snapshot(rows, 'spend_per_trip', focusBrand, peerBrands, wave, null, peerMode)} metric="spend_per_trip" onBrandClick={drillBrand} />
+            </ChartCard>
+          </div>
+          <div className={chartGrid}>
+            <ChartCard title="Share of wallet" note="Share of this category spend that goes to these brands." wide={stackCharts}>
+              <SeriesChart kind="area" data={trend(rows, 'share_of_wallet', focusBrand, peerBrands, null, fromWave, toWave, waves)} metric="share_of_wallet" series={chartSeries} onBrandClick={drillBrand} />
+            </ChartCard>
+            <ChartCard title="Share of wallet, by buyer type" note="Awaiting buyer-type breakdown." exportKey="Share of wallet, by buyer type" wide={stackCharts}>
+              <p className="py-10 text-center text-sm text-amber-800">Data currently being gathered.</p>
             </ChartCard>
           </div>
           {hasMetric(rows, 'cross_purchase_affinity') ? (
             <div className="space-y-3">
-              <h3 className="text-lg font-semibold">Also bought</h3>
+              <h3 className="text-lg font-semibold">Cross Purchase Affinity</h3>
               <p className="text-sm text-gray-500">
                 {mode === 'selected'
-                  ? `Other selected brands ${focusBrand} buyers also bought.`
+                  ? `Other selected brands ${focusBrand} buyers also bought — not limited to this category.`
                   : `Other brands ${focusBrand} buyers also bought. The pair is not the same in reverse.`}
               </p>
-              <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2">
-                <ChartCard title={`Share of ${focusBrand} buyers`} note={wave ? weekLabel(wave) : ''} exportKey="Also bought share" fit>
-                  <HorizontalBars
+              <div className={chartGrid}>
+                <ChartCard title={`Share of ${focusBrand} buyers`} note={wave ? weekLabel(wave) : ''} exportKey="Also bought share" fit wide={stackCharts}>
+                  <BrandBars
                     data={ranked(rows, 'cross_purchase_affinity', focusBrand, wave).filter((row) => (
                       allowedBrands.includes(row.name)
                       && (mode !== 'selected' || chartBrands.includes(row.name))
                     ))}
                     metric="cross_purchase_affinity"
+                    onBrandClick={drillBrand}
                   />
                 </ChartCard>
-                <ChartCard title="Lift" note="1 means no extra link between the brands." exportKey="Also bought lift" fit>
-                  <HorizontalBars
+                <ChartCard title="Lift" note="1 means no extra link between the brands." exportKey="Also bought lift" fit wide={stackCharts}>
+                  <BrandBars
                     data={ranked(rows, 'cross_purchase_lift', focusBrand, wave).filter((row) => (
                       allowedBrands.includes(row.name)
                       && (mode !== 'selected' || chartBrands.includes(row.name))
                     ))}
                     metric="cross_purchase_lift"
+                    onBrandClick={drillBrand}
                   />
                 </ChartCard>
               </div>
             </div>
           ) : (
-            <p className="rounded-2xl border border-slate-100 bg-white px-4 py-4 text-sm text-gray-500">Loading also-bought brands...</p>
+            <p className="rounded-2xl border border-dashed border-amber-200 bg-amber-50 px-4 py-6 text-center text-sm text-amber-900">
+              Cross Purchase Affinity — data currently being gathered for this category.
+            </p>
           )}
         </div>}
 
-        {!needsBrandPick && showSection('sensory') && <div className="space-y-3">
+        {!needsBrandPick && showSection('occasions') && <div className="space-y-3" data-export-section="Occasions">
+          <h2 className="text-xl font-semibold">Occasions</h2>
+          <p className="text-sm text-gray-500">Brand × occasion matrix. People can pick more than one, so shares can add past 100%.</p>
+          {occasionMatrixData.length ? (
+            <ChartCard
+              title="Occasion matrix"
+              note={[wave ? weekLabel(wave) : null, chartBrands.join(', ')].filter(Boolean).join(' · ')}
+              exportKey="Occasion matrix"
+              wide
+              tall
+            >
+              <GroupedBars data={occasionMatrixData} metric="occasion_usage" series={occasionMatrixSeries} />
+            </ChartCard>
+          ) : (
+            <p className="rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500">No occasion data for this week.</p>
+          )}
+        </div>}
+
+        {!needsBrandPick && showSection('switching') && <div className="space-y-3" data-export-section="Switching">
+          <h2 className="text-xl font-semibold">Switching</h2>
+          <p className="text-sm text-gray-500">Flow and net gains use the same panelists across waves. Reasons are from switchers this week.</p>
+          <ChartCard
+            title="Main brand flow"
+            note="Same panelists across waves. Blue bands are gains; coral bands are losses."
+            howToRead="Each band is the share of matched panelists who moved from one main brand to another between waves. Click a brand name to open that brand alone."
+            tall
+            wide
+            exportKey="Main brand flow"
+          >
+            {hasMetric(rows, 'brand_switch_flow') ? (
+              <BrandSwitchFlow
+                rows={rows}
+                wave={wave}
+                defaultFocus={focusBrand}
+                onlyBrands={flowOnlyBrands}
+                onBrandClick={drillBrand}
+              />
+            ) : (
+              <p className="py-10 text-center text-sm text-amber-800">Data currently being gathered for brand switch flow.</p>
+            )}
+          </ChartCard>
+          <ChartCard
+            title="Brand switching tracker"
+            note={focusBrand ? `Net gains and losses for ${focusBrand}.` : 'Net gains and losses.'}
+            howToRead="Share of matched panelists won from or lost to each competitor. Net is won minus lost. Click a competitor to open that brand alone."
+            exportKey="Brand switching tracker"
+            wide
+          >
+            {netGains?.data?.length ? (
+              <NetGainsBars data={netGains.data} onBrandClick={drillBrand} />
+            ) : (
+              <p className="py-10 text-center text-sm text-amber-800">
+                {hasMetric(rows, 'brand_switch_flow')
+                  ? 'No competitor wins or losses for this brand this week.'
+                  : 'Data currently being gathered for brand switch flow.'}
+              </p>
+            )}
+          </ChartCard>
+          {mode !== 'selected' ? (
+            <ChartCard title="Category over the weeks" wide exportKey="Category over the weeks">
+              <SeriesChart
+                kind="area"
+                data={waves.filter((item) => inSpan(item, fromWave, toWave)).map((item) => ({
+                  label: weekLabel(item).replace('Week of ', ''),
+                  reduced: shown(findRow(rows, 'brand_switching', 'ALL', item, 'lapsed_reduced_or_stopped')),
+                  adopted: shown(findRow(rows, 'brand_switching', 'ALL', item, 'adopted_or_increased')),
+                }))}
+                metric="brand_switching"
+                series={[
+                  { key: 'reduced', name: 'Reduced or stopped', color: '#0891b2' },
+                  { key: 'adopted', name: 'Adopted or increased', color: '#059669' },
+                ]}
+              />
+              {!rows.some((row) => row.metric === 'brand_switching' && row.item === 'adopted_or_increased') ? (
+                <p className="mt-2 text-xs text-amber-700">Adopted or increased — data currently being gathered.</p>
+              ) : null}
+            </ChartCard>
+          ) : null}
+          <ChartCard
+            title="Brand switching reasons"
+            note={focusBrand ? `Why switchers name each reason · ${focusBrand} vs category.` : ''}
+            howToRead="Share of switchers naming each reason (more than one allowed). Blue is this brand; coral is the category. Live metrics do not yet split left vs came."
+            exportKey="Brand switching reasons"
+            wide
+          >
+            {switchReasonData.length ? (
+              <SwitchReasonBars data={switchReasonData} focusLabel={focusBrand || 'This brand'} />
+            ) : (
+              <p className="py-10 text-center text-sm text-amber-800">
+                Data currently being gathered for switch reasons.
+              </p>
+            )}
+          </ChartCard>
+        </div>}
+
+        {!needsBrandPick && showSection('loyalty') && <div className="space-y-3" data-export-section="Loyalty">
+          <h2 className="text-xl font-semibold">Loyalty</h2>
+          <ChartCard
+            title="NPS this week"
+            note={wave ? weekLabel(wave) : ''}
+            howToRead="Each bar is that brand’s buyers this week: promoters (would recommend), passives, and detractors. NPS at the end is promoters minus detractors (Net Promoter Score)."
+            exportKey="NPS this week"
+            wide
+          >
+            {npsStackData.length ? (
+              <NpsStackedBars data={npsStackData} onBrandClick={drillBrand} />
+            ) : (
+              <p className="py-10 text-center text-sm text-gray-500">No NPS breakdown for this week.</p>
+            )}
+          </ChartCard>
+          <ChartCard
+            title="NPS over the weeks"
+            note={[fromWave ? weekLabel(fromWave) : null, toWave ? weekLabel(toWave) : null].filter(Boolean).join(' → ')}
+            howToRead="Net Promoter Score by week. A gap means that week is missing or too small to show — it is not zero. Click a brand in the legend to open it alone."
+            exportKey="NPS over the weeks"
+            wide
+          >
+            <SeriesChart
+              data={trend(rows, 'nps', focusBrand, peerBrands, 'NPS', fromWave, toWave, waves)}
+              metric="nps"
+              item="NPS"
+              series={chartSeries}
+              onBrandClick={drillBrand}
+            />
+          </ChartCard>
+        </div>}
+
+        {!needsBrandPick && showSection('sensory') && <div className="space-y-3" data-export-section="Sensory">
           <h2 className="text-xl font-semibold">Sensory</h2>
-          <p className="text-sm text-gray-500">Average score from 1 to 5. This category stays on its own chart.</p>
+          <p className="text-sm text-gray-500">
+            Average score from 1 to 5. Chart shows up to three brands so the radar stays readable.
+          </p>
           {sensoryData.length ? (
-            <ChartCard title="Sensory" note={wave ? weekLabel(wave) : ''} exportKey="Sensory" wide>
+            <ChartCard
+              title="Sensory"
+              note={[wave ? weekLabel(wave) : null, sensoryBrands.join(', ')].filter(Boolean).join(' · ')}
+              howToRead="Average score from 1 (low) to 5 (high) on each attribute. Up to three brands so the shape stays readable."
+              exportKey="Sensory"
+              wide
+            >
               <SensoryRadar data={sensoryData} series={sensorySeries} />
             </ChartCard>
           ) : (
@@ -892,7 +1021,7 @@ export default function BrandDashboard({ client, viewer = null }) {
           <section className="rounded-3xl bg-white p-6 text-sm text-gray-600 shadow-[0_12px_30px_rgba(37,99,235,0.08)]">
             <h2 className="text-base font-semibold text-gray-900">How to read this</h2>
             <ul className="mt-3 list-disc space-y-2 pl-5">
-              <li>{viewer ? 'Admins can view one brand, a selected set, or every brand in the category. Click Focus on a brand to set the headline. In All mode, charts page through five brands at a time.' : 'Search to compare, up to five brands.'} The week arrows move one week. From and To set the months on the long charts.</li>
+              <li>{viewer ? 'Admins can view one brand, a selected set (up to five), or every brand in the category. All mode shows every brand on full-width charts — click a brand on a chart (or its chip) to open that brand alone.' : 'Search to compare, up to five brands.'} The week arrows move one week. From and To set the weeks on the long charts.</li>
               <li>A low base / directional mark means fewer than 50 people (including under 30). Treat those figures as early shape, not precise comparison.</li>
               <li>A gap in a line means that week is missing or too small to show. It is not zero.</li>
               <li>Functional Beverages and Personal Care are never mixed. Comparing stays inside the category.</li>
@@ -972,7 +1101,7 @@ export default function BrandDashboard({ client, viewer = null }) {
         <button
           type="button"
           onClick={scrollToTop}
-          className="fixed bottom-6 right-6 z-[80] inline-flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700"
+          className="fixed bottom-6 left-6 z-[80] inline-flex h-11 w-11 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-700"
           aria-label="Back to top"
         >
           <ArrowUp className="h-5 w-5" />

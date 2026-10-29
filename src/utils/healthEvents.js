@@ -265,16 +265,12 @@ function postLandingVisit(pathname, acquisition) {
 }
 
 /**
- * First page of a logged-out browser. A later page does not replace it.
+ * First page of a browser session. A later page does not replace it.
+ * Signed-in visits are posted too so engagement can be tied to the account.
  * A first real campaign tag can still be written onto a visit that has none.
  */
 export function rememberLandingVisit(pathname) {
   try {
-    if (localStorage.getItem('access_token')) {
-      localStorage.setItem(VISIT_POSTED, '1');
-      localStorage.setItem(VISIT_TAGGED, '1');
-      return;
-    }
     const acquisition = readAcquisition();
     if (localStorage.getItem(VISIT_POSTED)) {
       if (!acquisition || localStorage.getItem(VISIT_TAGGED) || visitInFlight) return;

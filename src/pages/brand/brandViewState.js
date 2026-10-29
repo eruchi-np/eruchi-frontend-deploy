@@ -160,60 +160,121 @@ async function canvasFromElement(element) {
 function pdfPageMetrics(pdf) {
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const margin = 24;
+  const margin = 28;
   const gap = 14;
+  const headerH = 36;
+  const footerH = 28;
   return {
     margin,
     gap,
-    usableWidth: pageWidth - margin * 2,
-    usableHeight: pageHeight - margin * 2,
+    headerH,
+    footerH,
+    pageWidth,
     pageHeight,
+    usableWidth: pageWidth - margin * 2,
+    contentTop: margin + headerH,
+    contentBottom: pageHeight - margin - footerH,
+    usableHeight: pageHeight - margin * 2 - headerH - footerH,
   };
 }
 
-/** Pack chart images top-to-bottom on A4; new page only when the next chart won't fit. */
-function createPdfPacker(pdf) {
-  const metrics = pdfPageMetrics(pdf);
-  let cursorY = metrics.margin;
-  let pageStarted = false;
+function formatExportStamp(date = new Date()) {
+  return date.toLocaleString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
-  const ensurePage = () => {
+/** Pack chart images on A4 with chrome + optional section page breaks. */
+function createPdfPacker(pdf, { exportedAt = formatExportStamp() } = {}) {
+  const metrics = pdfPageMetrics(pdf);
+  let cursorY = metrics.contentTop;
+  let pageStarted = false;
+  let currentSection = '';
+
+  const paintChrome = () => {
+    const { margin, pageWidth, pageHeight, headerH, footerH } = metrics;
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.setTextColor(40, 40, 40);
+    pdf.text('Analytics by Ruchi Insights, powered by eRuchi.', margin, margin + 12);
+    pdf.text(`Exported on ${exportedAt}`, pageWidth - margin, margin + 12, { align: 'right' });
+    pdf.setDrawColor(220, 220, 220);
+    pdf.line(margin, margin + headerH - 8, pageWidth - margin, margin + headerH - 8);
+
+    const pageNo = pdf.internal.getNumberOfPages();
+    pdf.setFontSize(8);
+    pdf.setTextColor(120, 120, 120);
+    pdf.text(`Page ${pageNo}`, pageWidth / 2, pageHeight - margin + 4, { align: 'center' });
+    pdf.line(margin, pageHeight - margin - footerH + 10, pageWidth - margin, pageHeight - margin - footerH + 10);
+  };
+
+  const ensurePage = (sectionTitle = '') => {
     if (!pageStarted) {
       pageStarted = true;
+      paintChrome();
+      cursorY = metrics.contentTop;
+      if (sectionTitle) {
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(14);
+        pdf.setTextColor(15, 23, 42);
+        pdf.text(sectionTitle, metrics.margin, cursorY + 4);
+        cursorY += 22;
+        currentSection = sectionTitle;
+      }
       return;
     }
     pdf.addPage();
-    cursorY = metrics.margin;
+    paintChrome();
+    cursorY = metrics.contentTop;
+    if (sectionTitle) {
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(14);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(sectionTitle, metrics.margin, cursorY + 4);
+      cursorY += 22;
+      currentSection = sectionTitle;
+    }
   };
 
-  const addCanvas = (canvas) => {
+  const beginSection = (sectionTitle) => {
+    if (!sectionTitle) return;
+    if (!pageStarted || currentSection !== sectionTitle) {
+      ensurePage(sectionTitle);
+    }
+  };
+
+  const addCanvas = (canvas, sectionTitle = '') => {
     if (!canvas || canvas.width < 2 || canvas.height < 2) return;
+    if (sectionTitle) beginSection(sectionTitle);
+    else if (!pageStarted) ensurePage();
+
     const image = canvas.toDataURL('image/jpeg', 0.82);
     const drawWidth = metrics.usableWidth;
     const drawHeight = (canvas.height * drawWidth) / canvas.width;
+    const bottom = metrics.contentBottom;
 
-    // Tall single chart: slice across pages.
     if (drawHeight > metrics.usableHeight) {
-      ensurePage();
+      ensurePage(sectionTitle && currentSection !== sectionTitle ? sectionTitle : '');
       let remaining = drawHeight;
       let offsetY = 0;
       while (remaining > 0) {
-        if (offsetY > 0) {
-          pdf.addPage();
-          cursorY = metrics.margin;
-        }
-        pdf.addImage(image, 'JPEG', metrics.margin, metrics.margin - offsetY, drawWidth, drawHeight);
+        if (offsetY > 0) ensurePage();
+        pdf.addImage(image, 'JPEG', metrics.margin, metrics.contentTop - offsetY, drawWidth, drawHeight);
         remaining -= metrics.usableHeight;
         offsetY += metrics.usableHeight;
       }
-      cursorY = metrics.margin + metrics.usableHeight;
+      cursorY = bottom;
       return;
     }
 
-    const needed = drawHeight + (cursorY > metrics.margin ? metrics.gap : 0);
-    if (!pageStarted || cursorY + needed > metrics.margin + metrics.usableHeight) {
+    const needed = drawHeight + (cursorY > metrics.contentTop ? metrics.gap : 0);
+    if (cursorY + needed > bottom) {
       ensurePage();
-    } else if (cursorY > metrics.margin) {
+    } else if (cursorY > metrics.contentTop) {
       cursorY += metrics.gap;
     }
 
@@ -221,12 +282,26 @@ function createPdfPacker(pdf) {
     cursorY += drawHeight;
   };
 
-  return { addCanvas };
+  const finish = () => {
+    const total = pdf.internal.getNumberOfPages();
+    for (let page = 1; page <= total; page += 1) {
+      pdf.setPage(page);
+      // Re-stamp page numbers after all pages exist.
+      pdf.setFontSize(8);
+      pdf.setTextColor(120, 120, 120);
+      pdf.text(`Page ${page} of ${total}`, metrics.pageWidth / 2, metrics.pageHeight - metrics.margin + 4, { align: 'center' });
+    }
+  };
+
+  return { addCanvas, beginSection, finish };
+}
+
+function sectionForCard(element) {
+  return element?.closest?.('[data-export-section]')?.getAttribute('data-export-section') || '';
 }
 
 export async function exportPanelPdf(element, filename) {
   if (!element) return;
-  // Capture cards one-by-one (reliable for Recharts), then pack several per page.
   const cards = [...element.querySelectorAll('[data-export-chart]')];
   if (cards.length) {
     await exportElementsPdf(cards, filename);
@@ -237,6 +312,7 @@ export async function exportPanelPdf(element, filename) {
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
   const packer = createPdfPacker(pdf);
   packer.addCanvas(canvas);
+  packer.finish();
   pdf.save(filename);
 }
 
@@ -248,10 +324,14 @@ export async function exportElementsPdf(elements, filename) {
   const packer = createPdfPacker(pdf);
   let wrote = false;
   for (let index = 0; index < list.length; index += 1) {
-    const canvas = await canvasFromElement(list[index]);
+    const node = list[index];
+    const canvas = await canvasFromElement(node);
     if (!canvas || canvas.width < 2 || canvas.height < 2) continue;
-    packer.addCanvas(canvas);
+    packer.addCanvas(canvas, sectionForCard(node));
     wrote = true;
   }
-  if (wrote) pdf.save(filename);
+  if (wrote) {
+    packer.finish();
+    pdf.save(filename);
+  }
 }

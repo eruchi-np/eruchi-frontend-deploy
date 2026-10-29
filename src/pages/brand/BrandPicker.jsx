@@ -62,7 +62,8 @@ export function CompareSearch({ peers, compares, onToggle }) {
         placeholder={full ? '5 brands selected' : 'Search brands'}
         disabled={full}
         onChange={(event) => { setQuery(event.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
+        onFocus={() => { if (!full) setOpen(true); }}
+        onClick={() => { if (!full) setOpen(true); }}
         onBlur={() => setOpen(false)}
       />
       <OptionMenu open={open && !full} anchorRef={anchorRef}>
@@ -72,7 +73,12 @@ export function CompareSearch({ peers, compares, onToggle }) {
               type="button"
               className="block w-full px-3 py-2 text-left text-sm text-gray-800 hover:bg-slate-50"
               onMouseDown={(event) => event.preventDefault()}
-              onClick={() => { onToggle(name); setQuery(''); setOpen(false); }}
+              onClick={() => {
+                onToggle(name);
+                setQuery('');
+                // Keep menu open so the next peer can be picked without re-typing.
+                setOpen(true);
+              }}
             >
               {name}
             </button>

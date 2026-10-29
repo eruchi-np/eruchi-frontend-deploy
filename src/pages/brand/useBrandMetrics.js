@@ -84,35 +84,30 @@ export default function useBrandMetrics(viewer) {
     ensure([...new Set([...KPI_METRICS, ...GROUPS[0].metrics])]);
   }, []);
 
-  useEffect(() => {
-    const group = GROUPS[page];
-    if (group.id === 'loyalty') {
-      ensure(['nps']).then(() => ensure(['cross_purchase_affinity', 'cross_purchase_lift']));
-      return;
+  const ensureChunked = async (metrics) => {
+    const list = [...new Set(metrics)];
+    for (let index = 0; index < list.length; index += 6) {
+      await ensure(list.slice(index, index + 6));
     }
-    ensure(group.metrics);
+  };
+
+  useEffect(() => {
+    ensureChunked(GROUPS[page].metrics);
   }, [page]);
 
   useEffect(() => {
     const next = GROUPS[page + 1];
     if (!next) return undefined;
     const timer = window.setTimeout(() => {
-      if (next.id === 'loyalty') ensure(['nps']);
-      else ensure(next.metrics);
+      ensureChunked(next.metrics);
     }, 400);
     return () => window.clearTimeout(timer);
   }, [page, rows]);
 
   const group = GROUPS[page];
-  const pageReady = group.id === 'loyalty'
-    ? Boolean(loaded.nps)
-    : group.metrics.every((metric) => loaded[metric]);
+  const pageReady = group.metrics.every((metric) => loaded[metric]);
 
-  const preloadAll = () => Promise.all(GROUPS.map((group) => (
-    group.id === 'loyalty'
-      ? ensure(['nps']).then(() => ensure(['cross_purchase_affinity', 'cross_purchase_lift']))
-      : ensure(group.metrics)
-  )));
+  const preloadAll = () => Promise.all(GROUPS.map((entry) => ensureChunked(entry.metrics)));
 
   return {
     rows,

@@ -13,6 +13,7 @@ import GoogleOAuthHint from "../../components/auth/GoogleOAuthHint";
 import GoogleSignInButton from "../../components/auth/GoogleSignInButton";
 import { consumeIncompleteGoogleOAuthAttempt } from "../../utils/googleOAuth";
 import { ensureCsrfToken } from "../../utils/csrf";
+import { readVisitorId } from "../../utils/healthEvents";
 import OnboardingShell from "../../components/onboarding/OnboardingShell";
 import { parseStep } from "../../utils/onboardingSchemas";
 import "../../components/onboarding/onboarding.css";
@@ -105,11 +106,13 @@ const Login = () => {
         return;
       }
 
+      const visitorId = readVisitorId();
       const response = await axios.post(
         `${API_BASE_URL}/auth/login`,
         {
           email: data.username,
           password: data.password,
+          ...(visitorId ? { visitorId } : {}),
         },
         { withCredentials: true }
       );

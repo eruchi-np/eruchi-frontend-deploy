@@ -37,16 +37,45 @@ export default function AdminBrandTracker() {
     };
   };
 
+  const CATEGORY_ORDER = [
+    { category: 'FB', label: 'Functional Beverages' },
+    { category: 'PC', label: 'Personal Care' },
+  ];
+
+  // Always keep FB + PC so the switcher never disappears when live only has one.
+  const categoriesFromStatus = (data) => {
+    const byCat = new Map();
+    const ingest = (list) => {
+      (list || []).forEach((item) => {
+        if (!item?.category) return;
+        const prev = byCat.get(item.category) || {
+          category: item.category,
+          label: item.label || item.category,
+          brands: [],
+        };
+        if (item.label) prev.label = item.label;
+        prev.brands = [...new Set([...prev.brands, ...(item.brands || [])])];
+        byCat.set(item.category, prev);
+      });
+    };
+    ingest(data.categories);
+    ingest(data.live);
+    ingest(data.sample);
+    return CATEGORY_ORDER.map((base) => {
+      const hit = byCat.get(base.category);
+      return {
+        category: base.category,
+        label: hit?.label || base.label,
+        brands: [...new Set(hit?.brands || [])].sort(),
+      };
+    });
+  };
+
   const refreshStatus = () => {
     adminAPI.getBrandMetricsStatus({ skipErrorToast: true })
       .then(({ data }) => {
         setStatus(data);
-        const sampleList = (data.sample || []).map((item) => ({
-          category: item.category,
-          label: item.label,
-          brands: [...new Set(item.brands || [])],
-        })).filter((item) => item.brands.length);
-        const list = (data.categories?.length ? data.categories : sampleList) || [];
+        const list = categoriesFromStatus(data);
         if (!list.length) return;
         setCategories(list);
         const applied = applyCategoryBrands(list, category, brand, selected);
@@ -63,17 +92,11 @@ export default function AdminBrandTracker() {
     adminAPI.getBrandMetricsStatus({ skipErrorToast: true })
       .then(({ data }) => {
         setStatus(data);
-        // Prefer sample brands from status; categories is already sample-primary on the API.
-        const sampleList = (data.sample || []).map((item) => ({
-          category: item.category,
-          label: item.label,
-          brands: [...new Set(item.brands || [])],
-        })).filter((item) => item.brands.length);
-        const list = (data.categories?.length ? data.categories : sampleList) || [];
+        const list = categoriesFromStatus(data);
         setCategories(list);
         const saved = list.find((item) => item.category === category) || list.find((item) => item.category === 'FB') || list[0];
         if (!saved) {
-          setError('No brands found in the sample metrics database for this category.');
+          setError('No brands found in the metrics database for this category.');
           return;
         }
         setCategory(saved.category);
@@ -81,7 +104,6 @@ export default function AdminBrandTracker() {
         setBrand(nextBrand);
         const nextSelected = (selected.length ? selected : [nextBrand]).filter((name) => saved.brands.includes(name));
         setSelected(nextSelected.length ? nextSelected : (nextBrand ? [nextBrand] : []));
-        // Remount dashboard so cached live rows are dropped.
         setReloadToken((value) => value + 1);
       })
       .catch(() => setError('Could not load the brand list.'));
@@ -92,12 +114,13 @@ export default function AdminBrandTracker() {
   }, [category, mode, brand, selected]);
 
   const current = categories.find((item) => item.category === category);
-  // Sample store only — never pull live import names into the admin pickers.
+  // Live brands first; sample only if live has none for this category.
   const brands = (() => {
-    const sampleBrands = status?.sample?.find((item) => item.category === category)?.brands;
-    if (sampleBrands?.length) return [...new Set(sampleBrands)];
+    const liveBrands = status?.live?.find((item) => item.category === category)?.brands;
+    if (liveBrands?.length) return [...new Set(liveBrands)];
     if (current?.brands?.length) return [...new Set(current.brands)];
-    return [];
+    const sampleBrands = status?.sample?.find((item) => item.category === category)?.brands;
+    return sampleBrands?.length ? [...new Set(sampleBrands)] : [];
   })();
 
   const brandsKey = brands.join('|');
@@ -116,9 +139,17 @@ export default function AdminBrandTracker() {
     });
   }, [category, brandsKey]);
 
+  const brandsForCategory = (nextCategory) => {
+    const liveBrands = status?.live?.find((item) => item.category === nextCategory)?.brands;
+    if (liveBrands?.length) return [...new Set(liveBrands)];
+    const listed = categories.find((item) => item.category === nextCategory)?.brands;
+    if (listed?.length) return [...new Set(listed)];
+    const sampleBrands = status?.sample?.find((item) => item.category === nextCategory)?.brands;
+    return sampleBrands?.length ? [...new Set(sampleBrands)] : [];
+  };
+
   const onCategory = (next) => {
-    const found = categories.find((item) => item.category === next);
-    const nextBrands = found?.brands || [];
+    const nextBrands = brandsForCategory(next);
     setCategory(next);
     setBrand(nextBrands[0] || '');
     setSelected(nextBrands[0] ? [nextBrands[0]] : []);
@@ -143,6 +174,13 @@ export default function AdminBrandTracker() {
     if (mode === 'selected' && !selected.includes(name)) {
       setSelected((currentSelected) => [...currentSelected, name]);
     }
+  };
+
+  /** Chart / chip click → One mode with only that brand's data. */
+  const onSelectOneBrand = (name) => {
+    if (!brands.includes(name)) return;
+    setMode('one');
+    setBrand(name);
   };
 
   const toggleSelected = (name) => {
@@ -226,18 +264,13 @@ export default function AdminBrandTracker() {
       : null;
   const apiBrand = mode === 'one' ? brand : (selectedBrands?.[0] || brand);
   const liveForCategory = status?.live?.find((item) => item.category === category);
-  const sampleForCategory = status?.sample?.find((item) => item.category === category);
-  const primaryRows = sampleForCategory?.rows || 0;
-  const importRows = liveForCategory?.rows || 0;
+  const primaryRows = liveForCategory?.rows || 0;
 
   const toolbar = (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
       <div className="text-sm text-gray-700">
         <p className="font-medium text-gray-900">
-          Charts use sample DB ({primaryRows ? `${primaryRows} rows` : 'loading…'})
-        </p>
-        <p className="text-xs text-gray-500">
-          brand_tracker_metrics_sample for {current.label}. Live CSV import ({importRows} rows) is stored but not shown.
+          Charts use live DB ({primaryRows ? `${primaryRows} rows` : 'loading…'}) — {current.label}
         </p>
         {importMsg ? <p className="mt-1 text-xs text-blue-700">{importMsg}</p> : null}
       </div>
@@ -264,7 +297,7 @@ export default function AdminBrandTracker() {
 
   return (
     <BrandDashboard
-      key={`${category}:${mode}:${mode === 'one' ? brand : 'multi'}:${reloadToken}:sample`}
+      key={`${category}:${mode}:${mode === 'one' ? brand : 'multi'}:${reloadToken}:live`}
       viewer={{
         mode,
         modes: MODES,
@@ -277,10 +310,11 @@ export default function AdminBrandTracker() {
         categories,
         onCategory,
         onBrand,
+        onSelectOneBrand,
         onToggleSelected: toggleSelected,
         onFocusSelected: focusSelected,
         toolbar,
-        dataSource: 'sample',
+        dataSource: 'live',
         fetchMetrics: (metrics) => adminAPI.getBrandMetrics(category, apiBrand, metrics, { skipErrorToast: true }),
       }}
     />
