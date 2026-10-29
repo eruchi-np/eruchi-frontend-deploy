@@ -15,7 +15,11 @@ import {
 } from "../../../utils/surveyComplete";
 import { emptyMatrixValue } from "../../../components/survey/MatrixQuestion";
 import { plainSurveyText } from "../../../utils/surveyMarkup";
-import { isQuestionAnswered, isQuestionValid } from "./validation";
+import {
+  isNoneExclusiveOption,
+  isQuestionAnswered,
+  isQuestionValid,
+} from "./validation";
 
 export default function useStandaloneSurvey() {
   const { surveyId } = useParams();
@@ -175,19 +179,31 @@ export default function useStandaloneSurvey() {
   const handleCheckbox = (qText, option, checked) => {
     const question = questions.find((item) => item.questionText === qText);
     const max = Math.max(1, Number(question?.maxSelections) || 1);
-    const current = Array.isArray(responses[qText]) ? responses[qText] : [];
-    if (checked && !current.includes(option) && current.length >= max) {
-      toast.error(
-        max === 1 ? "You can pick one option" : `You can pick up to ${max} options`
-      );
-      return;
-    }
+    const pickingNone = isNoneExclusiveOption(option);
+
     setResponses((prev) => {
       const arr = Array.isArray(prev[qText]) ? prev[qText] : [];
       let nextVal = arr;
-      if (!checked) nextVal = arr.filter((v) => v !== option);
-      else if (!arr.includes(option) && arr.length < max) nextVal = [...arr, option];
-      else return prev;
+
+      if (!checked) {
+        nextVal = arr.filter((v) => v !== option);
+      } else if (pickingNone) {
+        // "None" is exclusive — drop every other selection.
+        nextVal = arr.includes(option) ? arr : [option];
+      } else {
+        const withoutNone = arr.filter((v) => !isNoneExclusiveOption(v));
+        if (withoutNone.includes(option)) return prev;
+        if (withoutNone.length >= max) {
+          toast.error(
+            max === 1
+              ? "You can pick one option"
+              : `You can pick up to ${max} options`
+          );
+          return prev;
+        }
+        nextVal = [...withoutNone, option];
+      }
+
       const next = { ...prev, [qText]: nextVal };
       maybeAdvanceAfter(qText, next);
       return next;

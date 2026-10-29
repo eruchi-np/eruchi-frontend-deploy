@@ -188,7 +188,9 @@ export default function StandaloneSurvey() {
               return (
                 <section
                   key={qId}
-                  className={`q${isBad ? " bad" : ""}`}
+                  className={`q${isBad ? " bad" : ""}${
+                    q.questionType === "matrix_radio" ? " q-matrix" : ""
+                  }`}
                   id={qId}
                   aria-labelledby={titleId}
                   onPointerDown={() =>

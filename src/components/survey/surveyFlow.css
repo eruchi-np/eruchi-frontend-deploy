@@ -41,7 +41,18 @@
 .chip.tert{background:var(--tert);border-color:var(--tert);color:var(--navy);font-weight:700}
 
 /* ---------- body layout + progress rail ---------- */
-.sv-wrap{max-width:1180px;margin:0 auto;padding:0 24px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:72px;align-items:start}
+.sv-wrap{
+  --sf-wrap-max:1400px;
+  --sf-wrap-gutter:16px;
+  --sf-wrap-pad:24px;
+  max-width:min(var(--sf-wrap-max),calc(100vw - var(--sf-wrap-gutter)));
+  margin:0 auto;
+  padding:0 var(--sf-wrap-pad);
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 280px;
+  gap:48px;
+  align-items:start;
+}
 .rail{position:sticky;top:24px;align-self:start;background:var(--navy);color:#fff;border-radius:24px;padding:28px;z-index:2}
 .rail h2{margin:0;font-size:16px;line-height:1.3;font-weight:700;letter-spacing:-0.01em}
 .rail-n{margin-top:16px;font-size:15px;color:#dde3ea}
@@ -133,15 +144,50 @@ textarea.tx{height:auto;min-height:168px;padding:16px 20px;line-height:1.55;resi
 .rte .tx{border:0;border-radius:0;box-shadow:none}
 
 /* matrix, desktop */
-.mxw{border:1.5px solid var(--line);border-radius:16px;overflow:hidden}
-.mx{width:100%;border-collapse:collapse;table-layout:fixed}
-.mx thead th{height:52px;padding:0 6px;background:var(--surf);font-size:14px;line-height:1.25;font-weight:600;color:#454c53;text-align:center}
-.mx thead th:first-child{width:34%}
+.mxw{border:1.5px solid var(--line);border-radius:16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.mx{width:100%;border-collapse:collapse;table-layout:fixed;min-width:36rem}
+.mx thead th{height:auto;min-height:52px;padding:10px 8px;background:var(--surf);font-size:13px;line-height:1.3;font-weight:600;color:#454c53;text-align:center;vertical-align:bottom}
+.mx thead th:first-child{width:14%;min-width:7rem}
 .mx tbody th{padding:0 16px 0 20px;border-top:1.5px solid var(--line);font-size:16px;line-height:1.35;font-weight:500;text-align:left}
 .mx tbody td{padding:0;border-top:1.5px solid var(--line);text-align:center}
 .mx tbody tr:hover th,.mx tbody tr:hover td{background:var(--tint)}
 .mxc{display:flex;align-items:center;justify-content:center;width:100%;height:64px;cursor:pointer}
 .mxc:has(input:focus-visible) .rb{outline:3px solid var(--blue);outline-offset:3px}
+
+/*
+ * Matrix full-bleed on desktop: pull the question to the viewport edges.
+ * margin cancels .sv-wrap centering + side padding (vw/px only — works from the left column).
+ * z-index above the sticky rail so the grid isn’t covered while answering.
+ */
+@media (min-width: 901px) {
+  .sf-page .sheet{overflow-x:clip}
+  .sf-page .q.q-matrix{
+    position:relative;
+    z-index:3;
+    box-sizing:border-box;
+    width:100vw;
+    max-width:100vw;
+    padding-left:var(--sf-wrap-pad, 24px);
+    padding-right:var(--sf-wrap-pad, 24px);
+    margin-left:calc(
+      -1 * (
+        max(0px, (100vw - min(var(--sf-wrap-max, 1400px), calc(100vw - var(--sf-wrap-gutter, 16px)))) / 2)
+        + var(--sf-wrap-pad, 24px)
+      )
+    );
+    background:#fff;
+  }
+  .sf-page .q.q-matrix .q-b{
+    width:100%;
+  }
+  .sf-page .q.q-matrix .mxw{
+    width:100%;
+    background:#fff;
+  }
+  .sf-page .q.q-matrix .mx{
+    min-width:0;
+  }
+}
 
 /* inline errors */
 .err{display:flex;align-items:flex-start;gap:8px;margin-top:14px;color:var(--err);font-size:15px;line-height:1.45;font-weight:500}
