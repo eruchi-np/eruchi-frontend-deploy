@@ -100,13 +100,13 @@ function AppChrome({ children }) {
   const hideNav =
     isProfileCompletion ||
     isProfileOnboardingLocked(user) ||
-    isSurveyTake ||
-    isSurveyComplete;
+    isSurveyTake;
   const overlayNav =
     isHome ||
     isProfile ||
     isShop ||
     isSurveys ||
+    isSurveyComplete ||
     isOnboarding;
   const navVariant = overlayNav ? 'overlay' : 'page';
 
