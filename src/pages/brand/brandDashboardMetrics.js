@@ -6,24 +6,76 @@ import {
   wavesOf,
 } from './brandMetrics';
 import { COMPARE_COLORS, YOU, colorForBrand } from './BrandCharts';
+import { TOKEN_HEX } from './ruchiChartColors';
 
 export const GROUPS = [
   { id: 'awareness', label: 'Awareness', metrics: ['awareness_prompted', 'awareness_unprompted'] },
-  { id: 'buying', label: 'Penetration and Purchase', metrics: ['penetration', 'trial', 'purchase_frequency', 'spend_per_trip', 'share_of_wallet', 'cross_purchase_affinity', 'cross_purchase_lift'] },
-  { id: 'occasions', label: 'Occasions', metrics: ['occasion_usage'] },
-  { id: 'switching', label: 'Switching', metrics: ['brand_switching', 'switch_reason', 'brand_switch_flow'] },
-  { id: 'loyalty', label: 'Loyalty', metrics: ['nps'] },
-  { id: 'sensory', label: 'Sensory', metrics: ['sensory_mean'] },
+  {
+    id: 'purchase',
+    label: 'Purchase',
+    metrics: [
+      'penetration',
+      'trial',
+      'purchase_frequency',
+      'spend_per_trip',
+      'share_of_wallet',
+      'cross_purchase_affinity',
+      'cross_purchase_lift',
+    ],
+  },
+  { id: 'usage', label: 'Usage', metrics: ['occasion_usage', 'sensory_mean'] },
+  {
+    id: 'switching',
+    label: 'Switching',
+    metrics: ['brand_switching', 'switch_reason', 'brand_switch_flow', 'nps'],
+  },
 ];
+
+/** Old section query params → new 4-section IA. */
+export const SECTION_ALIASES = {
+  buying: 'purchase',
+  occasions: 'usage',
+  sensory: 'usage',
+  loyalty: 'switching',
+};
 
 export const KPI_METRICS = ['awareness_prompted', 'penetration', 'trial', 'nps'];
 
 /** Grouped awareness bars: Top of mind → Unprompted → Prompted. */
 export const AWARENESS_TYPE_SERIES = [
-  { key: 'top', name: 'Top of mind', color: '#0f766e' },
-  { key: 'unprompted', name: 'Unprompted', color: '#2563eb' },
-  { key: 'prompted', name: 'Prompted', color: '#7c3aed' },
+  { key: 'top', name: 'Top of mind', color: TOKEN_HEX.c1 },
+  { key: 'unprompted', name: 'Unprompted', color: TOKEN_HEX.primary },
+  { key: 'prompted', name: 'Prompted', color: TOKEN_HEX.c3 },
 ];
+
+/** High → low by metric; nulls last. */
+export function sortByMetricDesc(rows, metric, brands, wave, item = null) {
+  return [...(brands || [])].filter(Boolean).sort((a, b) => {
+    const av = shown(findRow(rows, metric, a, wave, item));
+    const bv = shown(findRow(rows, metric, b, wave, item));
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    return bv - av;
+  });
+}
+
+/**
+ * Brand login / One / Selected: focus first, peers high→low.
+ * All mode: pure high→low.
+ */
+export function orderBrandsForChart(rows, metric, brands, wave, {
+  focus = null,
+  focusFirst = true,
+  item = null,
+} = {}) {
+  const list = [...new Set((brands || []).filter(Boolean))];
+  if (!list.length) return [];
+  if (!focusFirst || !focus || !list.includes(focus)) {
+    return sortByMetricDesc(rows, metric, list, wave, item);
+  }
+  return [focus, ...sortByMetricDesc(rows, metric, list.filter((name) => name !== focus), wave, item)];
+}
 
 export function awarenessTypeSnapshot(rows, brands, wave) {
   return (brands || []).filter(Boolean).map((name) => {
@@ -44,8 +96,8 @@ export function awarenessTypeSnapshot(rows, brands, wave) {
 }
 
 export const MARKET_PEN_SERIES = [
-  { key: 'awareness', name: 'Awareness', color: '#2563eb' },
-  { key: 'penetration', name: 'Penetration', color: '#0f766e' },
+  { key: 'awareness', name: 'Awareness', color: TOKEN_HEX.primary },
+  { key: 'penetration', name: 'Penetration', color: TOKEN_HEX.c1 },
 ];
 
 /** Prompted + unprompted (any mention) when available; else prompted only. */
@@ -76,7 +128,7 @@ export const EXPORT_CHART_CATALOG = [
     ],
   },
   {
-    section: 'Penetration and Purchase',
+    section: 'Purchase',
     charts: [
       { id: 'Market Penetration', label: 'Market Penetration' },
       { id: 'Penetration over the weeks', label: 'Penetration over the weeks' },
@@ -90,9 +142,10 @@ export const EXPORT_CHART_CATALOG = [
     ],
   },
   {
-    section: 'Occasions',
+    section: 'Usage',
     charts: [
       { id: 'Occasion matrix', label: 'Occasion matrix' },
+      { id: 'Sensory', label: 'Sensory' },
     ],
   },
   {
@@ -102,19 +155,8 @@ export const EXPORT_CHART_CATALOG = [
       { id: 'Category over the weeks', label: 'Category over the weeks' },
       { id: 'Brand switching tracker', label: 'Brand switching tracker' },
       { id: 'Brand switching reasons', label: 'Brand switching reasons' },
-    ],
-  },
-  {
-    section: 'Loyalty',
-    charts: [
       { id: 'NPS this week', label: 'NPS this week' },
       { id: 'NPS over the weeks', label: 'NPS over the weeks' },
-    ],
-  },
-  {
-    section: 'Sensory',
-    charts: [
-      { id: 'Sensory', label: 'Sensory' },
     ],
   },
 ];
@@ -147,14 +189,26 @@ export function trend(rows, metric, brand, compares, item = null, fromWave = '',
   });
 }
 
-export function snapshot(rows, metric, brand, compares, wave, item = null, peerMode = false) {
-  return [brand, ...compares].filter(Boolean).map((name, index) => {
+export function snapshot(rows, metric, brand, compares, wave, item = null, peerMode = false, options = {}) {
+  const focusFirst = options.focusFirst !== false;
+  const ordered = orderBrandsForChart(
+    rows,
+    metric,
+    [brand, ...(compares || [])],
+    wave,
+    { focus: brand, focusFirst, item },
+  );
+  const original = [brand, ...(compares || [])].filter(Boolean);
+  return ordered.map((name) => {
     const row = findRow(rows, metric, name, wave, item);
+    const stableIndex = Math.max(0, original.indexOf(name));
     return {
       name,
       value: shown(row),
       low: isLowBase(row),
-      fill: peerMode ? colorForBrand(index) : (index === 0 ? YOU : COMPARE_COLORS[(index - 1) % COMPARE_COLORS.length]),
+      fill: peerMode
+        ? colorForBrand(stableIndex)
+        : (name === brand ? YOU : COMPARE_COLORS[Math.max(0, (compares || []).indexOf(name)) % COMPARE_COLORS.length]),
     };
   });
 }

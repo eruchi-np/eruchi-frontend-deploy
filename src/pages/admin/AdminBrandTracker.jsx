@@ -60,7 +60,6 @@ export default function AdminBrandTracker() {
     };
     ingest(data.categories);
     ingest(data.live);
-    ingest(data.sample);
     return CATEGORY_ORDER.map((base) => {
       const hit = byCat.get(base.category);
       return {
@@ -114,13 +113,11 @@ export default function AdminBrandTracker() {
   }, [category, mode, brand, selected]);
 
   const current = categories.find((item) => item.category === category);
-  // Live brands first; sample only if live has none for this category.
   const brands = (() => {
     const liveBrands = status?.live?.find((item) => item.category === category)?.brands;
     if (liveBrands?.length) return [...new Set(liveBrands)];
     if (current?.brands?.length) return [...new Set(current.brands)];
-    const sampleBrands = status?.sample?.find((item) => item.category === category)?.brands;
-    return sampleBrands?.length ? [...new Set(sampleBrands)] : [];
+    return [];
   })();
 
   const brandsKey = brands.join('|');
@@ -144,8 +141,7 @@ export default function AdminBrandTracker() {
     if (liveBrands?.length) return [...new Set(liveBrands)];
     const listed = categories.find((item) => item.category === nextCategory)?.brands;
     if (listed?.length) return [...new Set(listed)];
-    const sampleBrands = status?.sample?.find((item) => item.category === nextCategory)?.brands;
-    return sampleBrands?.length ? [...new Set(sampleBrands)] : [];
+    return [];
   };
 
   const onCategory = (next) => {
@@ -314,6 +310,7 @@ export default function AdminBrandTracker() {
         onToggleSelected: toggleSelected,
         onFocusSelected: focusSelected,
         toolbar,
+        adminChrome: true,
         dataSource: 'live',
         fetchMetrics: (metrics) => adminAPI.getBrandMetrics(category, apiBrand, metrics, { skipErrorToast: true }),
       }}

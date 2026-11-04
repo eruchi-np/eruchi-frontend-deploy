@@ -25,17 +25,19 @@ import {
   YAxis,
 } from 'recharts';
 import { formatValue } from './brandMetrics';
+import {
+  YOU,
+  ALL,
+  LOW,
+  COMPARE_COLORS,
+  BRAND_COLORS,
+  PIE_COLORS,
+  BAR_PALETTE,
+  TOKEN_HEX,
+  colorForBrand as tokenColorForBrand,
+} from './ruchiChartColors';
 
-export const YOU = '#2563eb';
-export const ALL = '#14b8a6';
-export const LOW = '#4d7c0f';
-export const COMPARE_COLORS = ['#64748b', '#0f766e', '#7c3aed', '#0891b2', '#db2777'];
-export const BRAND_COLORS = [
-  '#2563eb', '#0f766e', '#7c3aed', '#0891b2', '#db2777',
-  '#4f46e5', '#65a30d', '#be185d', '#64748b', '#9333ea',
-];
-const PIE_COLORS = ['#7c3aed', '#0f766e', '#db2777', '#0891b2', '#65a30d', '#4f46e5', '#be185d'];
-const BAR_PALETTE = ['#7c3aed', '#0f766e', '#db2777', '#0891b2', '#65a30d', '#4f46e5', '#9333ea', '#be185d', '#0e7490', '#64748b'];
+export { YOU, ALL, LOW, COMPARE_COLORS, BRAND_COLORS, TOKEN_HEX };
 
 const HEIGHT = {
   sm: 250,
@@ -44,17 +46,29 @@ const HEIGHT = {
   xl: 420,
 };
 
+/** Optional InsightBrand.color overrides from metrics meta. */
+let brandColorMap = {};
+
+export function setBrandColorMap(map) {
+  brandColorMap = map && typeof map === 'object' ? map : {};
+}
+
 export function colorForBrand(index) {
-  return BRAND_COLORS[index % BRAND_COLORS.length];
+  return tokenColorForBrand(index);
+}
+
+export function colorForNamedBrand(name, fallbackIndex = 0) {
+  if (name && brandColorMap[name]) return brandColorMap[name];
+  return colorForBrand(fallbackIndex);
 }
 
 export function seriesFor(compares, focusLabel = 'You') {
   return [
-    { key: 'you', name: focusLabel, color: YOU },
+    { key: 'you', name: focusLabel, color: brandColorMap[focusLabel] || YOU },
     ...compares.slice(0, 5).map((name, index) => ({
       key: `c${index}`,
       name,
-      color: COMPARE_COLORS[index],
+      color: colorForNamedBrand(name, index + 1) || COMPARE_COLORS[index],
     })),
   ];
 }
@@ -63,7 +77,7 @@ export function seriesForBrands(brands) {
   return (brands || []).map((name, index) => ({
     key: index === 0 ? 'you' : `c${index - 1}`,
     name,
-    color: colorForBrand(index),
+    color: colorForNamedBrand(name, index),
   }));
 }
 
@@ -129,8 +143,42 @@ function resolveHeight({ tall = false, wide = false, fit = false }) {
   return HEIGHT.sm;
 }
 
-export function ChartCard({ title, note, howToRead = '', children, tall = false, fit = false, wide = false, exportKey = null }) {
+/** Build a simple table payload from series chart points. */
+export function seriesTable(data, series) {
+  const cols = Array.isArray(series) ? series : [];
+  return {
+    columns: ['Label', ...cols.map((item) => item.name)],
+    rows: (data || []).map((point) => [
+      point.label || point.name || '',
+      ...cols.map((item) => point[item.key]),
+    ]),
+  };
+}
+
+/** Snapshot / bar rows → table. */
+export function barsTable(data, valueLabel = 'Value') {
+  return {
+    columns: ['Brand', valueLabel],
+    rows: (data || []).map((row) => [row.name, row.value]),
+  };
+}
+
+export function ChartCard({
+  title,
+  note,
+  howToRead = '',
+  insight = '',
+  children,
+  tall = false,
+  fit = false,
+  wide = false,
+  exportKey = null,
+  table = null,
+  allowTable = true,
+}) {
+  const [view, setView] = React.useState('chart');
   const height = resolveHeight({ tall, wide, fit });
+  const canTable = allowTable && table?.columns?.length && table?.rows?.length;
   const content = React.Children.map(children, (child) => {
     if (!React.isValidElement(child)) return child;
     if (child.props?.height != null) return child;
@@ -142,15 +190,65 @@ export function ChartCard({ title, note, howToRead = '', children, tall = false,
       data-export-chart={exportKey || title}
       className={`min-w-0 max-w-full rounded-3xl border border-slate-100 bg-white p-4 shadow-[0_12px_30px_rgba(37,99,235,0.08)] sm:p-6 ${wide ? 'lg:col-span-2' : ''}`}
     >
-      <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+        {canTable ? (
+          <div className="inline-flex rounded-full border border-[var(--line)] p-0.5 text-xs font-semibold">
+            <button
+              type="button"
+              className={`rounded-full px-2.5 py-1 ${view === 'chart' ? 'bg-[var(--primary)] text-white' : 'text-[var(--ink-2)]'}`}
+              onClick={() => setView('chart')}
+            >
+              Chart
+            </button>
+            <button
+              type="button"
+              className={`rounded-full px-2.5 py-1 ${view === 'table' ? 'bg-[var(--primary)] text-white' : 'text-[var(--ink-2)]'}`}
+              onClick={() => setView('table')}
+            >
+              Table
+            </button>
+          </div>
+        ) : null}
+      </div>
       {note ? <p className="mt-1 text-sm text-gray-500">{note}</p> : null}
+      {insight ? (
+        <p className="mt-2 rounded-xl bg-[var(--primary-soft)] px-3 py-2 text-xs text-[var(--ink-2)]" data-insights-slot="chart">
+          {insight}
+        </p>
+      ) : null}
       {howToRead ? (
         <details className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-gray-600">
           <summary className="cursor-pointer font-medium text-gray-700">How to read this</summary>
           <p className="mt-1.5 leading-relaxed">{howToRead}</p>
         </details>
       ) : null}
-      <div className="mt-4 w-full min-w-0 max-w-full">{content}</div>
+      <div className="mt-4 w-full min-w-0 max-w-full">
+        {view === 'table' && canTable ? (
+          <div className="max-h-[28rem] overflow-auto rounded-xl border border-[var(--line)]">
+            <table className="min-w-full text-left text-xs">
+              <thead className="sticky top-0 bg-[var(--rail)] text-[var(--ink-2)]">
+                <tr>
+                  {table.columns.map((col) => (
+                    <th key={col} className="whitespace-nowrap px-3 py-2 font-semibold">{col}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {table.rows.map((row, index) => (
+                  <tr key={`${row[0]}-${index}`} className="border-t border-[var(--line)]">
+                    {row.map((cell, cellIndex) => (
+                      <td key={`${index}-${cellIndex}`} className="whitespace-nowrap px-3 py-1.5 tabular-nums text-[var(--ink)]">
+                        {cell == null || cell === '' ? '—' : (typeof cell === 'number' ? cell : String(cell))}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : content}
+      </div>
     </section>
   );
 }
@@ -265,9 +363,9 @@ export function NpsStackedBars({ data, height = HEIGHT.lg, onBrandClick = null }
             }}
           />
           <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} />
-          <Bar dataKey="promoters" name="Promoters" stackId="nps" fill="#059669" maxBarSize={28} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined} />
-          <Bar dataKey="passives" name="Passives" stackId="nps" fill="#94a3b8" maxBarSize={28} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined} />
-          <Bar dataKey="detractors" name="Detractors" stackId="nps" fill="#e11d48" maxBarSize={28} radius={[0, 6, 6, 0]} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined}>
+          <Bar dataKey="detractors" name="Detractors" stackId="nps" fill={TOKEN_HEX.lost} maxBarSize={28} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined} />
+          <Bar dataKey="passives" name="Passives" stackId="nps" fill={TOKEN_HEX.other} maxBarSize={28} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined} />
+          <Bar dataKey="promoters" name="Promoters" stackId="nps" fill={TOKEN_HEX.good} maxBarSize={28} radius={[0, 6, 6, 0]} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined}>
             <LabelList dataKey="nps" content={<NpsEndLabel />} />
           </Bar>
         </BarChart>
@@ -316,8 +414,8 @@ export function NetGainsBars({ data, height = HEIGHT.lg, onBrandClick = null }) 
               return (
                 <div className="rounded-xl border border-gray-100 bg-white px-3 py-2 text-xs shadow-lg">
                   <p className="mb-1 font-medium text-gray-900">{label}</p>
-                  <p style={{ color: '#f87171' }}>Lost to: {row?.lost ?? 0}%</p>
-                  <p style={{ color: '#3b82f6' }}>Won from: {row?.won ?? 0}%</p>
+                  <p style={{ color: TOKEN_HEX.lost }}>Lost to: {row?.lost ?? 0}%</p>
+                  <p style={{ color: TOKEN_HEX.won }}>Won from: {row?.won ?? 0}%</p>
                   <p className="mt-1 font-semibold text-gray-900">
                     Net: {row?.net > 0 ? '+' : ''}{row?.net ?? 0} pts
                   </p>
@@ -326,8 +424,8 @@ export function NetGainsBars({ data, height = HEIGHT.lg, onBrandClick = null }) 
             }}
           />
           <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} />
-          <Bar dataKey="lostNeg" name="Lost to" fill="#f87171" stackId="net" maxBarSize={22} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined} />
-          <Bar dataKey="won" name="Won from" fill="#3b82f6" stackId="net" maxBarSize={22} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined}>
+          <Bar dataKey="lostNeg" name="Lost to" fill={TOKEN_HEX.lost} stackId="net" maxBarSize={22} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined} />
+          <Bar dataKey="won" name="Won from" fill={TOKEN_HEX.won} stackId="net" maxBarSize={22} isAnimationActive={false} cursor={clickable ? 'pointer' : 'default'} onClick={clickable ? pick : undefined}>
             <LabelList
               dataKey="net"
               position="right"
@@ -382,10 +480,10 @@ export function SwitchReasonBars({ data, focusLabel = 'This brand', height = HEI
               return (
                 <div className="rounded-xl border border-gray-100 bg-white px-3 py-2 text-xs shadow-lg">
                   <p className="mb-1 font-medium text-gray-900">{label}</p>
-                  <p style={{ color: '#f87171' }}>
+                  <p style={{ color: TOKEN_HEX.lost }}>
                     Category: {row?.all == null ? '—' : `${Math.round(row.all)}%`}
                   </p>
-                  <p style={{ color: '#3b82f6' }}>
+                  <p style={{ color: TOKEN_HEX.won }}>
                     {focusLabel}: {row?.focus == null ? '—' : `${Math.round(row.focus)}%`}
                   </p>
                 </div>
@@ -393,8 +491,8 @@ export function SwitchReasonBars({ data, focusLabel = 'This brand', height = HEI
             }}
           />
           <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} />
-          <Bar dataKey="allNeg" name="Category" fill="#f87171" stackId="reason" maxBarSize={18} isAnimationActive={false} />
-          <Bar dataKey="focusPlot" name={focusLabel} fill="#3b82f6" stackId="reason" maxBarSize={18} isAnimationActive={false} />
+          <Bar dataKey="allNeg" name="Category" fill={TOKEN_HEX.lost} stackId="reason" maxBarSize={18} isAnimationActive={false} />
+          <Bar dataKey="focusPlot" name={focusLabel} fill={TOKEN_HEX.won} stackId="reason" maxBarSize={18} isAnimationActive={false} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -448,8 +546,8 @@ export function BrandBars({ data, metric, item, height = HEIGHT.sm, onBrandClick
             <Cell
               key={entry.name}
               fill={entry.low ? LOW : (entry.fill || (metric === 'cross_purchase_lift'
-                ? (entry.value < 1 ? '#e11d48' : '#059669')
-                : BAR_PALETTE[index % BAR_PALETTE.length]))}
+                ? (entry.value < 1 ? TOKEN_HEX.bad : TOKEN_HEX.good)
+                  : BAR_PALETTE[index % BAR_PALETTE.length]))}
             />
           ))}
         </Bar>
@@ -587,7 +685,7 @@ export function HorizontalBars({ data, metric, pageSize = 5, height = HEIGHT.sm 
             {slice.map((entry, index) => (
               <Cell
                 key={entry.name}
-                fill={entry.low ? LOW : (metric === 'cross_purchase_lift' ? (entry.value < 1 ? '#e11d48' : '#059669') : BAR_PALETTE[(safePage * pageSize + index) % BAR_PALETTE.length])}
+                fill={entry.low ? LOW : (metric === 'cross_purchase_lift' ? (entry.value < 1 ? TOKEN_HEX.bad : TOKEN_HEX.good) : BAR_PALETTE[(safePage * pageSize + index) % BAR_PALETTE.length])}
               />
             ))}
           </Bar>

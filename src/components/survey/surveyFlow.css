@@ -247,14 +247,14 @@ textarea.tx{height:auto;min-height:168px;padding:16px 20px;line-height:1.55;resi
 .dlg-sum{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px;padding:14px 18px;border-radius:16px;background:var(--surf);font-size:15px;line-height:1.3;font-weight:500}
 .dlg-sum b{font-weight:700}
 .dlg-a{display:flex;gap:10px;margin-top:28px}
-.dlg-a .btn{padding:0 24px}
-.dlg-a .btn.pri,.dlg-a .btn.busy{flex:1}
+.dlg-a .btn{height:56px;min-height:56px;padding:0 24px;box-sizing:border-box}
+.dlg-a .btn.pri,.dlg-a .btn.busy{flex:1 1 auto}
 .btn[disabled]{cursor:not-allowed}
 .btn.ghost[disabled]{background:#fff;color:#6d747c;box-shadow:inset 0 0 0 1.5px var(--line);transform:none}
 .dlg.sh{position:absolute;left:0;right:0;bottom:0;width:auto;margin:0;padding:28px 20px 24px;border-radius:28px 28px 0 0}
 .dlg.sh h2{font-size:24px}
 .dlg.sh .dlg-a{flex-direction:column-reverse;gap:10px}
-.dlg.sh .dlg-a .btn{width:100%;flex:none}
+.dlg.sh .dlg-a .btn{width:100%;flex:none;height:56px;min-height:56px}
 
 /* ================= survey complete ================= */
 .nav{display:flex;align-items:center;gap:2px}
@@ -403,7 +403,14 @@ textarea.tx{height:auto;min-height:168px;padding:16px 20px;line-height:1.55;resi
   .sf-confirm-root .dlg-wrap { align-items: flex-end; padding: 0; }
   .sf-confirm-root .dlg { width: 100%; border-radius: 28px 28px 0 0; margin: 0; }
   .sf-confirm-root .dlg .dlg-a { flex-direction: column-reverse; }
-  .sf-confirm-root .dlg .dlg-a .btn { width: 100%; flex: none; }
+  .sf-confirm-root .dlg .dlg-a .btn,
+  .sf-confirm-root .dlg .dlg-a .btn.pri,
+  .sf-confirm-root .dlg .dlg-a .btn.busy {
+    width: 100%;
+    flex: none;
+    height: 56px;
+    min-height: 56px;
+  }
 }
 
 /* next-survey embed on complete */
@@ -453,5 +460,5 @@ textarea.tx{height:auto;min-height:168px;padding:16px 20px;line-height:1.55;resi
 .sf-confirm-root .dlg-sum{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px;padding:14px 18px;border-radius:16px;background:var(--surf);font-size:15px;line-height:1.3;font-weight:500}
 .sf-confirm-root .dlg-sum b{font-weight:700}
 .sf-confirm-root .dlg-a{display:flex;gap:10px;margin-top:28px}
-.sf-confirm-root .dlg-a .btn{padding:0 24px}
-.sf-confirm-root .dlg-a .btn.pri,.sf-confirm-root .dlg-a .btn.busy{flex:1}
+.sf-confirm-root .dlg-a .btn{height:56px;min-height:56px;padding:0 24px;box-sizing:border-box}
+.sf-confirm-root .dlg-a .btn.pri,.sf-confirm-root .dlg-a .btn.busy{flex:1 1 auto}

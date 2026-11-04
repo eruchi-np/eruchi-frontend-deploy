@@ -30,10 +30,31 @@ export function monthsOf(waves) {
   return [...new Set((waves || []).map(monthKey))].filter((key) => key.length === 7).sort();
 }
 
+/** Legacy spellings → live metric brand names (keep in sync with backend brandClients). */
+const BRAND_ALIASES = {
+  Xtreme: 'X-treme',
+  'Xtreme Energy': 'X-treme',
+  'Himalaya Wellness': 'Himalaya',
+  "L'Oreal": "L'Oréal",
+  Loreal: "L'Oréal",
+  Ponds: "Pond's",
+};
+
+export function canonicalBrand(brand) {
+  if (typeof brand !== 'string') return '';
+  const trimmed = brand.trim();
+  if (!trimmed) return '';
+  if (BRAND_ALIASES[trimmed]) return BRAND_ALIASES[trimmed];
+  const lower = trimmed.toLowerCase();
+  const hit = Object.entries(BRAND_ALIASES).find(([key]) => key.toLowerCase() === lower);
+  return hit ? hit[1] : trimmed;
+}
+
 export function findRow(rows, metric, brand, wave, item = null) {
+  const names = [...new Set([brand, canonicalBrand(brand)].filter(Boolean))];
   return rows.find((row) =>
     row.metric === metric
-    && row.brand === brand
+    && names.includes(row.brand)
     && row.wave_start === wave
     && (row.item || null) === (item || null)
   ) || null;
@@ -91,9 +112,10 @@ export function uniqueBrands(list) {
   const seen = new Set();
   const out = [];
   (list || []).forEach((name) => {
-    if (!isSelectableBrand(name) || seen.has(name)) return;
-    seen.add(name);
-    out.push(name);
+    const canon = canonicalBrand(name);
+    if (!isSelectableBrand(canon) || seen.has(canon)) return;
+    seen.add(canon);
+    out.push(canon);
   });
   return out.sort();
 }
@@ -107,5 +129,6 @@ export function brandsOf(rows) {
 }
 
 export function peersOf(rows, brand) {
-  return brandsOf(rows).filter((name) => name !== brand);
+  const focus = canonicalBrand(brand);
+  return brandsOf(rows).filter((name) => name !== focus);
 }

@@ -1,0 +1,60 @@
+/**
+ * Ruchi Insights design tokens.
+ * Update brand/placeholder colours here only — charts and UI read these vars.
+ */
+:root {
+  /* Brand / accent — placeholders; change these hexes to retheme */
+  --primary: #3399ff;
+  --secondary: #3399ff;
+  --tertiary: #3399ff;
+  --client: #6f3aa8;
+
+  /* Competitor pool */
+  --c1: #1f9e89;
+  --c2: #e0674a;
+  --c3: #5464c8;
+  --c4: #c2589a;
+  --c5: #5f8f2a;
+  --c6: #d99a00;
+  --cat: #8a94a6;
+  --other: #b4bcc8;
+  --won: #3b82d6;
+  --lost: #e06b5c;
+  --seq: #2a78d6;
+
+  --ink: #0f1b2d;
+  --ink-2: #465264;
+  --ink-3: #5d6879;
+  --page: #f3f5f8;
+  --surface: #ffffff;
+  --line: #e2e7ee;
+  --line-2: #d3dae4;
+  --grid: #ebeff4;
+  --axis: #c3ccd8;
+  --good: #067647;
+  --bad: #b42318;
+  --warn-bg: #fcf1d8;
+  --warn-ink: #7a4605;
+  --low: #4d7c0f;
+
+  --primary-ink: color-mix(in oklab, var(--primary) 70%, #0a1530);
+  --primary-soft: color-mix(in oklab, var(--primary) 11%, white);
+  --primary-line: color-mix(in oklab, var(--primary) 35%, white);
+  --secondary-ink: color-mix(in oklab, var(--secondary) 68%, #0a1530);
+  --secondary-soft: color-mix(in oklab, var(--secondary) 7%, white);
+  --secondary-line: color-mix(in oklab, var(--secondary) 22%, white);
+  --tertiary-ink: color-mix(in oklab, var(--tertiary) 70%, #0a1530);
+  --tertiary-soft: color-mix(in oklab, var(--tertiary) 14%, white);
+  --rail: color-mix(in oklab, var(--primary) 4%, #f7f9fb);
+
+  --r-card: 12px;
+  --r-ctl: 8px;
+  --shadow-pop: 0 12px 32px -8px rgba(15, 27, 45, 0.22), 0 2px 6px rgba(15, 27, 45, 0.08);
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ruchi-insights {
+  color: var(--ink);
+  background: var(--page);
+  font-family: "Mona Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+}

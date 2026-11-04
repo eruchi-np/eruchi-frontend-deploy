@@ -9,11 +9,13 @@ import {
 } from 'recharts';
 import { weekLabel } from './brandMetrics';
 
-const WON = '#3b82f6';
-const LOST = '#f87171';
-const KEPT = '#93c5fd';
-const OTHER = '#64748b';
-const MUTED = '#cbd5e1';
+import { TOKEN_HEX } from './ruchiChartColors';
+
+const WON = TOKEN_HEX.won;
+const LOST = TOKEN_HEX.lost;
+const KEPT = TOKEN_HEX.primary;
+const OTHER = TOKEN_HEX.other;
+const MUTED = TOKEN_HEX.axis;
 
 function mergeMatrixRows(rows) {
   const merged = new Map();

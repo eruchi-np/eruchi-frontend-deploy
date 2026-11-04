@@ -90,7 +90,7 @@ export default function BrandSignup() {
         </div>
         {error ? <p className="onboard-error">{error}</p> : null}
         <div className="onboard-actions">
-          <button type="submit" className="home-pill home-pill-lg home-pill-navy" disabled={busy || !brand}>{busy ? 'Creating...' : 'Create account'}</button>
+          <button type="submit" className="ri-auth-btn ri-auth-btn-primary" disabled={busy || !brand}>{busy ? 'Creating…' : 'Create account'}</button>
         </div>
       </form>
     </BrandAuthLayout>
