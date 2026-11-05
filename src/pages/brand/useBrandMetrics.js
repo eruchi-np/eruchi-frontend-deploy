@@ -48,11 +48,21 @@ export default function useBrandMetrics(viewer) {
           setMeta((current) => {
             const waves = (data.waves?.length ? data.waves : current?.waves) || [];
             const brands = (data.brands?.length ? data.brands : current?.brands) || [];
-            if (!current) return { ...data, waves, brands };
+            const nextUpdateCopy = typeof data.nextUpdateCopy === 'string'
+              ? data.nextUpdateCopy
+              : (current?.nextUpdateCopy || '');
+            const brandColors = data.brandColors && typeof data.brandColors === 'object'
+              ? data.brandColors
+              : (current?.brandColors || {});
+            if (!current) return { ...data, waves, brands, nextUpdateCopy, brandColors };
             return {
               ...current,
-              waves: current.waves?.length ? current.waves : waves,
-              brands: current.brands?.length ? current.brands : brands,
+              waves: data.waves?.length ? waves : (current.waves || waves),
+              brands: data.brands?.length ? brands : (current.brands || brands),
+              nextUpdateCopy,
+              brandColors,
+              publishGateActive: Boolean(data.publishGateActive ?? current.publishGateActive),
+              brandGateActive: Boolean(data.brandGateActive ?? current.brandGateActive),
             };
           });
           const waveList = data.waves?.length ? data.waves : wavesOf(data.rows || []);

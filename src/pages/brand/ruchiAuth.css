@@ -1,0 +1,693 @@
+/* Ruchi Insights auth shell — split-screen */
+
+.ri-auth {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: minmax(300px, 0.95fr) minmax(0, 1.15fr);
+  background: var(--page);
+  color: var(--ink);
+}
+
+.ri-auth-side {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(120% 80% at 0% 0%, color-mix(in oklab, var(--primary) 22%, transparent), transparent 55%),
+    radial-gradient(90% 70% at 100% 100%, color-mix(in oklab, var(--primary) 12%, transparent), transparent 50%),
+    linear-gradient(165deg, #f7f9fc 0%, var(--rail) 45%, color-mix(in oklab, var(--primary) 6%, #eef2f7) 100%);
+  border-right: 1px solid var(--line);
+  padding: 2.25rem 2.75rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+
+.ri-auth-side::before {
+  content: '';
+  position: absolute;
+  inset: auto -20% -30% 20%;
+  height: 55%;
+  background: radial-gradient(closest-side, color-mix(in oklab, var(--primary) 18%, transparent), transparent 70%);
+  pointer-events: none;
+  animation: ri-auth-glow 10s var(--ease) infinite alternate;
+}
+
+.ri-auth-side-brand {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  animation: ri-auth-rise 0.7s var(--ease) both;
+}
+
+.ri-auth-side .ri-logo-img,
+.ri-logo-img--auth {
+  height: 2.35rem;
+  max-width: 16rem;
+  width: auto;
+}
+
+.ri-auth-kicker {
+  margin: 0;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--primary-ink);
+}
+
+.ri-auth-side-title {
+  margin: 0;
+  max-width: 18rem;
+  font-size: clamp(1.65rem, 2.4vw, 2.15rem);
+  font-weight: 700;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  color: var(--ink);
+}
+
+.ri-auth-side-copy {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  margin-top: auto;
+  max-width: 22rem;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--ink-2);
+  animation: ri-auth-rise 0.85s var(--ease) 0.08s both;
+}
+
+.ri-auth-side-points {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.55rem;
+  animation: ri-auth-rise 0.9s var(--ease) 0.12s both;
+}
+
+.ri-auth-side-points li {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.85rem;
+  font-weight: 550;
+  color: var(--ink-2);
+}
+
+.ri-auth-side-points li::before {
+  content: '';
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: var(--primary);
+  flex-shrink: 0;
+}
+
+.ri-auth-main {
+  display: grid;
+  place-items: center;
+  padding: 3rem 2rem;
+  background:
+    linear-gradient(180deg, color-mix(in oklab, var(--page) 70%, white), var(--page));
+}
+
+.ri-auth-card {
+  width: 100%;
+  max-width: 26rem;
+  animation: ri-auth-rise 0.65s var(--ease) 0.05s both;
+}
+
+.ri-auth-card h1 {
+  margin: 0;
+  font-size: clamp(1.55rem, 2.2vw, 1.85rem);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.ri-auth-card .ri-auth-sub {
+  margin: 0.55rem 0 1.5rem;
+  font-size: 0.925rem;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.ri-auth-card .onboard-form,
+.ri-auth-card .onboard-field,
+.ri-auth-card .onboard-actions {
+  width: 100%;
+}
+
+.ri-auth-card .onboard-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.ri-auth-card .onboard-field {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.ri-auth-card .onboard-field label {
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--ink-2);
+}
+
+.ri-auth-card .onboard-field input,
+.ri-auth-card .onboard-field select {
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: var(--surface);
+  padding: 0.75rem 0.9rem;
+  font-size: 0.95rem;
+  color: var(--ink);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ri-auth-card .onboard-field input:hover,
+.ri-auth-card .onboard-field select:hover {
+  border-color: var(--line-2);
+}
+
+.ri-auth-card .onboard-field input:focus,
+.ri-auth-card .onboard-field select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.ri-auth-card .onboard-password-wrap {
+  position: relative;
+}
+
+.ri-auth-card .onboard-password-wrap input {
+  width: 100%;
+  padding-right: 2.75rem;
+}
+
+.ri-auth-card .onboard-password-toggle {
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  padding: 0.35rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+
+.ri-auth-card .onboard-password-toggle:hover {
+  color: var(--ink);
+  background: color-mix(in oklab, var(--primary) 8%, white);
+}
+
+.ri-auth-card .onboard-error {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--r-ctl);
+  background: color-mix(in oklab, var(--bad) 8%, white);
+  color: var(--bad);
+  font-size: 0.85rem;
+  font-weight: 550;
+}
+
+.ri-auth-ok {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border-radius: var(--r-ctl);
+  background: color-mix(in oklab, var(--good) 10%, white);
+  color: var(--good);
+  font-size: 0.85rem;
+  font-weight: 550;
+}
+
+.ri-auth-link {
+  color: var(--primary-ink);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ri-auth-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ri-auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.ri-auth-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 0.7rem 1.15rem;
+  font-size: 0.9rem;
+  font-weight: 650;
+  color: var(--ink);
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease, filter 0.15s ease;
+}
+
+.ri-auth-btn:hover {
+  background: color-mix(in oklab, var(--primary) 12%, white);
+  border-color: color-mix(in oklab, var(--primary) 40%, white);
+}
+
+.ri-auth-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ri-auth-btn-primary {
+  width: 100%;
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  padding: 0.8rem 1.2rem;
+  font-size: 0.95rem;
+}
+
+.ri-auth-btn-primary:hover:not(:disabled),
+.ri-auth-btn-primary:active:not(:disabled) {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  filter: brightness(0.9);
+}
+
+.ri-auth-btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-2);
+}
+
+.ri-auth-btn-ghost:hover {
+  background: color-mix(in oklab, var(--primary) 8%, white);
+  color: var(--ink);
+}
+
+.ri-auth-btn-danger {
+  border-color: color-mix(in oklab, var(--bad) 25%, white);
+  color: var(--bad);
+  background: color-mix(in oklab, var(--bad) 5%, white);
+}
+
+.ri-auth-btn-danger:hover {
+  background: color-mix(in oklab, var(--bad) 10%, white);
+  border-color: color-mix(in oklab, var(--bad) 40%, white);
+}
+
+.ri-auth-msg {
+  text-align: center;
+  padding: 1.5rem 0;
+}
+
+.ri-auth-msg h1 {
+  margin-bottom: 0.5rem;
+}
+
+.ri-auth-foot {
+  margin-top: 1.35rem;
+  font-size: 0.875rem;
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.ri-auth-foot a {
+  color: var(--primary-ink);
+  font-weight: 600;
+}
+
+.ri-auth-google {
+  min-height: 2.75rem;
+  width: 100%;
+}
+
+.ri-auth-google > div {
+  width: 100% !important;
+}
+
+/* Account page — dashboard-style shell (not auth split) */
+
+.ri-account-page {
+  min-height: 100dvh;
+  display: grid;
+  grid-template-columns: 15.5rem minmax(0, 1fr);
+  background: var(--page);
+}
+
+.ri-account-rail {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 0.9rem 0.85rem 1.1rem;
+  background: var(--rail);
+  border-right: 1px solid var(--line);
+}
+
+.ri-account-logo {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ri-account-rail-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  flex: 1;
+}
+
+.ri-account-rail-nav button {
+  text-align: left;
+  border: 0;
+  background: transparent;
+  border-radius: var(--r-ctl);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.9rem;
+  font-weight: 550;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.ri-account-rail-nav button:hover {
+  background: color-mix(in oklab, var(--primary) 14%, white);
+  color: var(--ink);
+}
+
+.ri-account-rail-nav button.is-active {
+  background: var(--primary);
+  color: #fff;
+  font-weight: 650;
+}
+
+.ri-account-rail-nav a.ri-account-ext {
+  text-align: left;
+  border-radius: var(--r-ctl);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.9rem;
+  font-weight: 550;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.ri-account-rail-nav a.ri-account-ext:hover {
+  background: color-mix(in oklab, var(--primary) 14%, white);
+  color: var(--ink);
+}
+
+.ri-account-logout {
+  border: 0;
+  border-radius: 999px;
+  background: #e11d48;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(225, 29, 72, 0.28);
+}
+
+.ri-account-logout:hover {
+  filter: brightness(0.95);
+}
+
+.ri-account-main {
+  padding: 1.5rem 1.75rem 2.5rem;
+  max-width: 44rem;
+}
+
+.ri-account-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+}
+
+.ri-account-header h1 {
+  margin: 0.15rem 0 0;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.ri-account-lead {
+  margin: 0.35rem 0 0;
+  font-size: 0.9rem;
+  color: var(--ink-2);
+  line-height: 1.45;
+  max-width: 28rem;
+}
+
+.ri-account-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.ri-account-chip {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  border: 1px solid var(--primary-line);
+}
+
+.ri-account-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: 1.1rem 1.15rem;
+  margin-bottom: 0.85rem;
+}
+
+.ri-account-panel h2 {
+  margin: 0 0 0.85rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ri-account-facts {
+  display: grid;
+  gap: 0.85rem;
+  margin: 0;
+}
+
+.ri-account-facts dt {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.ri-account-facts dd {
+  margin: 0.2rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.ri-account-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.ri-account-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 650;
+  color: var(--ink-2);
+}
+
+.ri-account-form input {
+  border: 1px solid var(--line);
+  border-radius: var(--r-ctl);
+  background: #fff;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.95rem;
+  color: var(--ink);
+}
+
+.ri-account-form input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+
+.ri-account-form .onboard-password-wrap {
+  position: relative;
+}
+
+.ri-account-form .onboard-password-wrap input {
+  width: 100%;
+  padding-right: 2.75rem;
+}
+
+.ri-account-form .onboard-password-toggle {
+  position: absolute;
+  right: 0.45rem;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  padding: 0.35rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+
+.ri-account-form .ri-auth-btn-primary {
+  width: auto;
+  justify-self: start;
+  min-width: 10rem;
+}
+
+.ri-account-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.ri-account-quick .ri-auth-btn-primary {
+  width: auto;
+}
+
+.ri-account-banner {
+  margin: 0 0 0.85rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--r-ctl);
+  font-size: 0.85rem;
+  font-weight: 550;
+}
+
+.ri-account-banner-ok {
+  background: color-mix(in oklab, var(--good) 10%, white);
+  color: var(--good);
+}
+
+.ri-account-banner-bad {
+  background: color-mix(in oklab, var(--bad) 8%, white);
+  color: var(--bad);
+}
+
+@media (max-width: 860px) {
+  .ri-account-page {
+    grid-template-columns: 1fr;
+  }
+
+  .ri-account-rail {
+    position: relative;
+    height: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .ri-account-rail-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .ri-account-main {
+    padding: 1.25rem;
+  }
+}
+
+@keyframes ri-auth-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ri-auth-glow {
+  from { opacity: 0.55; transform: translate3d(0, 0, 0) scale(1); }
+  to { opacity: 1; transform: translate3d(-4%, -3%, 0) scale(1.05); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ri-auth-side::before,
+  .ri-auth-side-brand,
+  .ri-auth-side-copy,
+  .ri-auth-side-points,
+  .ri-auth-card {
+    animation: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .ri-auth {
+    grid-template-columns: 1fr;
+  }
+
+  .ri-auth-side {
+    padding: 1.25rem 1.25rem 1.1rem;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+    min-height: auto;
+    gap: 0.75rem;
+  }
+
+  .ri-auth-side::before {
+    display: none;
+  }
+
+  .ri-auth-side-title,
+  .ri-auth-side-points {
+    display: none;
+  }
+
+  .ri-auth-side-copy {
+    margin-top: 0;
+    font-size: 0.85rem;
+    max-width: none;
+  }
+
+  .ri-auth-kicker {
+    display: none;
+  }
+
+  .ri-auth-main {
+    padding: 1.5rem 1.25rem 2.5rem;
+    place-items: start center;
+  }
+
+  .ri-auth-card {
+    max-width: 28rem;
+  }
+}

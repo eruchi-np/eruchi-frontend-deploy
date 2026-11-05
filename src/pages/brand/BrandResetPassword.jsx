@@ -20,7 +20,12 @@ export default function BrandResetPassword() {
       await brandAPI.resetPassword(resetToken, { password }, { skipAuthRedirect: true, skipErrorToast: true });
       navigate('/brand/login', { replace: true });
     } catch (err) {
-      setError(err.response?.data?.message || 'Could not update password');
+      const msg = err.response?.data?.message || 'Could not update password';
+      if (/expir/i.test(msg)) {
+        navigate('/brand/reset-password/expired', { replace: true });
+        return;
+      }
+      setError(msg);
     } finally {
       setBusy(false);
     }
@@ -55,7 +60,7 @@ export default function BrandResetPassword() {
         </div>
         {error ? <p className="onboard-error">{error}</p> : null}
         <div className="onboard-actions">
-          <button type="submit" className="home-pill home-pill-lg home-pill-navy" disabled={busy}>{busy ? 'Saving...' : 'Update password'}</button>
+          <button type="submit" className="ri-auth-btn ri-auth-btn-primary" disabled={busy}>{busy ? 'Saving…' : 'Update password'}</button>
         </div>
       </form>
     </BrandAuthLayout>

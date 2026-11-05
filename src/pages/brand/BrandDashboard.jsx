@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowUp, Download, Menu, X } from 'lucide-react';
 import { brandAPI } from '../../services/api';
 import {
+  canonicalBrand,
   findRow,
   hasMetric,
   isLowBase,
@@ -22,6 +23,7 @@ import {
   itemsAt,
   marketPenetrationSnapshot,
   nearestWave,
+  orderBrandsForChart,
   ranked,
   snapshot,
   trend,
@@ -33,10 +35,12 @@ import useBrandMetrics from './useBrandMetrics';
 import {
   exportElementsPdf,
   exportPanelPdf,
+  insightsOn,
   markTipSeen,
   parseDashboardSearch,
   tipSeen,
   writeDashboardSearch,
+  writeInsightsOn,
 } from './brandViewState';
 import {
   ALL,
@@ -50,10 +54,19 @@ import {
   SensoryRadar,
   SeriesChart,
   SwitchReasonBars,
+  barsTable,
   colorForBrand,
+  colorForNamedBrand,
   seriesFor,
   seriesForBrands,
+  seriesTable,
+  setBrandColorMap,
+  TOKEN_HEX,
 } from './BrandCharts';
+import { trackRuchi, RuchiEvents } from './ruchiAnalytics';
+import RuchiLogo from './RuchiLogo';
+import './ruchiTokens.css';
+import './ruchiShell.css';
 
 export default function BrandDashboard({ client, viewer = null }) {
   const navigate = useNavigate();
@@ -82,6 +95,10 @@ export default function BrandDashboard({ client, viewer = null }) {
   const [exportMode, setExportMode] = useState('section');
   const [exportCharts, setExportCharts] = useState([]);
   const [exportAll, setExportAll] = useState(false);
+  const [showInsights, setShowInsights] = useState(() => insightsOn());
+  const [insightReads, setInsightReads] = useState([]);
+  const [kpiCompact, setKpiCompact] = useState(false);
+  const kpiRef = useRef(null);
   const seededPage = useRef(false);
   const seededWave = useRef(false);
   const seededCompares = useRef(Boolean(urlSeed.current.compare?.length));
@@ -92,15 +109,25 @@ export default function BrandDashboard({ client, viewer = null }) {
     if (urlSeed.current.page) setPage(urlSeed.current.page);
   }, [setPage]);
 
+  const toggleInsights = () => {
+    setShowInsights((prev) => {
+      const next = !prev;
+      writeInsightsOn(next);
+      trackRuchi(RuchiEvents.INSIGHTS_TOGGLE, { on: next });
+      return next;
+    });
+  };
+
   const mode = viewer?.mode || 'one';
   const peerMode = mode === 'selected' || mode === 'all';
-  const brand = viewer?.brand || meta?.brand || client?.brand || '';
+  const brand = canonicalBrand(viewer?.brand || meta?.brand || client?.brand || '');
   const categoryLabel = viewer?.categoryLabel || meta?.categoryLabel || client?.categoryLabel || '';
-  const rawPeerBrands = mode === 'selected'
+  const rawPeerBrands = (mode === 'selected'
     ? (viewer?.selectedBrands || []).filter(Boolean)
     : peerMode
       ? (viewer?.selectedBrands?.length ? viewer.selectedBrands : [brand].filter(Boolean))
-      : [brand, ...compares].filter(Boolean);
+      : [brand, ...compares].filter(Boolean)
+  ).map(canonicalBrand);
   const needsBrandPick = mode === 'selected' && !rawPeerBrands.length;
   const focusBrand = rawPeerBrands[0] || brand;
   // All = every brand; Selected stays capped by the picker (max 5).
@@ -108,18 +135,45 @@ export default function BrandDashboard({ client, viewer = null }) {
     ? [focusBrand, ...rawPeerBrands.filter((name) => name !== focusBrand)]
     : rawPeerBrands;
   const peerBrands = chartBrands.slice(1);
-  const chartSeries = peerMode ? seriesForBrands(chartBrands) : seriesFor(compares, focusBrand || 'You');
   const stackCharts = mode === 'all';
   const chartGrid = stackCharts
     ? 'grid min-w-0 grid-cols-1 gap-4'
     : 'grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-2';
   const brandPageSize = stackCharts ? Math.max(chartBrands.length, 1) : 5;
-  const drillBrand = viewer?.onSelectOneBrand
-    ? (name) => {
-      if (!name || name === 'Category' || name === 'ALL' || name === 'Others') return;
-      viewer.onSelectOneBrand(name);
-    }
-    : null;
+  // Brand login: keep logged-in brand first. Admin tracker: always high→low.
+  const focusFirst = !viewer;
+  /** Peers / brands ordered by this metric (high→low). Brand portal pins focus first. */
+  const brandsOrdered = (metric, item = null, atWave = toWave || wave) => orderBrandsForChart(
+    rows,
+    metric,
+    chartBrands,
+    atWave,
+    { focus: focusBrand, focusFirst, item },
+  );
+  const seriesForOrdered = (ordered) => {
+    if (!ordered?.length) return peerMode ? [] : seriesFor([], focusBrand || 'You');
+    if (peerMode) return seriesForBrands(ordered);
+    const peers = ordered.filter((name) => name !== focusBrand);
+    return seriesFor(peers, focusBrand || 'You');
+  };
+  /** Line/area: focus first (or top brand in All), peers high→low for this metric. */
+  const lineBundle = (metric, item = null) => {
+    const ordered = brandsOrdered(metric, item);
+    const focus = focusFirst ? focusBrand : (ordered[0] || focusBrand);
+    const peers = focusFirst
+      ? ordered.filter((name) => name !== focusBrand)
+      : ordered.slice(1);
+    return {
+      ordered,
+      series: seriesForOrdered(ordered),
+      data: trend(rows, metric, focus, peers, item, fromWave, toWave, waves),
+    };
+  };
+  const drillBrand = (name) => {
+    if (!name || name === 'Category' || name === 'ALL' || name === 'Others') return;
+    trackRuchi(RuchiEvents.CHART_CLICK, { brand: name, section: GROUPS[page]?.id });
+    if (viewer?.onSelectOneBrand) viewer.onSelectOneBrand(name);
+  };
   const waves = useMemo(
     () => (meta?.waves?.length ? meta.waves : wavesOf(rows)),
     [meta?.waves, rows],
@@ -235,6 +289,52 @@ export default function BrandDashboard({ client, viewer = null }) {
   const pageId = GROUPS[page].id;
   const allCount = (viewer?.selectedBrands || []).length;
 
+  useEffect(() => {
+    setBrandColorMap(meta?.brandColors || {});
+  }, [meta?.brandColors]);
+
+  useEffect(() => {
+    trackRuchi(RuchiEvents.SECTION, { section: pageId, wave: wave || null });
+  }, [pageId, wave]);
+
+  useEffect(() => {
+    // Admin metrics importer keeps insights off; staff brand-portal viewer can show them.
+    if (!wave || !showInsights || (viewer && !viewer.allowInsights)) {
+      setInsightReads([]);
+      return undefined;
+    }
+    let cancelled = false;
+    brandAPI.insightReads(
+      {
+        week: wave,
+        ...(viewer?.category ? { category: viewer.category } : {}),
+      },
+      { skipErrorToast: true, skipAuthRedirect: true },
+    )
+      .then(({ data }) => {
+        if (!cancelled) setInsightReads(Array.isArray(data?.reads) ? data.reads : []);
+      })
+      .catch(() => {
+        if (!cancelled) setInsightReads([]);
+      });
+    return () => { cancelled = true; };
+  }, [wave, viewer, showInsights]);
+
+  const weeklyReads = insightReads.filter((row) => row.scope === 'weekly');
+  const pageReads = insightReads.filter((row) => row.scope === 'page' && row.pageId === pageId);
+  const chartInsight = (chartId) => {
+    if (!showInsights) return '';
+    const hit = insightReads.find((row) => row.scope === 'chart' && row.chartId === chartId);
+    if (!hit) return '';
+    return hit.title ? `${hit.title} — ${hit.body}` : hit.body;
+  };
+
+  const changeWave = (next) => {
+    if (!next || next === wave) return;
+    trackRuchi(RuchiEvents.WEEK, { from: wave || null, to: next });
+    setWave(next);
+  };
+
   const goTo = (next) => {
     const index = Math.min(GROUPS.length - 1, Math.max(0, next));
     setPage(index);
@@ -243,6 +343,7 @@ export default function BrandDashboard({ client, viewer = null }) {
   };
 
   const logout = async () => {
+    trackRuchi(RuchiEvents.LOGOUT);
     await brandAPI.logout({ skipErrorToast: true, skipAuthRedirect: true });
     navigate('/brand/login', { replace: true });
   };
@@ -261,7 +362,9 @@ export default function BrandDashboard({ client, viewer = null }) {
       peers: peerBrands.map((name, index) => ({
         name,
         value: shown(findRow(rows, metric, name, wave, item)),
-        color: peerMode ? colorForBrand(index + 1) : COMPARE_COLORS[index % COMPARE_COLORS.length],
+        color: peerMode
+          ? colorForNamedBrand(name, index + 1)
+          : (colorForNamedBrand(name, index + 1) || COMPARE_COLORS[index % COMPARE_COLORS.length]),
       })),
     };
   };
@@ -323,9 +426,7 @@ export default function BrandDashboard({ client, viewer = null }) {
     .filter((row) => row.focus != null || row.all != null)
     .sort((a, b) => ((b.focus || 0) + (b.all || 0)) - ((a.focus || 0) + (a.all || 0)));
 
-  const npsStackBrands = peerMode
-    ? chartBrands
-    : [focusBrand, ...peerBrands].filter(Boolean);
+  const npsStackBrands = brandsOrdered('nps', 'NPS', wave);
   const npsStackData = npsStackBrands.map((name) => {
     const npsRow = findRow(rows, 'nps', name, wave, 'NPS');
     const promotersRow = findRow(rows, 'nps', name, wave, 'promoters_pct');
@@ -359,9 +460,11 @@ export default function BrandDashboard({ client, viewer = null }) {
 
   const toggleCompare = (name) => {
     setCompares((current) => {
-      if (current.includes(name)) return current.filter((item) => item !== name);
-      if (current.length >= 5) return current;
-      return [...current, name];
+      const next = current.includes(name)
+        ? current.filter((item) => item !== name)
+        : (current.length >= 5 ? current : [...current, name]);
+      trackRuchi(RuchiEvents.COMPARE, { brands: next });
+      return next;
     });
   };
 
@@ -391,6 +494,7 @@ export default function BrandDashboard({ client, viewer = null }) {
     setExportOpen(false);
     setExporting(true);
     const filename = `eruchi-${exportMode === 'dashboard' ? 'dashboard' : exportMode === 'charts' ? 'charts' : pageId}-${wave || 'range'}.pdf`;
+    trackRuchi(RuchiEvents.PDF_EXPORT, { mode: exportMode, section: pageId, wave: wave || null });
     try {
       if (exportMode === 'section') {
         await waitForPaint();
@@ -411,7 +515,8 @@ export default function BrandDashboard({ client, viewer = null }) {
         await exportPanelPdf(panelRef.current, filename);
         setExportAll(false);
       }
-    } catch {
+    } catch (err) {
+      trackRuchi(RuchiEvents.ERROR, { where: 'pdf_export', message: err?.message || 'export_failed' });
       setExportAll(false);
     } finally {
       setExporting(false);
@@ -423,6 +528,17 @@ export default function BrandDashboard({ client, viewer = null }) {
   };
 
   const showSection = (id) => exportAll || (pageReady && pageId === id);
+
+  useEffect(() => {
+    const node = kpiRef.current;
+    if (!node || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver(
+      ([entry]) => setKpiCompact(!entry.isIntersecting),
+      { root: null, threshold: 0, rootMargin: '-72px 0px 0px 0px' },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [booting, pageReady, pageId, needsBrandPick]);
 
   const firstWave = waves[0] || '';
   const lastWave = waves[waves.length - 1] || '';
@@ -469,9 +585,7 @@ export default function BrandDashboard({ client, viewer = null }) {
               </div>
             ) : null}
           </div>
-        ) : (
-          <p className="text-xs font-medium uppercase tracking-wide text-blue-600">{categoryLabel}</p>
-        )}
+        ) : null}
         {viewer ? (
           mode === 'one' ? (
             <BrandSearch brands={allowedBrands} value={focusBrand} onChange={viewer.onBrand} />
@@ -490,9 +604,11 @@ export default function BrandDashboard({ client, viewer = null }) {
             </div>
           )
         ) : (
-          <h1 className="text-2xl font-bold">{brand}</h1>
+          <>
+            <h1 className="text-2xl font-bold">{brand}</h1>
+            {categoryLabel ? <p className="ri-rail-label mt-1">{categoryLabel}</p> : null}
+          </>
         )}
-        {viewer ? <p className="mt-1 text-xs font-medium uppercase tracking-wide text-blue-600">{categoryLabel}</p> : null}
         {viewer && peerMode ? (
           <p className="mt-1 text-xs text-gray-500">
             {needsBrandPick
@@ -502,13 +618,13 @@ export default function BrandDashboard({ client, viewer = null }) {
         ) : null}
       </div>
 
-      <nav className="flex flex-col gap-1">
+      <nav className="ri-nav" aria-label="Sections">
         {GROUPS.map((item, index) => (
           <button
             key={item.id}
             type="button"
             onClick={() => goTo(index)}
-            className={`rounded-xl px-3 py-2 text-left text-sm font-medium ${index === page ? 'bg-blue-600 text-white' : 'text-gray-700 hover:bg-slate-100'}`}
+            className={index === page ? 'is-active' : undefined}
           >
             {item.label}
           </button>
@@ -519,7 +635,7 @@ export default function BrandDashboard({ client, viewer = null }) {
         <div>
           <p>Week</p>
           <div className="mt-1 flex items-center gap-1">
-            <button type="button" className="h-9 w-8 shrink-0 rounded-lg border border-gray-200 text-sm disabled:opacity-40" disabled={waveIndex <= 0} onClick={() => setWave(waves[waveIndex - 1])} aria-label="Previous week">&lt;</button>
+            <button type="button" className="h-9 w-8 shrink-0 rounded-lg border border-gray-200 text-sm disabled:opacity-40" disabled={waveIndex <= 0} onClick={() => changeWave(waves[waveIndex - 1])} aria-label="Previous week">&lt;</button>
             <input
               type="date"
               className="h-9 min-w-0 flex-1 rounded-xl border border-gray-200 bg-white px-2 text-sm text-gray-900"
@@ -528,10 +644,10 @@ export default function BrandDashboard({ client, viewer = null }) {
               max={lastWave || undefined}
               onChange={(event) => {
                 const next = nearestWave(waves, event.target.value);
-                if (next) setWave(next);
+                if (next) changeWave(next);
               }}
             />
-            <button type="button" className="h-9 w-8 shrink-0 rounded-lg border border-gray-200 text-sm disabled:opacity-40" disabled={waveIndex < 0 || waveIndex >= waves.length - 1} onClick={() => setWave(waves[waveIndex + 1])} aria-label="Next week">&gt;</button>
+            <button type="button" className="h-9 w-8 shrink-0 rounded-lg border border-gray-200 text-sm disabled:opacity-40" disabled={waveIndex < 0 || waveIndex >= waves.length - 1} onClick={() => changeWave(waves[waveIndex + 1])} aria-label="Next week">&gt;</button>
           </div>
         </div>
         <label>
@@ -619,35 +735,35 @@ export default function BrandDashboard({ client, viewer = null }) {
         <span className="inline-flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: LOW }} /> Low base</span>
       </div>
 
-      {viewer ? null : (
-        <div className="mt-auto flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={() => navigate('/brand/account')}
-            className="inline-flex h-10 w-full items-center justify-center rounded-full border border-gray-200 bg-white px-5 text-[12px] font-bold uppercase tracking-[0.12em] text-gray-700"
-          >
-            Account
-          </button>
-          <button
-            type="button"
-            onClick={logout}
-            className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#e11d48] px-5 text-[12px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_8px_20px_rgba(225,29,72,0.28)]"
-          >
-            Logout
-          </button>
-        </div>
-      )}
+      <div className="mt-auto flex flex-col gap-2">
+        <button
+          type="button"
+          onClick={() => navigate('/brand/account')}
+          className="inline-flex h-10 w-full items-center justify-center rounded-full border border-gray-200 bg-white px-5 text-[12px] font-bold uppercase tracking-[0.12em] text-gray-700"
+        >
+          Account
+        </button>
+        <button
+          type="button"
+          onClick={logout}
+          className="inline-flex h-11 w-full items-center justify-center rounded-full bg-[#e11d48] px-5 text-[12px] font-bold uppercase tracking-[0.12em] text-white shadow-[0_8px_20px_rgba(225,29,72,0.28)]"
+        >
+          Logout
+        </button>
+      </div>
     </>
   );
 
+  const adminChrome = Boolean(viewer?.adminChrome);
+
   return (
-    <div className="brand-dashboard min-h-screen bg-[#f4f7fb] text-gray-900">
-      <div className={`sticky z-50 flex items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 lg:hidden ${viewer ? 'top-[5.5rem]' : 'top-0'}`}>
-        <button type="button" className="inline-flex items-center gap-2 rounded-full border border-gray-200 px-3 py-2 text-sm text-gray-700" onClick={() => setNavOpen(true)}>
+    <div className={`ruchi-insights brand-dashboard ${adminChrome ? 'ruchi-insights--viewer' : ''}`}>
+      <div className={`ri-mobile-bar ${adminChrome ? 'top-[5.5rem]' : 'top-0'}`}>
+        <button type="button" className="ri-btn" onClick={() => setNavOpen(true)}>
           <Menu className="h-4 w-4" /> Menu
         </button>
         <p className="min-w-0 truncate text-sm font-semibold">{viewer ? (mode === 'all' ? 'All brands' : focusBrand) : brand}</p>
-        <button type="button" className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-2 text-sm text-gray-700" onClick={openExport} disabled={!pageReady || exporting}>
+        <button type="button" className="ri-btn" onClick={openExport} disabled={!pageReady || exporting}>
           <Download className="h-4 w-4" /> {exporting ? 'PDF...' : 'PDF'}
         </button>
       </div>
@@ -655,10 +771,10 @@ export default function BrandDashboard({ client, viewer = null }) {
       {navOpen ? (
         <div className="fixed inset-0 z-[70] lg:hidden">
           <button type="button" className="absolute inset-0 bg-black/40" aria-label="Close menu" onClick={() => setNavOpen(false)} />
-          <aside className="absolute left-0 top-0 flex h-full w-[min(20rem,90vw)] flex-col gap-5 overflow-y-auto bg-white px-4 py-4 shadow-xl">
+          <aside className="ri-rail absolute left-0 top-0 h-full w-[min(20rem,90vw)] shadow-xl" style={{ position: 'absolute', height: '100%' }}>
             <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-gray-900">Sections</p>
-              <button type="button" className="rounded-full p-2 text-gray-500 hover:bg-gray-100" onClick={() => setNavOpen(false)} aria-label="Close">
+              <p className="ri-rail-label">Sections</p>
+              <button type="button" className="ri-btn" onClick={() => setNavOpen(false)} aria-label="Close">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -667,46 +783,108 @@ export default function BrandDashboard({ client, viewer = null }) {
         </div>
       ) : null}
 
-      <div className={`lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start ${viewer ? 'lg:-mt-[5.5rem]' : ''}`}>
-        <aside className={`hidden border-b border-gray-200 bg-white px-4 py-4 lg:flex lg:flex-col lg:gap-5 lg:border-b-0 lg:border-r ${viewer ? 'lg:relative lg:z-[65] lg:pt-[5.5rem]' : ''}`}>
+      <div className="ri-shell">
+        <aside className="ri-rail hidden lg:flex" aria-label="Sections and filters">
+          <div className="ri-rail-brand">
+            <RuchiLogo />
+          </div>
           {sideNav}
         </aside>
 
-        <main ref={panelRef} className={`min-w-0 px-4 ${viewer ? 'space-y-4 py-4 lg:pt-[5.5rem]' : 'space-y-8 py-6'}`}>
-          {viewer?.toolbar ? (
-            <div className="flex flex-col gap-2 rounded-2xl border border-gray-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0 flex-1">{viewer.toolbar}</div>
+        <div className="ri-main">
+          <header className={`ri-topbar ${viewer ? 'lg:pt-[0.5rem]' : ''}`}>
+            <div className="min-w-0 flex-1">
+              <h1>{GROUPS[page]?.label || 'Dashboard'}</h1>
+              <p className="mt-0.5 text-xs text-[var(--ink-3)]">
+                {wave ? `Week of ${weekLabel(wave).replace('Week of ', '')}.` : 'Updated weekly.'}
+                {lastWave && wave === lastWave
+                  ? (meta?.nextUpdateCopy ? ` ${meta.nextUpdateCopy}` : ' Next update pending.')
+                  : ''}
+              </p>
+              {kpiCompact && !needsBrandPick && !booting ? (
+                <div className="mt-2 hidden lg:block">
+                  <BrandKpiRow kpi={kpi} compact />
+                </div>
+              ) : null}
+            </div>
+            <div className="ri-topbar-actions">
+              {viewer?.toolbar ? <div className="min-w-0 flex-1">{viewer.toolbar}</div> : null}
+              {viewer?.staffLinks ? (
+                <div className="ri-staff-topnav hidden sm:flex">
+                  <button type="button" className="ri-btn" onClick={() => navigate('/brand/insights')}>
+                    Insights CMS
+                  </button>
+                  <button type="button" className="ri-btn is-current" onClick={() => navigate('/brand/dashboard')}>
+                    Metrics
+                  </button>
+                  <a
+                    className="ri-btn"
+                    href="https://eruchi.com.np/login"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Full eRuchi admin
+                  </a>
+                </div>
+              ) : null}
+              <label className="ri-toggle">
+                <input type="checkbox" checked={showInsights} onChange={toggleInsights} />
+                Insights
+              </label>
               <button
                 type="button"
                 onClick={openExport}
                 disabled={!pageReady || booting || exporting}
-                className="hidden shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-slate-50 disabled:opacity-40 lg:inline-flex"
+                className="ri-btn ri-btn-primary hidden lg:inline-flex"
               >
                 <Download className="h-4 w-4" /> {exporting ? 'Exporting PDF...' : 'Export PDF'}
               </button>
             </div>
-          ) : (
-            <div className="hidden items-center justify-end lg:flex">
-              <button
-                type="button"
-                onClick={openExport}
-                disabled={!pageReady || booting || exporting}
-                className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700 hover:bg-slate-50 disabled:opacity-40"
-              >
-                <Download className="h-4 w-4" /> {exporting ? 'Exporting PDF...' : 'Export PDF'}
-              </button>
-            </div>
-          )}
+          </header>
 
+        <main ref={panelRef} className={`ri-panel ${viewer ? 'lg:pt-2' : ''}`}>
         {showTip ? (
-          <div className="flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-950 sm:flex-row sm:items-center sm:justify-between">
+          <div className="ri-card flex flex-col gap-3 text-sm sm:flex-row sm:items-center sm:justify-between" style={{ background: 'var(--primary-soft)', borderColor: 'var(--primary-line)' }}>
             <p>Use the week arrows and From/To weeks to move through the charts. Open Compare to line up peers.</p>
-            <button type="button" className="shrink-0 rounded-full bg-white px-3 py-1.5 text-xs font-medium text-blue-800" onClick={dismissTip}>Got it</button>
+            <button type="button" className="ri-btn" onClick={dismissTip}>Got it</button>
+          </div>
+        ) : null}
+
+        {showInsights ? (
+          <div className="ri-card space-y-3" data-insights-slot="weekly">
+            <div>
+              <p className="ri-rail-label">Weekly brief</p>
+              {weeklyReads.length ? (
+                <ul className="mt-2 space-y-2">
+                  {weeklyReads.map((row) => (
+                    <li key={row.id} className="text-sm text-[var(--ink-2)]">
+                      {row.title ? <span className="font-semibold text-[var(--ink)]">{row.title} </span> : null}
+                      {row.body}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-1 text-sm text-[var(--ink-2)]">Insights will appear here when published for this week.</p>
+              )}
+            </div>
+            {pageReads.length ? (
+              <div>
+                <p className="ri-rail-label">{GROUPS[page]?.label} notes</p>
+                <ul className="mt-2 space-y-2">
+                  {pageReads.map((row) => (
+                    <li key={row.id} className="text-sm text-[var(--ink-2)]">
+                      {row.title ? <span className="font-semibold text-[var(--ink)]">{row.title} </span> : null}
+                      {row.body}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
           </div>
         ) : null}
 
         {!booting && rows.some((row) => row.status === 'suppressed' || row.status === 'low_base') ? (
-          <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          <p className="ri-warn">
             Some figures are low-base (under 50 people). They show as directional only — use them for early shape, not precise comparison.
           </p>
         ) : null}
@@ -717,7 +895,7 @@ export default function BrandDashboard({ client, viewer = null }) {
           </p>
         ) : null}
 
-        {!booting && !needsBrandPick ? <BrandKpiRow kpi={kpi} /> : null}
+        {!booting && !needsBrandPick ? <BrandKpiRow ref={kpiRef} kpi={kpi} /> : null}
 
         {needsBrandPick ? (
           <div className="rounded-3xl border border-dashed border-blue-200 bg-white px-6 py-16 text-center shadow-[0_12px_30px_rgba(37,99,235,0.08)]">
@@ -737,10 +915,17 @@ export default function BrandDashboard({ client, viewer = null }) {
             title="Awareness this week"
             note={chartBrands.join(', ')}
             exportKey="Awareness this week"
+            insight={chartInsight('Awareness this week')}
             wide
+            table={{
+              columns: ['Brand', ...AWARENESS_TYPE_SERIES.map((item) => item.name)],
+              rows: awarenessTypeSnapshot(rows, brandsOrdered('awareness_prompted', null, wave), wave).map((row) => (
+                [row.name, row.top, row.unprompted, row.prompted]
+              )),
+            }}
           >
             <GroupedBars
-              data={awarenessTypeSnapshot(rows, chartBrands, wave)}
+              data={awarenessTypeSnapshot(rows, brandsOrdered('awareness_prompted', null, wave), wave)}
               metric="awareness_prompted"
               series={AWARENESS_TYPE_SERIES}
               pageSize={brandPageSize}
@@ -752,14 +937,16 @@ export default function BrandDashboard({ client, viewer = null }) {
               title="Unprompted awareness over the weeks"
               note="Named the brand unprompted (any mention)."
               exportKey="Unprompted awareness over the weeks"
+              insight={chartInsight('Unprompted awareness over the weeks')}
               wide
+              table={seriesTable(lineBundle('awareness_unprompted', 'any_mention').data, lineBundle('awareness_unprompted', 'any_mention').series)}
             >
               <SeriesChart
                 kind="area"
-                data={trend(rows, 'awareness_unprompted', focusBrand, peerBrands, 'any_mention', fromWave, toWave, waves)}
+                data={lineBundle('awareness_unprompted', 'any_mention').data}
                 metric="awareness_unprompted"
                 item="any_mention"
-                series={chartSeries}
+                series={lineBundle('awareness_unprompted', 'any_mention').series}
                 onBrandClick={drillBrand}
               />
             </ChartCard>
@@ -768,27 +955,41 @@ export default function BrandDashboard({ client, viewer = null }) {
               Unprompted awareness — data currently being gathered for this category.
             </p>
           )}
-          <ChartCard title="Prompted awareness over the weeks" note="Selected when shown the list." wide>
+          <ChartCard
+            title="Prompted awareness over the weeks"
+            note="Selected when shown the list."
+            exportKey="Prompted awareness over the weeks"
+            insight={chartInsight('Prompted awareness over the weeks')}
+            wide
+            table={seriesTable(lineBundle('awareness_prompted').data, lineBundle('awareness_prompted').series)}
+          >
             <SeriesChart
-              data={trend(rows, 'awareness_prompted', focusBrand, peerBrands, null, fromWave, toWave, waves)}
+              data={lineBundle('awareness_prompted').data}
               metric="awareness_prompted"
-              series={chartSeries}
+              series={lineBundle('awareness_prompted').series}
               onBrandClick={drillBrand}
             />
           </ChartCard>
         </div>}
 
-        {!needsBrandPick && showSection('buying') && <div className="space-y-3" data-export-section="Penetration and Purchase">
-          <h2 className="text-xl font-semibold">Penetration and Purchase</h2>
+        {!needsBrandPick && showSection('purchase') && <div className="space-y-3" data-export-section="Purchase">
+          <h2 className="text-xl font-semibold">Purchase</h2>
           <div className={chartGrid}>
             <ChartCard
               title="Market Penetration"
               note={wave ? weekLabel(wave) : 'Awareness (prompted + unprompted) beside penetration.'}
               exportKey="Market Penetration"
+              insight={chartInsight('Market Penetration')}
               wide={stackCharts}
+              table={{
+                columns: ['Brand', ...MARKET_PEN_SERIES.map((item) => item.name)],
+                rows: marketPenetrationSnapshot(rows, brandsOrdered('penetration', null, wave), wave).map((row) => (
+                  [row.name, row.awareness, row.penetration]
+                )),
+              }}
             >
               <GroupedBars
-                data={marketPenetrationSnapshot(rows, chartBrands, wave)}
+                data={marketPenetrationSnapshot(rows, brandsOrdered('penetration', null, wave), wave)}
                 metric="penetration"
                 series={MARKET_PEN_SERIES}
                 pageSize={brandPageSize}
@@ -801,27 +1002,57 @@ export default function BrandDashboard({ client, viewer = null }) {
                 ? `Weeks ${weekLabel(fromWave).replace('Week of ', '')} – ${weekLabel(toWave).replace('Week of ', '')}`
                 : (wave ? weekLabel(wave) : 'Bought recently')}
               exportKey="Penetration over the weeks"
+              insight={chartInsight('Penetration over the weeks')}
               wide={stackCharts}
+              table={seriesTable(lineBundle('penetration').data, lineBundle('penetration').series)}
             >
-              <SeriesChart kind="area" data={trend(rows, 'penetration', focusBrand, peerBrands, null, fromWave, toWave, waves)} metric="penetration" series={chartSeries} onBrandClick={drillBrand} />
+              <SeriesChart kind="area" data={lineBundle('penetration').data} metric="penetration" series={lineBundle('penetration').series} onBrandClick={drillBrand} />
             </ChartCard>
           </div>
           <div className={chartGrid}>
-            <ChartCard title="Trial this week" note="Ever tried the brand." wide={stackCharts}>
-              <BrandBars data={snapshot(rows, 'trial', focusBrand, peerBrands, wave, null, peerMode)} metric="trial" onBrandClick={drillBrand} />
+            <ChartCard
+              title="Trial this week"
+              note="Ever tried the brand."
+              exportKey="Trial this week"
+              insight={chartInsight('Trial this week')}
+              wide={stackCharts}
+              table={barsTable(snapshot(rows, 'trial', focusBrand, peerBrands, wave, null, peerMode, { focusFirst }))}
+            >
+              <BrandBars data={snapshot(rows, 'trial', focusBrand, peerBrands, wave, null, peerMode, { focusFirst })} metric="trial" onBrandClick={drillBrand} />
             </ChartCard>
-            <ChartCard title="Purchase Frequency" note="Purchases per month among people whose main brand is this one." exportKey="Purchase Frequency" wide={stackCharts}>
-              <BrandBars data={snapshot(rows, 'purchase_frequency', focusBrand, peerBrands, wave, null, peerMode)} metric="purchase_frequency" onBrandClick={drillBrand} />
+            <ChartCard
+              title="Purchase Frequency"
+              note="Purchases per month among people whose main brand is this one."
+              exportKey="Purchase Frequency"
+              insight={chartInsight('Purchase Frequency')}
+              wide={stackCharts}
+              table={barsTable(snapshot(rows, 'purchase_frequency', focusBrand, peerBrands, wave, null, peerMode, { focusFirst }), 'Purchases / month')}
+            >
+              <BrandBars data={snapshot(rows, 'purchase_frequency', focusBrand, peerBrands, wave, null, peerMode, { focusFirst })} metric="purchase_frequency" onBrandClick={drillBrand} />
             </ChartCard>
-            <ChartCard title="Rupees per trip" note={wave ? weekLabel(wave) : ''} wide>
-              <BrandBars data={snapshot(rows, 'spend_per_trip', focusBrand, peerBrands, wave, null, peerMode)} metric="spend_per_trip" onBrandClick={drillBrand} />
+            <ChartCard
+              title="Rupees per trip"
+              note={wave ? weekLabel(wave) : ''}
+              exportKey="Rupees per trip"
+              insight={chartInsight('Rupees per trip')}
+              wide
+              table={barsTable(snapshot(rows, 'spend_per_trip', focusBrand, peerBrands, wave, null, peerMode, { focusFirst }), 'Rs')}
+            >
+              <BrandBars data={snapshot(rows, 'spend_per_trip', focusBrand, peerBrands, wave, null, peerMode, { focusFirst })} metric="spend_per_trip" onBrandClick={drillBrand} />
             </ChartCard>
           </div>
           <div className={chartGrid}>
-            <ChartCard title="Share of wallet" note="Share of this category spend that goes to these brands." wide={stackCharts}>
-              <SeriesChart kind="area" data={trend(rows, 'share_of_wallet', focusBrand, peerBrands, null, fromWave, toWave, waves)} metric="share_of_wallet" series={chartSeries} onBrandClick={drillBrand} />
+            <ChartCard
+              title="Share of wallet"
+              note="Share of this category spend that goes to these brands."
+              exportKey="Share of wallet"
+              insight={chartInsight('Share of wallet')}
+              wide={stackCharts}
+              table={seriesTable(lineBundle('share_of_wallet').data, lineBundle('share_of_wallet').series)}
+            >
+              <SeriesChart kind="area" data={lineBundle('share_of_wallet').data} metric="share_of_wallet" series={lineBundle('share_of_wallet').series} onBrandClick={drillBrand} />
             </ChartCard>
-            <ChartCard title="Share of wallet, by buyer type" note="Awaiting buyer-type breakdown." exportKey="Share of wallet, by buyer type" wide={stackCharts}>
+            <ChartCard title="Share of wallet, by buyer type" note="Awaiting buyer-type breakdown." exportKey="Share of wallet, by buyer type" wide={stackCharts} allowTable={false}>
               <p className="py-10 text-center text-sm text-amber-800">Data currently being gathered.</p>
             </ChartCard>
           </div>
@@ -863,21 +1094,43 @@ export default function BrandDashboard({ client, viewer = null }) {
           )}
         </div>}
 
-        {!needsBrandPick && showSection('occasions') && <div className="space-y-3" data-export-section="Occasions">
-          <h2 className="text-xl font-semibold">Occasions</h2>
+        {!needsBrandPick && showSection('usage') && <div className="space-y-3" data-export-section="Usage">
+          <h2 className="text-xl font-semibold">Usage</h2>
+          <p className="text-sm text-gray-500">Occasions and sensory scores for this week.</p>
           <p className="text-sm text-gray-500">Brand × occasion matrix. People can pick more than one, so shares can add past 100%.</p>
           {occasionMatrixData.length ? (
             <ChartCard
               title="Occasion matrix"
               note={[wave ? weekLabel(wave) : null, chartBrands.join(', ')].filter(Boolean).join(' · ')}
               exportKey="Occasion matrix"
+              insight={chartInsight('Occasion matrix')}
               wide
               tall
+              allowTable={false}
             >
               <GroupedBars data={occasionMatrixData} metric="occasion_usage" series={occasionMatrixSeries} />
             </ChartCard>
           ) : (
             <p className="rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500">No occasion data for this week.</p>
+          )}
+          <h3 className="text-lg font-semibold">Sensory</h3>
+          <p className="text-sm text-gray-500">
+            Average score from 1 to 5. Chart shows up to three brands so the radar stays readable.
+          </p>
+          {sensoryData.length ? (
+            <ChartCard
+              title="Sensory"
+              note={[wave ? weekLabel(wave) : null, sensoryBrands.join(', ')].filter(Boolean).join(' · ')}
+              howToRead="Average score from 1 (low) to 5 (high) on each attribute. Up to three brands so the shape stays readable."
+              exportKey="Sensory"
+              insight={chartInsight('Sensory')}
+              wide
+              allowTable={false}
+            >
+              <SensoryRadar data={sensoryData} series={sensorySeries} />
+            </ChartCard>
+          ) : (
+            <p className="rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500">No sensory scores for this week.</p>
           )}
         </div>}
 
@@ -891,6 +1144,8 @@ export default function BrandDashboard({ client, viewer = null }) {
             tall
             wide
             exportKey="Main brand flow"
+            insight={chartInsight('Main brand flow')}
+            allowTable={false}
           >
             {hasMetric(rows, 'brand_switch_flow') ? (
               <BrandSwitchFlow
@@ -909,7 +1164,9 @@ export default function BrandDashboard({ client, viewer = null }) {
             note={focusBrand ? `Net gains and losses for ${focusBrand}.` : 'Net gains and losses.'}
             howToRead="Share of matched panelists won from or lost to each competitor. Net is won minus lost. Click a competitor to open that brand alone."
             exportKey="Brand switching tracker"
+            insight={chartInsight('Brand switching tracker')}
             wide
+            table={barsTable((netGains?.data || []).map((row) => ({ name: row.name, value: row.net })), 'Net')}
           >
             {netGains?.data?.length ? (
               <NetGainsBars data={netGains.data} onBrandClick={drillBrand} />
@@ -922,7 +1179,23 @@ export default function BrandDashboard({ client, viewer = null }) {
             )}
           </ChartCard>
           {mode !== 'selected' ? (
-            <ChartCard title="Category over the weeks" wide exportKey="Category over the weeks">
+            <ChartCard
+              title="Category over the weeks"
+              wide
+              exportKey="Category over the weeks"
+              insight={chartInsight('Category over the weeks')}
+              table={seriesTable(
+                waves.filter((item) => inSpan(item, fromWave, toWave)).map((item) => ({
+                  label: weekLabel(item).replace('Week of ', ''),
+                  reduced: shown(findRow(rows, 'brand_switching', 'ALL', item, 'lapsed_reduced_or_stopped')),
+                  adopted: shown(findRow(rows, 'brand_switching', 'ALL', item, 'adopted_or_increased')),
+                })),
+                [
+                  { key: 'reduced', name: 'Reduced or stopped' },
+                  { key: 'adopted', name: 'Adopted or increased' },
+                ],
+              )}
+            >
               <SeriesChart
                 kind="area"
                 data={waves.filter((item) => inSpan(item, fromWave, toWave)).map((item) => ({
@@ -932,8 +1205,8 @@ export default function BrandDashboard({ client, viewer = null }) {
                 }))}
                 metric="brand_switching"
                 series={[
-                  { key: 'reduced', name: 'Reduced or stopped', color: '#0891b2' },
-                  { key: 'adopted', name: 'Adopted or increased', color: '#059669' },
+                  { key: 'reduced', name: 'Reduced or stopped', color: TOKEN_HEX.seq },
+                  { key: 'adopted', name: 'Adopted or increased', color: TOKEN_HEX.good },
                 ]}
               />
               {!rows.some((row) => row.metric === 'brand_switching' && row.item === 'adopted_or_increased') ? (
@@ -946,7 +1219,12 @@ export default function BrandDashboard({ client, viewer = null }) {
             note={focusBrand ? `Why switchers name each reason · ${focusBrand} vs category.` : ''}
             howToRead="Share of switchers naming each reason (more than one allowed). Blue is this brand; coral is the category. Live metrics do not yet split left vs came."
             exportKey="Brand switching reasons"
+            insight={chartInsight('Brand switching reasons')}
             wide
+            table={{
+              columns: ['Reason', focusBrand || 'Brand', 'Category'],
+              rows: switchReasonData.map((row) => [row.name, row.focus, row.all]),
+            }}
           >
             {switchReasonData.length ? (
               <SwitchReasonBars data={switchReasonData} focusLabel={focusBrand || 'This brand'} />
@@ -956,16 +1234,18 @@ export default function BrandDashboard({ client, viewer = null }) {
               </p>
             )}
           </ChartCard>
-        </div>}
-
-        {!needsBrandPick && showSection('loyalty') && <div className="space-y-3" data-export-section="Loyalty">
-          <h2 className="text-xl font-semibold">Loyalty</h2>
+          <h3 className="text-lg font-semibold">Loyalty</h3>
           <ChartCard
             title="NPS this week"
             note={wave ? weekLabel(wave) : ''}
-            howToRead="Each bar is that brand’s buyers this week: promoters (would recommend), passives, and detractors. NPS at the end is promoters minus detractors (Net Promoter Score)."
+            howToRead="Each bar is that brand’s buyers this week, stacked Detractors → Passives → Promoters. NPS at the end is promoters minus detractors (Net Promoter Score)."
             exportKey="NPS this week"
+            insight={chartInsight('NPS this week')}
             wide
+            table={{
+              columns: ['Brand', 'Detractors', 'Passives', 'Promoters', 'NPS'],
+              rows: npsStackData.map((row) => [row.name, row.detractors, row.passives, row.promoters, row.nps]),
+            }}
           >
             {npsStackData.length ? (
               <NpsStackedBars data={npsStackData} onBrandClick={drillBrand} />
@@ -978,36 +1258,18 @@ export default function BrandDashboard({ client, viewer = null }) {
             note={[fromWave ? weekLabel(fromWave) : null, toWave ? weekLabel(toWave) : null].filter(Boolean).join(' → ')}
             howToRead="Net Promoter Score by week. A gap means that week is missing or too small to show — it is not zero. Click a brand in the legend to open it alone."
             exportKey="NPS over the weeks"
+            insight={chartInsight('NPS over the weeks')}
             wide
+            table={seriesTable(lineBundle('nps', 'NPS').data, lineBundle('nps', 'NPS').series)}
           >
             <SeriesChart
-              data={trend(rows, 'nps', focusBrand, peerBrands, 'NPS', fromWave, toWave, waves)}
+              data={lineBundle('nps', 'NPS').data}
               metric="nps"
               item="NPS"
-              series={chartSeries}
+              series={lineBundle('nps', 'NPS').series}
               onBrandClick={drillBrand}
             />
           </ChartCard>
-        </div>}
-
-        {!needsBrandPick && showSection('sensory') && <div className="space-y-3" data-export-section="Sensory">
-          <h2 className="text-xl font-semibold">Sensory</h2>
-          <p className="text-sm text-gray-500">
-            Average score from 1 to 5. Chart shows up to three brands so the radar stays readable.
-          </p>
-          {sensoryData.length ? (
-            <ChartCard
-              title="Sensory"
-              note={[wave ? weekLabel(wave) : null, sensoryBrands.join(', ')].filter(Boolean).join(' · ')}
-              howToRead="Average score from 1 (low) to 5 (high) on each attribute. Up to three brands so the shape stays readable."
-              exportKey="Sensory"
-              wide
-            >
-              <SensoryRadar data={sensoryData} series={sensorySeries} />
-            </ChartCard>
-          ) : (
-            <p className="rounded-2xl border border-dashed border-gray-200 bg-white px-4 py-8 text-center text-sm text-gray-500">No sensory scores for this week.</p>
-          )}
         </div>}
 
         {!booting && !pageReady && !exportAll ? (
@@ -1029,6 +1291,7 @@ export default function BrandDashboard({ client, viewer = null }) {
           </section>
         ) : null}
         </main>
+        </div>
       </div>
 
       {exportOpen ? (

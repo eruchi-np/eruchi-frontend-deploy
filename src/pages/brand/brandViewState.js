@@ -1,7 +1,8 @@
-import { GROUPS } from './brandDashboardMetrics';
+import { GROUPS, SECTION_ALIASES } from './brandDashboardMetrics';
 
 const ADMIN_KEY = 'eruchi.brandTracker.prefs';
 const TIP_KEY = 'eruchi.brandDashboard.tipSeen';
+const INSIGHTS_KEY = 'eruchi.brandDashboard.insightsOn';
 
 export function readAdminPrefs() {
   try {
@@ -35,9 +36,28 @@ export function markTipSeen() {
   }
 }
 
+export function insightsOn() {
+  try {
+    const raw = localStorage.getItem(INSIGHTS_KEY);
+    if (raw == null) return true;
+    return raw === '1';
+  } catch {
+    return true;
+  }
+}
+
+export function writeInsightsOn(on) {
+  try {
+    localStorage.setItem(INSIGHTS_KEY, on ? '1' : '0');
+  } catch {
+    /* ignore */
+  }
+}
+
 export function parseDashboardSearch(search) {
   const params = new URLSearchParams(search);
-  const section = params.get('section') || '';
+  const rawSection = params.get('section') || '';
+  const section = SECTION_ALIASES[rawSection] || rawSection;
   const page = Math.max(0, GROUPS.findIndex((item) => item.id === section));
   const compare = (params.get('compare') || '')
     .split(',')
@@ -50,6 +70,7 @@ export function parseDashboardSearch(search) {
     from: params.get('from') || '',
     to: params.get('to') || '',
     compare,
+    aliased: Boolean(rawSection && SECTION_ALIASES[rawSection]),
   };
 }
 

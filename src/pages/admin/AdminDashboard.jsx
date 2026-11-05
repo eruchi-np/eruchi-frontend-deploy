@@ -448,8 +448,13 @@ const AdminDashboard = () => {
                 </button>
               )}
               {can("analytics") && (
+                <button onClick={() => navigate("/admin/insights")} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
+                  <BarChart3 className="h-4 w-4" /> Ruchi Insights
+                </button>
+              )}
+              {can("analytics") && (
                 <button onClick={() => navigate("/admin/brands")} className="flex items-center gap-2 bg-white border-2 px-3 sm:px-5 py-2 sm:py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-gray-50" style={{ borderColor: NAVY, color: NAVY }}>
-                  <Activity className="h-4 w-4" /> Brand tracker
+                  <Activity className="h-4 w-4" /> Metrics viewer
                 </button>
               )}
               {can("surveys") && (

@@ -1,32 +1,51 @@
-import React, { useEffect, useState } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
-import { brandAPI } from '../../services/api';
+import { useBrandSession } from './BrandSessionContext';
+import { trackRuchi, RuchiEvents } from './ruchiAnalytics';
+import './ruchiTokens.css';
 
-export default function BrandProtectedRoute({ children }) {
-  const [status, setStatus] = useState('loading');
-  const [client, setClient] = useState(null);
+/** Heavy metrics shell — only load when staff hits /brand/dashboard. */
+const BrandStaffViewer = lazy(() => import('./BrandStaffViewer'));
+
+function RouteSpinner() {
+  return (
+    <div className="ruchi-insights flex min-h-screen items-center justify-center">
+      <Loader2 className="h-10 w-10 animate-spin text-[var(--ink-3)]" />
+    </div>
+  );
+}
+
+export default function BrandProtectedRoute({ children, staffOnly = false }) {
+  const { status, client } = useBrandSession();
   const location = useLocation();
 
   useEffect(() => {
-    brandAPI.me({ skipErrorToast: true, skipAuthRedirect: true })
-      .then(({ data }) => {
-        setClient(data.client);
-        setStatus('authed');
-      })
-      .catch(() => setStatus('unauthed'));
-  }, []);
+    if (status !== 'authed' || !client) return;
+    trackRuchi(RuchiEvents.SESSION, {
+      path: location.pathname,
+      viewer: Boolean(client?.viewer),
+    });
+  }, [status, client, location.pathname]);
 
   if (status === 'loading') {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f4f7fb]">
-        <Loader2 className="h-10 w-10 animate-spin text-gray-400" />
-      </div>
-    );
+    return <RouteSpinner />;
   }
 
   if (status === 'unauthed') {
     return <Navigate to="/brand/login" state={{ from: location }} replace />;
+  }
+
+  if (staffOnly && !client?.viewer) {
+    return <Navigate to="/brand/dashboard" replace />;
+  }
+
+  if (client?.viewer && location.pathname.startsWith('/brand/dashboard')) {
+    return (
+      <Suspense fallback={<RouteSpinner />}>
+        <BrandStaffViewer client={client} />
+      </Suspense>
+    );
   }
 
   return React.cloneElement(children, { client });

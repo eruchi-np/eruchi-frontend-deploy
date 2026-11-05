@@ -54,15 +54,28 @@ const AdminBusinessManagement = lazy(() => import('./pages/admin/admin-business/
 const AdminFaqManagement = lazy(() => import('./pages/admin/AdminFaqManagement.jsx'));
 const AdminHealth = lazy(() => import('./pages/admin/admin-health/AdminHealth.jsx'));
 const AdminBrandTracker = lazy(() => import('./pages/admin/AdminBrandTracker.jsx'));
+const InsightsAdminLayout = lazy(() => import('./pages/admin/insights/InsightsAdminLayout.jsx'));
+const InsightsOverview = lazy(() => import('./pages/admin/insights/InsightsOverview.jsx'));
+const InsightsCompanies = lazy(() => import('./pages/admin/insights/InsightsCompanies.jsx'));
+const InsightsBrands = lazy(() => import('./pages/admin/insights/InsightsBrands.jsx'));
+const InsightsUsers = lazy(() => import('./pages/admin/insights/InsightsUsers.jsx'));
+const InsightsWeeks = lazy(() => import('./pages/admin/insights/InsightsWeeks.jsx'));
+const InsightsReads = lazy(() => import('./pages/admin/insights/InsightsReads.jsx'));
+const InsightsUsage = lazy(() => import('./pages/admin/insights/InsightsUsage.jsx'));
+const BrandInsightsLayout = lazy(() => import('./pages/brand/BrandInsightsLayout.jsx'));
 const BusinessScan = lazy(() => import('./pages/business/BusinessScan'));
 const BusinessDashboard = lazy(() => import('./pages/business/BusinessDashboard'));
 const BrandLogin = lazy(() => import('./pages/brand/BrandLogin'));
 const BrandSignup = lazy(() => import('./pages/brand/BrandSignup'));
 const BrandForgotPassword = lazy(() => import('./pages/brand/BrandForgotPassword'));
 const BrandResetPassword = lazy(() => import('./pages/brand/BrandResetPassword'));
+const BrandResetExpired = lazy(() => import('./pages/brand/BrandResetExpired'));
+const BrandActivate = lazy(() => import('./pages/brand/BrandActivate'));
+const BrandActivateInvalid = lazy(() => import('./pages/brand/BrandActivateInvalid'));
 const BrandAccount = lazy(() => import('./pages/brand/BrandAccount'));
 const BrandDashboard = lazy(() => import('./pages/brand/BrandDashboard'));
 const BrandProtectedRoute = lazy(() => import('./pages/brand/BrandProtectedRoute'));
+const BrandSessionGate = lazy(() => import('./pages/brand/BrandSessionGate'));
 const BusinessProfile = lazy(() => import('./pages/business/BusinessProfile'));
 const BusinessVouchers = lazy(() => import('./pages/business/BusinessVouchers'));
 const MerchantPublicProfile = lazy(() => import('./pages/public/MerchantPublicProfile'));
@@ -85,7 +98,9 @@ function AppChrome({ children }) {
   const isSurveyComplete = pathname === '/survey-complete';
   const isBusiness = pathname.startsWith('/business');
   const isBrand = pathname.startsWith('/brand');
-  const isAdminBrands = pathname === '/admin/brands' || pathname.startsWith('/admin/brands/');
+  const isAdminBrands = pathname === '/admin/brands'
+    || pathname.startsWith('/admin/brands/')
+    || pathname.startsWith('/admin/insights');
   const isProfileCompletion =
     pathname === '/complete-basic-info' ||
     pathname === '/complete-profile' ||
@@ -383,29 +398,66 @@ function App() {
                 </AdminRoute>
               }
             />
+            <Route
+              path="/admin/insights"
+              element={
+                <AdminRoute permission="analytics">
+                  <InsightsAdminLayout />
+                </AdminRoute>
+              }
+            >
+              <Route index element={<InsightsOverview />} />
+              <Route path="companies" element={<InsightsCompanies />} />
+              <Route path="brands" element={<InsightsBrands />} />
+              <Route path="users" element={<InsightsUsers />} />
+              <Route path="weeks" element={<InsightsWeeks />} />
+              <Route path="reads" element={<InsightsReads />} />
+              <Route path="usage" element={<InsightsUsage />} />
+            </Route>
 
             {/* ==================== BRAND CLIENT ROUTES ==================== */}
 
             <Route path="/brand/login" element={<BrandLogin />} />
             <Route path="/brand/signup" element={<BrandSignup />} />
             <Route path="/brand/forgot-password" element={<BrandForgotPassword />} />
+            <Route path="/brand/reset-password/expired" element={<BrandResetExpired />} />
             <Route path="/brand/reset-password/:resetToken" element={<BrandResetPassword />} />
-            <Route
-              path="/brand/account"
-              element={
-                <BrandProtectedRoute>
-                  <BrandAccount />
-                </BrandProtectedRoute>
-              }
-            />
-            <Route
-              path="/brand/dashboard"
-              element={
-                <BrandProtectedRoute>
-                  <BrandDashboard />
-                </BrandProtectedRoute>
-              }
-            />
+            <Route path="/brand/activate/invalid" element={<BrandActivateInvalid />} />
+            <Route path="/brand/activate" element={<BrandActivate />} />
+            <Route element={<BrandSessionGate />}>
+              <Route
+                path="/brand/account"
+                element={
+                  <BrandProtectedRoute>
+                    <BrandAccount />
+                  </BrandProtectedRoute>
+                }
+              />
+              <Route
+                path="/brand/dashboard"
+                element={
+                  <BrandProtectedRoute>
+                    <BrandDashboard />
+                  </BrandProtectedRoute>
+                }
+              />
+              <Route
+                path="/brand/insights"
+                element={
+                  <BrandProtectedRoute staffOnly>
+                    <BrandInsightsLayout />
+                  </BrandProtectedRoute>
+                }
+              >
+                <Route index element={<InsightsOverview />} />
+                <Route path="companies" element={<InsightsCompanies />} />
+                <Route path="brands" element={<InsightsBrands />} />
+                <Route path="users" element={<InsightsUsers />} />
+                <Route path="weeks" element={<InsightsWeeks />} />
+                <Route path="reads" element={<InsightsReads />} />
+                <Route path="usage" element={<InsightsUsage />} />
+              </Route>
+            </Route>
 
             {/* ==================== BUSINESS ROUTES ==================== */}
 

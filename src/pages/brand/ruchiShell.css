@@ -1,0 +1,285 @@
+/* Ruchi Insights dashboard shell — layout skeleton from HTML prototype */
+
+.ruchi-insights {
+  min-height: 100vh;
+  background: var(--page);
+  color: var(--ink);
+}
+
+.ri-shell {
+  display: block;
+  min-height: 100vh;
+  padding-left: 17.5rem;
+}
+
+.ri-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 0.95rem;
+  padding: 0.85rem 0.95rem 1.1rem;
+  background: var(--rail);
+  border-right: 1px solid var(--line);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  /* Hide scrollbar; content can still scroll if taller than the viewport */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.ri-rail::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Desktop: pin to the left for the whole page scroll */
+.ri-shell > .ri-rail {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: 17.5rem;
+  height: 100vh;
+  max-height: 100vh;
+  z-index: 40;
+}
+
+/* Admin tracker: sit below the admin chrome */
+.ruchi-insights--viewer .ri-shell > .ri-rail {
+  top: 5.5rem;
+  height: calc(100vh - 5.5rem);
+  max-height: calc(100vh - 5.5rem);
+}
+
+.ri-rail-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.ri-logo-img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: 1.55rem;
+  object-fit: contain;
+  object-position: left center;
+}
+
+.ri-rail-label {
+  font-size: 0.65rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.ri-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ri-nav button {
+  text-align: left;
+  border: 0;
+  background: transparent;
+  border-radius: var(--r-ctl);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.9rem;
+  font-weight: 550;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.ri-nav button:hover {
+  background: color-mix(in oklab, var(--primary) 18%, white);
+  color: var(--ink);
+}
+
+.ri-nav button:active {
+  background: color-mix(in oklab, var(--primary) 28%, white);
+  color: var(--ink);
+}
+
+.ri-nav button.is-active,
+.ri-nav button.is-active:hover,
+.ri-nav button.is-active:active,
+.ri-nav button.is-active:focus-visible {
+  background: var(--primary);
+  color: #fff;
+}
+
+.ri-nav button.is-active:hover {
+  filter: brightness(0.92);
+}
+
+.ri-nav button.is-active:active {
+  filter: brightness(0.86);
+}
+
+.ri-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--page);
+}
+
+.ri-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem 1rem;
+  padding: 0.85rem 1.25rem;
+  background: color-mix(in oklab, var(--surface) 92%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+
+.ri-topbar h1 {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.ri-topbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ri-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.ri-btn:hover {
+  background: color-mix(in oklab, var(--primary) 16%, white);
+  border-color: color-mix(in oklab, var(--primary) 45%, white);
+  color: var(--ink);
+}
+
+.ri-btn:active {
+  background: color-mix(in oklab, var(--primary) 26%, white);
+  color: var(--ink);
+}
+
+.ri-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ri-btn-primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.ri-btn-primary:hover,
+.ri-btn-primary:active,
+.ri-btn-primary:focus-visible {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  filter: brightness(0.9);
+}
+
+.ri-staff-topnav {
+  align-items: center;
+  gap: 0.35rem;
+  margin-right: 0.25rem;
+}
+
+.ri-staff-topnav .ri-btn.is-current {
+  background: color-mix(in oklab, var(--primary) 18%, white);
+  border-color: color-mix(in oklab, var(--primary) 45%, white);
+  color: var(--ink);
+}
+
+a.ri-btn {
+  text-decoration: none;
+}
+
+.ri-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.ri-toggle input {
+  accent-color: var(--primary);
+}
+
+.ri-panel {
+  padding: 1rem 1.25rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.ri-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-pop);
+  padding: 1rem 1.1rem;
+}
+
+.ri-warn {
+  background: var(--warn-bg);
+  color: var(--warn-ink);
+  border-radius: var(--r-card);
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+
+.ri-mobile-bar {
+  display: none;
+  position: sticky;
+  z-index: 50;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+@media (max-width: 1023px) {
+  .ri-shell {
+    padding-left: 0;
+  }
+
+  .ri-shell > .ri-rail {
+    display: none !important;
+  }
+
+  .ri-mobile-bar {
+    display: flex;
+  }
+
+  .ri-topbar {
+    display: none;
+  }
+}
