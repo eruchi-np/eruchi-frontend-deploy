@@ -92,7 +92,7 @@ export default function InsightsOverview() {
           </p>
           <ol className="mt-3 list-decimal space-y-1 pl-5">
             <li>Add brands and a company.</li>
-            <li>Create an activate invite for a portal user.</li>
+            <li>Allowlist a portal email, then they set a password.</li>
             <li>Publish weeks and write reads when you are ready.</li>
           </ol>
           <div className="ri-admin-actions mt-4">

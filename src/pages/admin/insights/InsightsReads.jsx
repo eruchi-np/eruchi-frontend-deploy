@@ -47,6 +47,11 @@ export default function InsightsReads() {
     return [...new Set([...(meta.brands.FB || []), ...(meta.brands.PC || [])])].sort();
   }, [meta, form.category]);
 
+  const chartOptions = useMemo(() => {
+    const byPage = meta?.chartsByPage?.[form.pageId];
+    return Array.isArray(byPage) ? byPage : [];
+  }, [meta, form.pageId]);
+
   const load = async (week, cat) => {
     try {
       const params = {};
@@ -84,12 +89,15 @@ export default function InsightsReads() {
   }, [weekKey, category]);
 
   const openCreate = () => {
+    const pageId = emptyForm.pageId;
+    const charts = meta?.chartsByPage?.[pageId] || [];
     setEditing({ id: null });
     setForm({
       ...emptyForm,
       weekKey: weekKey || waves.at(-1) || '',
       category,
-      chartId: meta?.charts?.[0]?.id || '',
+      pageId,
+      chartId: charts[0]?.id || '',
     });
   };
 
@@ -396,7 +404,17 @@ export default function InsightsReads() {
                   Page
                   <select
                     value={form.pageId}
-                    onChange={(event) => setForm((current) => ({ ...current, pageId: event.target.value }))}
+                    onChange={(event) => {
+                      const pageId = event.target.value;
+                      const charts = meta?.chartsByPage?.[pageId] || [];
+                      setForm((current) => ({
+                        ...current,
+                        pageId,
+                        chartId: charts.some((item) => item.id === current.chartId)
+                          ? current.chartId
+                          : (charts[0]?.id || ''),
+                      }));
+                    }}
                   >
                     {(meta?.pages || []).map((item) => (
                       <option key={item.id} value={item.id}>{item.label}</option>
@@ -412,7 +430,7 @@ export default function InsightsReads() {
                     value={form.chartId}
                     onChange={(event) => setForm((current) => ({ ...current, chartId: event.target.value }))}
                   >
-                    {(meta?.charts || []).map((item) => (
+                    {chartOptions.map((item) => (
                       <option key={item.id} value={item.id}>{item.label}</option>
                     ))}
                   </select>

@@ -252,7 +252,7 @@ export function Retention({ data }) {
           </table>
         </div>
       </Card>
-      <Card metricId="L4" title="Lifecycle" summary="How many people are onboarding, active, at risk, or dormant, and who changed since the earlier Sunday." note={`Change from ${data.L4.transition.from} to ${data.L4.transition.to}. ${data.L4.gaps?.[0] || ''}`}>
+      <Card metricId="L4" title="Lifecycle" summary="How many people are onboarding, active, at risk, or dormant each complete week, and who changed since the earlier Sunday." note={`Change from ${data.L4.transition.from} to ${data.L4.transition.to}. ${data.L4.gaps?.[0] || ''}`}>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
           {Object.entries(STATE_LABELS).map(([key, label]) => (
             <Mini key={key} label={label} value={int(data.L4.current.counts[key])} sub={STATE_DEFINITIONS[key]} tone={STATE_TONE[key]} />
@@ -264,6 +264,51 @@ export function Retention({ data }) {
           ))}
           <p className="text-sm text-gray-700">New since the earlier Sunday: {int(data.L4.transition.newUsers)}</p>
         </div>
+        {(data.L4.weeks || []).length ? (
+          <>
+            <MultiSeriesHybridChart
+              rows={(data.L4.weeks || []).map((row) => ({
+                week: row.week,
+                onboarding: row.counts?.onboarding ?? 0,
+                stalled: row.counts?.stalled ?? 0,
+                active: row.counts?.active ?? 0,
+                atRisk: row.counts?.atRisk ?? 0,
+                dormant: row.counts?.dormant ?? 0,
+              }))}
+              xKey="week"
+              yLabel="People"
+              lines={[
+                { key: 'onboarding', label: 'Onboarding', axis: 'left', color: '#0284C7' },
+                { key: 'stalled', label: 'Stalled', axis: 'left', color: '#D97706' },
+                { key: 'active', label: 'Active', axis: 'left', color: '#059669' },
+                { key: 'atRisk', label: 'At risk', axis: 'left', color: '#7C3AED' },
+                { key: 'dormant', label: 'Dormant', axis: 'left', color: '#DC2626' },
+              ]}
+            />
+            <div className="overflow-x-auto mt-4">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-xs text-gray-500">
+                    <th className="py-2 pr-3 font-medium">Week</th>
+                    {Object.entries(STATE_LABELS).map(([key, label]) => (
+                      <th key={key} className="py-2 pr-3 font-medium text-right">{label}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {latestFirst(data.L4.weeks || []).map((row) => (
+                    <tr key={row.week} className="border-t border-gray-100">
+                      <td className="py-2 pr-3 whitespace-nowrap">{row.week}</td>
+                      {Object.keys(STATE_LABELS).map((key) => (
+                        <td key={key} className="py-2 pr-3 text-right tabular-nums">{int(row.counts?.[key])}</td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : null}
       </Card>
       <ReturnVisits data={data} />
       <WhoLeft data={data} />

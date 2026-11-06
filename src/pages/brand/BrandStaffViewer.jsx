@@ -29,6 +29,7 @@ export default function BrandStaffViewer({ client }) {
   const [selected, setSelected] = useState(Array.isArray(prefs.selected) ? prefs.selected : []);
   const [error, setError] = useState('');
   const [status, setStatus] = useState(null);
+  const [booting, setBooting] = useState(true);
   const [reloadToken, setReloadToken] = useState(0);
 
   const categoriesFromStatus = (data) => {
@@ -79,7 +80,8 @@ export default function BrandStaffViewer({ client }) {
         setSelected(nextSelected.length ? nextSelected : (nextBrand ? [nextBrand] : []));
         setReloadToken((value) => value + 1);
       })
-      .catch(() => setError('Could not load metrics for staff viewer.'));
+      .catch(() => setError('Could not load metrics for staff viewer.'))
+      .finally(() => setBooting(false));
   }, []);
 
   useEffect(() => {
@@ -103,10 +105,22 @@ export default function BrandStaffViewer({ client }) {
     );
   }
 
-  if (!brands.length || !brand) {
+  if (booting) {
     return (
       <div className="ruchi-insights flex min-h-screen items-center justify-center">
         <Loader2 className="h-10 w-10 animate-spin text-[var(--ink-3)]" />
+      </div>
+    );
+  }
+
+  if (!brands.length || !brand) {
+    return (
+      <div className="ruchi-insights flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center">
+        <p className="text-lg font-semibold text-[var(--ink)]">No brands in live metrics yet</p>
+        <p className="max-w-md text-sm text-[var(--ink-2)]">
+          Import or publish metrics for {current?.label || 'this category'} first, then reopen the staff viewer.
+        </p>
+        <button type="button" className="ri-auth-btn" onClick={() => navigate('/brand/login')}>Back to sign in</button>
       </div>
     );
   }

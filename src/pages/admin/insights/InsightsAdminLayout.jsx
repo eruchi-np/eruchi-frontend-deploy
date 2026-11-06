@@ -53,7 +53,7 @@ function InsightsAdminChrome() {
       ) : null}
       <div className="ri-admin-shell">
         <aside className="ri-admin-rail">
-          <div>
+          <div className="ri-admin-rail-brand">
             <h1>Ruchi Insights</h1>
             <p>{staffPortal ? 'CMS' : 'Admin'}</p>
           </div>

@@ -128,6 +128,7 @@ export default function BrandDashboard({ client, viewer = null }) {
       ? (viewer?.selectedBrands?.length ? viewer.selectedBrands : [brand].filter(Boolean))
       : [brand, ...compares].filter(Boolean)
   ).map(canonicalBrand);
+  const needsBrandAssign = !viewer && !(client?.brand && client?.category);
   const needsBrandPick = mode === 'selected' && !rawPeerBrands.length;
   const focusBrand = rawPeerBrands[0] || brand;
   // All = every brand; Selected stays capped by the picker (max 5).
@@ -827,10 +828,22 @@ export default function BrandDashboard({ client, viewer = null }) {
                   </a>
                 </div>
               ) : null}
-              <label className="ri-toggle">
-                <input type="checkbox" checked={showInsights} onChange={toggleInsights} />
-                Insights
-              </label>
+              <div className="ri-segment" role="group" aria-label="Insights">
+                <button
+                  type="button"
+                  className={`ri-segment-btn ${showInsights ? 'is-on' : ''}`}
+                  onClick={() => { if (!showInsights) toggleInsights(); }}
+                >
+                  Insights
+                </button>
+                <button
+                  type="button"
+                  className={`ri-segment-btn ${!showInsights ? 'is-on' : ''}`}
+                  onClick={() => { if (showInsights) toggleInsights(); }}
+                >
+                  Hide
+                </button>
+              </div>
               <button
                 type="button"
                 onClick={openExport}
@@ -889,15 +902,24 @@ export default function BrandDashboard({ client, viewer = null }) {
           </p>
         ) : null}
 
-        {booting ? (
+        {needsBrandAssign ? (
+          <div className="rounded-3xl border border-dashed border-amber-200 bg-amber-50 px-6 py-16 text-center shadow-[0_12px_30px_rgba(37,99,235,0.08)]">
+            <p className="text-lg font-semibold text-gray-900">Brand not assigned yet</p>
+            <p className="mt-2 text-sm text-gray-600">
+              Your account is ready. An Insights admin will attach a brand and category, then your dashboard will open here. This page checks for that assignment automatically.
+            </p>
+          </div>
+        ) : null}
+
+        {!needsBrandAssign && booting ? (
           <p className="rounded-2xl border border-slate-100 bg-white px-4 py-6 text-sm text-gray-500 shadow-[0_12px_30px_rgba(37,99,235,0.08)]">
             Loading your dashboard...
           </p>
         ) : null}
 
-        {!booting && !needsBrandPick ? <BrandKpiRow ref={kpiRef} kpi={kpi} /> : null}
+        {!needsBrandAssign && !booting && !needsBrandPick ? <BrandKpiRow ref={kpiRef} kpi={kpi} /> : null}
 
-        {needsBrandPick ? (
+        {!needsBrandAssign && needsBrandPick ? (
           <div className="rounded-3xl border border-dashed border-blue-200 bg-white px-6 py-16 text-center shadow-[0_12px_30px_rgba(37,99,235,0.08)]">
             <p className="text-lg font-semibold text-gray-900">Select a brand</p>
             <p className="mt-2 text-sm text-gray-500">
@@ -906,7 +928,7 @@ export default function BrandDashboard({ client, viewer = null }) {
           </div>
         ) : null}
 
-        {!needsBrandPick && showSection('awareness') && <div className="space-y-3" data-export-section="Awareness">
+        {!needsBrandAssign && !needsBrandPick && showSection('awareness') && <div className="space-y-3" data-export-section="Awareness">
           <h2 className="text-xl font-semibold">Awareness</h2>
           <p className="text-sm text-gray-500">
             Top of mind is first mention. Unprompted is named without a list (not first). Prompted is when shown the list.
@@ -972,7 +994,7 @@ export default function BrandDashboard({ client, viewer = null }) {
           </ChartCard>
         </div>}
 
-        {!needsBrandPick && showSection('purchase') && <div className="space-y-3" data-export-section="Purchase">
+        {!needsBrandAssign && !needsBrandPick && showSection('purchase') && <div className="space-y-3" data-export-section="Purchase">
           <h2 className="text-xl font-semibold">Purchase</h2>
           <div className={chartGrid}>
             <ChartCard
@@ -1052,7 +1074,14 @@ export default function BrandDashboard({ client, viewer = null }) {
             >
               <SeriesChart kind="area" data={lineBundle('share_of_wallet').data} metric="share_of_wallet" series={lineBundle('share_of_wallet').series} onBrandClick={drillBrand} />
             </ChartCard>
-            <ChartCard title="Share of wallet, by buyer type" note="Awaiting buyer-type breakdown." exportKey="Share of wallet, by buyer type" wide={stackCharts} allowTable={false}>
+            <ChartCard
+              title="Share of wallet, by buyer type"
+              note="Awaiting buyer-type breakdown."
+              exportKey="Share of wallet, by buyer type"
+              insight={chartInsight('Share of wallet, by buyer type')}
+              wide={stackCharts}
+              allowTable={false}
+            >
               <p className="py-10 text-center text-sm text-amber-800">Data currently being gathered.</p>
             </ChartCard>
           </div>
@@ -1065,7 +1094,14 @@ export default function BrandDashboard({ client, viewer = null }) {
                   : `Other brands ${focusBrand} buyers also bought. The pair is not the same in reverse.`}
               </p>
               <div className={chartGrid}>
-                <ChartCard title={`Share of ${focusBrand} buyers`} note={wave ? weekLabel(wave) : ''} exportKey="Also bought share" fit wide={stackCharts}>
+                <ChartCard
+                  title={`Share of ${focusBrand} buyers`}
+                  note={wave ? weekLabel(wave) : ''}
+                  exportKey="Also bought share"
+                  insight={chartInsight('Also bought share')}
+                  fit
+                  wide={stackCharts}
+                >
                   <BrandBars
                     data={ranked(rows, 'cross_purchase_affinity', focusBrand, wave).filter((row) => (
                       allowedBrands.includes(row.name)
@@ -1075,7 +1111,14 @@ export default function BrandDashboard({ client, viewer = null }) {
                     onBrandClick={drillBrand}
                   />
                 </ChartCard>
-                <ChartCard title="Lift" note="1 means no extra link between the brands." exportKey="Also bought lift" fit wide={stackCharts}>
+                <ChartCard
+                  title="Lift"
+                  note="1 means no extra link between the brands."
+                  exportKey="Also bought lift"
+                  insight={chartInsight('Also bought lift')}
+                  fit
+                  wide={stackCharts}
+                >
                   <BrandBars
                     data={ranked(rows, 'cross_purchase_lift', focusBrand, wave).filter((row) => (
                       allowedBrands.includes(row.name)
@@ -1094,7 +1137,7 @@ export default function BrandDashboard({ client, viewer = null }) {
           )}
         </div>}
 
-        {!needsBrandPick && showSection('usage') && <div className="space-y-3" data-export-section="Usage">
+        {!needsBrandAssign && !needsBrandPick && showSection('usage') && <div className="space-y-3" data-export-section="Usage">
           <h2 className="text-xl font-semibold">Usage</h2>
           <p className="text-sm text-gray-500">Occasions and sensory scores for this week.</p>
           <p className="text-sm text-gray-500">Brand × occasion matrix. People can pick more than one, so shares can add past 100%.</p>
@@ -1134,7 +1177,7 @@ export default function BrandDashboard({ client, viewer = null }) {
           )}
         </div>}
 
-        {!needsBrandPick && showSection('switching') && <div className="space-y-3" data-export-section="Switching">
+        {!needsBrandAssign && !needsBrandPick && showSection('switching') && <div className="space-y-3" data-export-section="Switching">
           <h2 className="text-xl font-semibold">Switching</h2>
           <p className="text-sm text-gray-500">Flow and net gains use the same panelists across waves. Reasons are from switchers this week.</p>
           <ChartCard
@@ -1256,7 +1299,7 @@ export default function BrandDashboard({ client, viewer = null }) {
           <ChartCard
             title="NPS over the weeks"
             note={[fromWave ? weekLabel(fromWave) : null, toWave ? weekLabel(toWave) : null].filter(Boolean).join(' → ')}
-            howToRead="Net Promoter Score by week. A gap means that week is missing or too small to show — it is not zero. Click a brand in the legend to open it alone."
+            howToRead="Net Promoter Score by week. A gap means that week is missing or too small to show — it is not zero. Click a brand in the legend to show only that series; click again for all. Click the line to open that brand alone (admin)."
             exportKey="NPS over the weeks"
             insight={chartInsight('NPS over the weeks')}
             wide
@@ -1272,12 +1315,12 @@ export default function BrandDashboard({ client, viewer = null }) {
           </ChartCard>
         </div>}
 
-        {!booting && !pageReady && !exportAll ? (
+        {!needsBrandAssign && !booting && !pageReady && !exportAll ? (
           <p className="rounded-2xl border border-slate-100 bg-white px-4 py-6 text-sm text-gray-500 shadow-[0_12px_30px_rgba(37,99,235,0.08)]">
             Loading this section...
           </p>
         ) : null}
-        {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+        {!needsBrandAssign && error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
         {!exportAll ? (
           <section className="rounded-3xl bg-white p-6 text-sm text-gray-600 shadow-[0_12px_30px_rgba(37,99,235,0.08)]">

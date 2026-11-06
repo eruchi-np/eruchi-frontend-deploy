@@ -55,6 +55,27 @@ export function colorForBrand(index) {
   return BRAND_COLORS[index % BRAND_COLORS.length];
 }
 
+/** Client-side fallback when API brandColors is empty (mirrors backend catalog). */
+export const NAMED_BRAND_COLORS = {
+  'Red Bull': '#DB0A40',
+  'X-treme': '#6B2D8B',
+  'Max Tiger': '#F5A623',
+  Monster: '#8BC53F',
+  Sting: '#F5C518', // secondary — primary red clashes with Red Bull
+  Dove: '#003591',
+  Pantene: '#C9A227',
+  Himalaya: '#006B3F',
+  "L'Oréal": '#1A1A1A',
+  "Pond's": '#E8A0BF',
+  Nivea: '#001489',
+  Garnier: '#009639',
+  Sunsilk: '#7B2D8E',
+  'Clinic Plus': '#E31837',
+  Mamaearth: '#7CB342',
+  Biotique: '#2E7D32',
+  Parachute: '#1565C0',
+};
+
 /** Read a live CSS var when available (browser); else fall back to TOKEN_HEX. */
 export function cssToken(name, fallbackKey = null) {
   if (typeof window === 'undefined' || !window.getComputedStyle) {

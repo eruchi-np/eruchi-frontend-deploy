@@ -55,27 +55,17 @@ export default function BrandLogin() {
 
   return (
     <BrandAuthLayout
+      brandOnForm
       title="Sign in"
-      copy="Brand clients and eRuchi analytics admins can sign in here."
+      copy="Brand clients use email and password. Google is for eRuchi admins only."
       sideTitle="Your category, every week"
-      sideCopy="Clients see their brand. Admins get a read-only metrics and insights viewer."
+      sideCopy="See your brand against peers — awareness, purchase, usage, and switching."
       footer={(
         <>
-          New here? Open the invite link your company shared to activate.
-          {' '}
-          <span className="text-[var(--ink-3)]">Self-serve signup may still be open — </span>
-          <Link to="/brand/signup">create an account</Link>.
+          Need to set a password? <Link to="/brand/signup">Create an account</Link>
         </>
       )}
     >
-      <div className="mb-4">
-        <BrandGoogleButton onCredential={onGoogle} disabled={busy} />
-      </div>
-      <div className="ri-auth-or mb-4 flex items-center gap-3 text-xs font-semibold uppercase tracking-wide text-[var(--ink-3)]">
-        <span className="h-px flex-1 bg-[var(--line)]" />
-        or email
-        <span className="h-px flex-1 bg-[var(--line)]" />
-      </div>
       <form className="onboard-form" onSubmit={onSubmit}>
         <div className="onboard-field">
           <label htmlFor="brand-email">Email</label>
@@ -109,9 +99,9 @@ export default function BrandLogin() {
               {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
             </button>
           </div>
-          <p className="mt-1 text-sm">
-            <Link to="/brand/forgot-password" className="ri-auth-link">Forgot password?</Link>
-          </p>
+          <Link to="/brand/forgot-password" className="ri-auth-link ri-auth-forgot">
+            Forgot password?
+          </Link>
         </div>
         {error ? <p className="onboard-error" role="alert">{error}</p> : null}
         <div className="onboard-actions">
@@ -120,6 +110,12 @@ export default function BrandLogin() {
           </button>
         </div>
       </form>
+
+      <div className="ri-auth-or" role="separator">
+        <span>or</span>
+      </div>
+
+      <BrandGoogleButton onCredential={onGoogle} disabled={busy} />
     </BrandAuthLayout>
   );
 }

@@ -33,19 +33,28 @@
   gap: 1rem;
 }
 
-.ri-admin-rail h1 {
+.ri-admin-rail-brand {
+  color: var(--ri-admin-ink);
+}
+
+.ri-admin-rail h1,
+.ri-admin-rail-brand h1 {
   margin: 0;
   font-size: 0.95rem;
   font-weight: 700;
+  color: var(--ri-admin-ink);
+  line-height: 1.25;
 }
 
-.ri-admin-rail p {
+.ri-admin-rail p,
+.ri-admin-rail-brand p {
   margin: 0.2rem 0 0;
   font-size: 0.7rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--ri-admin-muted);
 }
+
 
 .ri-admin-nav {
   display: flex;
@@ -124,6 +133,7 @@
   margin: 0;
   font-size: 1.25rem;
   font-weight: 700;
+  color: var(--ri-admin-ink);
 }
 
 .ri-admin-actions {

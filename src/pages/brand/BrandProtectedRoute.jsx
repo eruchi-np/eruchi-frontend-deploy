@@ -17,8 +17,11 @@ function RouteSpinner() {
 }
 
 export default function BrandProtectedRoute({ children, staffOnly = false }) {
-  const { status, client } = useBrandSession();
+  const { status, client, refresh } = useBrandSession();
   const location = useLocation();
+  const waitingForBrand = Boolean(
+    client && !client.viewer && !(client.brand && client.category),
+  );
 
   useEffect(() => {
     if (status !== 'authed' || !client) return;
@@ -27,6 +30,23 @@ export default function BrandProtectedRoute({ children, staffOnly = false }) {
       viewer: Boolean(client?.viewer),
     });
   }, [status, client, location.pathname]);
+
+  // After an admin assigns a brand, pick it up without a full reload.
+  useEffect(() => {
+    if (!waitingForBrand) return undefined;
+    const pull = () => { refresh().catch(() => {}); };
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') pull();
+    };
+    const timer = window.setInterval(pull, 5000);
+    window.addEventListener('focus', pull);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', pull);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [waitingForBrand, refresh]);
 
   if (status === 'loading') {
     return <RouteSpinner />;
@@ -48,5 +68,11 @@ export default function BrandProtectedRoute({ children, staffOnly = false }) {
     );
   }
 
-  return React.cloneElement(children, { client });
+  // Remount dashboard when brand is assigned so metrics reload cleanly.
+  const shellKey = `${client?.id || ''}:${client?.brand || 'unassigned'}:${client?.category || ''}`;
+  return (
+    <React.Fragment key={shellKey}>
+      {React.cloneElement(children, { client })}
+    </React.Fragment>
+  );
 }

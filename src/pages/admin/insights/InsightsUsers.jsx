@@ -10,6 +10,8 @@ export default function InsightsUsers() {
   const [brands, setBrands] = useState([]);
   const [busy, setBusy] = useState(false);
   const [linkModal, setLinkModal] = useState(null);
+  const [editUser, setEditUser] = useState(null);
+  const [editForm, setEditForm] = useState({ brand: '', category: 'FB' });
   const [form, setForm] = useState({
     companyId: '',
     email: '',
@@ -18,10 +20,25 @@ export default function InsightsUsers() {
     sendEmail: true,
   });
 
-  const companyBrands = useMemo(
-    () => brands.filter((item) => !form.category || item.category === form.category),
-    [brands, form.category],
-  );
+  /** Prefer brands linked to the company; otherwise unlinked catalog brands (not another company's). */
+  const companyBrands = useMemo(() => {
+    const byCat = brands.filter((item) => !form.category || item.category === form.category);
+    const linked = form.companyId
+      ? byCat.filter((item) => item.companyId === form.companyId)
+      : [];
+    if (linked.length) return linked;
+    return byCat.filter((item) => !item.companyId);
+  }, [brands, form.companyId, form.category]);
+
+  const editBrands = useMemo(() => {
+    const companyId = editUser?.companyId || '';
+    const byCat = brands.filter((item) => !editForm.category || item.category === editForm.category);
+    const linked = companyId
+      ? byCat.filter((item) => item.companyId === companyId)
+      : [];
+    if (linked.length) return linked;
+    return byCat.filter((item) => !item.companyId);
+  }, [brands, editUser?.companyId, editForm.category]);
 
   const load = async () => {
     try {
@@ -42,7 +59,7 @@ export default function InsightsUsers() {
 
   useEffect(() => { load(); }, []);
 
-  const openInvite = () => {
+  const openAllowlist = () => {
     setForm({
       companyId: companies[0]?.id || '',
       email: '',
@@ -53,34 +70,38 @@ export default function InsightsUsers() {
     setLinkModal({ kind: 'create' });
   };
 
-  const createInvite = async (event) => {
+  const createAllowedUser = async (event) => {
     event.preventDefault();
-    if (!form.companyId) {
-      toast.error('Choose a company');
+    if (!form.email.trim()) {
+      toast.error('Enter an email');
       return;
     }
     setBusy(true);
     try {
-      const { data } = await adminAPI.createActivateInvite({
-        companyId: form.companyId,
-        email: form.email.trim() || undefined,
+      const { data } = await adminAPI.createInsightUser({
+        email: form.email.trim(),
+        companyId: form.companyId || undefined,
         brand: form.brand || undefined,
         category: form.brand ? form.category : undefined,
-        sendEmail: Boolean(form.sendEmail && form.email.trim()),
+        sendEmail: Boolean(form.sendEmail),
       }, { skipErrorToast: true });
-      setLinkModal({ kind: 'result', url: data.url, label: 'Activate link' });
+      setLinkModal(null);
       await load();
-      if (data.emailed) toast.success('Invite created and emailed');
-      else if (data.emailError) toast.success('Invite created (email failed — copy the link)');
-      else toast.success('Invite created');
+      if (data.emailed) toast.success('Email allowlisted and notified');
+      else if (data.emailError) toast.success('Email allowlisted (notify email failed)');
+      else toast.success('Email allowlisted — they can set a password on Create account');
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Could not create invite');
+      toast.error(err.response?.data?.message || 'Could not allowlist email');
     } finally {
       setBusy(false);
     }
   };
 
   const createReset = async (user) => {
+    if (!user.passwordSet) {
+      toast.error('They have not set a password yet — share Create account instead');
+      return;
+    }
     setBusy(true);
     try {
       const { data } = await adminAPI.createResetInvite({
@@ -118,6 +139,33 @@ export default function InsightsUsers() {
     }
   };
 
+  const openEditBrand = (user) => {
+    setEditUser(user);
+    setEditForm({
+      brand: user.brand || '',
+      category: user.category === 'PC' ? 'PC' : 'FB',
+    });
+  };
+
+  const saveUserBrand = async (event) => {
+    event.preventDefault();
+    if (!editUser) return;
+    setBusy(true);
+    try {
+      await adminAPI.updateInsightUser(editUser.id, {
+        brand: editForm.brand || '',
+        category: editForm.brand ? editForm.category : null,
+      }, { skipErrorToast: true });
+      toast.success(editForm.brand ? 'Brand assigned' : 'Brand cleared');
+      setEditUser(null);
+      await load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not update brand');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const copy = async (url) => {
     try {
       await navigator.clipboard.writeText(url);
@@ -132,8 +180,8 @@ export default function InsightsUsers() {
       <div className="ri-admin-toolbar">
         <h2>Users / invites</h2>
         <div className="ri-admin-actions">
-          <button type="button" className="ri-admin-btn ri-admin-btn-primary" onClick={openInvite}>
-            New activate invite
+          <button type="button" className="ri-admin-btn ri-admin-btn-primary" onClick={openAllowlist}>
+            Add allowed email
           </button>
         </div>
       </div>
@@ -159,17 +207,20 @@ export default function InsightsUsers() {
                   {user.title ? <div className="text-xs text-gray-400">{user.title}</div> : null}
                 </td>
                 <td>
-                  <div>{user.brand}</div>
-                  <div className="text-xs text-gray-500">{user.categoryLabel}</div>
+                  <div>{user.brand || 'Unassigned'}</div>
+                  <div className="text-xs text-gray-500">{user.categoryLabel || '—'}</div>
                 </td>
                 <td>{user.companyName || '—'}</td>
                 <td>
                   <span className={`ri-admin-pill ${user.active ? 'ri-admin-pill-on' : 'ri-admin-pill-off'}`}>
-                    {user.active ? 'Active' : 'Deactivated'}
+                    {!user.active ? 'Deactivated' : (user.passwordSet ? 'Active' : 'Pending password')}
                   </span>
                 </td>
                 <td>
                   <div className="ri-admin-actions justify-end">
+                    <button type="button" className="ri-admin-btn" onClick={() => openEditBrand(user)}>
+                      Set brand
+                    </button>
                     <button type="button" className="ri-admin-btn" disabled={busy} onClick={() => createReset(user)}>
                       Reset link
                     </button>
@@ -190,7 +241,7 @@ export default function InsightsUsers() {
       </div>
 
       <div className="ri-admin-card overflow-x-auto">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900">Invites</h3>
+        <h3 className="mb-3 text-sm font-semibold text-gray-900">Reset invites</h3>
         <table className="ri-admin-table">
           <thead>
             <tr>
@@ -203,12 +254,12 @@ export default function InsightsUsers() {
             </tr>
           </thead>
           <tbody>
-            {invites.map((invite) => (
+            {invites.filter((invite) => invite.type === 'reset').map((invite) => (
               <tr key={invite.id}>
                 <td className="capitalize">{invite.type}</td>
                 <td>
                   <div>{invite.companyName || '—'}</div>
-                  <div className="text-xs text-gray-500">{invite.email || 'Any approved email'}</div>
+                  <div className="text-xs text-gray-500">{invite.email || '—'}</div>
                 </td>
                 <td>{invite.brand || '—'}</td>
                 <td>
@@ -220,7 +271,7 @@ export default function InsightsUsers() {
                   {invite.expiresAt ? new Date(invite.expiresAt).toLocaleString() : '—'}
                 </td>
                 <td>
-                  {invite.status === 'active' && invite.type === 'activate' ? (
+                  {invite.status === 'active' ? (
                     <button type="button" className="ri-admin-btn ri-admin-btn-danger" onClick={() => revoke(invite)}>
                       Revoke
                     </button>
@@ -228,9 +279,9 @@ export default function InsightsUsers() {
                 </td>
               </tr>
             ))}
-            {!invites.length ? (
+            {!invites.filter((invite) => invite.type === 'reset').length ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-sm text-gray-500">No invites yet.</td>
+                <td colSpan={6} className="py-8 text-center text-sm text-gray-500">No reset invites yet.</td>
               </tr>
             ) : null}
           </tbody>
@@ -241,31 +292,34 @@ export default function InsightsUsers() {
         <div className="ri-admin-modal">
           <div className="ri-admin-modal-card">
             <div className="ri-admin-toolbar">
-              <h2>New activate invite</h2>
+              <h2>Add allowed email</h2>
               <button type="button" className="ri-admin-btn" onClick={() => setLinkModal(null)}>Close</button>
             </div>
-            <form className="ri-admin-form" onSubmit={createInvite}>
+            <p className="mb-3 text-sm text-gray-600">
+              They open Create account, enter this email, and set a password.
+            </p>
+            <form className="ri-admin-form" onSubmit={createAllowedUser}>
               <label>
-                Company
-                <select
-                  value={form.companyId}
-                  onChange={(e) => setForm((f) => ({ ...f, companyId: e.target.value }))}
-                  required
-                >
-                  <option value="">Select…</option>
-                  {companies.map((company) => (
-                    <option key={company.id} value={company.id}>{company.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Lock to email (optional)
+                Email
                 <input
                   type="email"
                   value={form.email}
                   onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
                   placeholder="name@company.com"
+                  required
                 />
+              </label>
+              <label>
+                Company (optional)
+                <select
+                  value={form.companyId}
+                  onChange={(e) => setForm((f) => ({ ...f, companyId: e.target.value, brand: '' }))}
+                >
+                  <option value="">None yet</option>
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>{company.name}</option>
+                  ))}
+                </select>
               </label>
               <label>
                 Category
@@ -277,7 +331,7 @@ export default function InsightsUsers() {
               <label>
                 Primary brand (optional)
                 <select value={form.brand} onChange={(e) => setForm((f) => ({ ...f, brand: e.target.value }))}>
-                  <option value="">Choose at activation</option>
+                  <option value="">Assign later</option>
                   {companyBrands.map((brand) => (
                     <option key={`${brand.category}-${brand.name}`} value={brand.name}>{brand.name}</option>
                   ))}
@@ -287,15 +341,14 @@ export default function InsightsUsers() {
                 <input
                   type="checkbox"
                   checked={Boolean(form.sendEmail)}
-                  disabled={!form.email.trim()}
                   onChange={(e) => setForm((f) => ({ ...f, sendEmail: e.target.checked }))}
                 />
-                <span>Email the activate link (needs lock-to email)</span>
+                <span>Email them the Create account link</span>
               </label>
               <div className="ri-admin-actions justify-end">
                 <button type="button" className="ri-admin-btn" onClick={() => setLinkModal(null)}>Cancel</button>
                 <button type="submit" className="ri-admin-btn ri-admin-btn-primary" disabled={busy}>
-                  {busy ? 'Creating…' : 'Create invite'}
+                  {busy ? 'Saving…' : 'Allowlist email'}
                 </button>
               </div>
             </form>
@@ -317,6 +370,48 @@ export default function InsightsUsers() {
                 Copy link
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {editUser ? (
+        <div className="ri-admin-modal">
+          <div className="ri-admin-modal-card">
+            <div className="ri-admin-toolbar">
+              <h2>Set brand</h2>
+              <button type="button" className="ri-admin-btn" onClick={() => setEditUser(null)}>Close</button>
+            </div>
+            <p className="mb-3 text-sm text-gray-600">{editUser.email}</p>
+            <form className="ri-admin-form" onSubmit={saveUserBrand}>
+              <label>
+                Category
+                <select
+                  value={editForm.category}
+                  onChange={(e) => setEditForm((f) => ({ ...f, category: e.target.value, brand: '' }))}
+                >
+                  <option value="FB">Functional Beverages</option>
+                  <option value="PC">Personal Care</option>
+                </select>
+              </label>
+              <label>
+                Brand
+                <select
+                  value={editForm.brand}
+                  onChange={(e) => setEditForm((f) => ({ ...f, brand: e.target.value }))}
+                >
+                  <option value="">Unassigned</option>
+                  {editBrands.map((brand) => (
+                    <option key={`${brand.category}-${brand.name}`} value={brand.name}>{brand.name}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="ri-admin-actions justify-end">
+                <button type="button" className="ri-admin-btn" onClick={() => setEditUser(null)}>Cancel</button>
+                <button type="submit" className="ri-admin-btn ri-admin-btn-primary" disabled={busy}>
+                  {busy ? 'Saving…' : 'Save'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       ) : null}

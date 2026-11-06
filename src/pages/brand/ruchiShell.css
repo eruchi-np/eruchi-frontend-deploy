@@ -231,6 +231,30 @@ a.ri-btn {
   accent-color: var(--primary);
 }
 
+.ri-segment {
+  display: inline-flex;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  padding: 0.15rem;
+  background: #fff;
+}
+
+.ri-segment-btn {
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 650;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+.ri-segment-btn.is-on {
+  background: var(--primary);
+  color: #fff;
+}
+
 .ri-panel {
   padding: 1rem 1.25rem 2.5rem;
   display: flex;

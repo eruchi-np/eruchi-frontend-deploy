@@ -6,6 +6,7 @@ import { GROUPS, KPI_METRICS } from './brandDashboardMetrics';
 export default function useBrandMetrics(viewer) {
   const cacheRef = useRef({});
   const inflight = useRef(new Map());
+  const failedRef = useRef(new Set());
   const [rows, setRows] = useState([]);
   const [meta, setMeta] = useState(null);
   const [booting, setBooting] = useState(true);
@@ -15,14 +16,37 @@ export default function useBrandMetrics(viewer) {
   const [wave, setWave] = useState('');
   const [error, setError] = useState('');
 
+  const markLoaded = (metrics) => {
+    setLoaded((current) => {
+      const next = { ...current };
+      metrics.forEach((metric) => { next[metric] = true; });
+      return next;
+    });
+  };
+
+  const clearFailed = (metrics) => {
+    const list = [...new Set(metrics)];
+    if (!list.some((metric) => failedRef.current.has(metric))) return;
+    list.forEach((metric) => {
+      if (!failedRef.current.has(metric)) return;
+      failedRef.current.delete(metric);
+      delete cacheRef.current[metric];
+    });
+    setLoaded((current) => {
+      const next = { ...current };
+      list.forEach((metric) => { delete next[metric]; });
+      return next;
+    });
+  };
+
   const ensure = (metrics) => {
     const unique = [...new Set(metrics)];
-    const needed = unique.filter((metric) => !cacheRef.current[metric]);
-    if (!needed.length) return Promise.resolve();
-
-    const pending = needed.filter((metric) => inflight.current.has(metric));
-    const toFetch = needed.filter((metric) => !inflight.current.has(metric));
+    const toConsider = unique.filter((metric) => !Object.prototype.hasOwnProperty.call(cacheRef.current, metric));
+    const pending = toConsider.filter((metric) => inflight.current.has(metric));
+    const toFetch = toConsider.filter((metric) => !inflight.current.has(metric));
     const waits = pending.map((metric) => inflight.current.get(metric));
+
+    if (!toFetch.length && !waits.length) return Promise.resolve();
 
     if (toFetch.length) {
       const request = (viewer
@@ -30,6 +54,8 @@ export default function useBrandMetrics(viewer) {
         : brandAPI.metrics(toFetch.join(','), { skipAuthRedirect: false })
       )
         .then(({ data }) => {
+          setError('');
+          toFetch.forEach((metric) => failedRef.current.delete(metric));
           const grouped = {};
           (data.rows || []).forEach((row) => {
             if (!grouped[row.metric]) grouped[row.metric] = [];
@@ -39,11 +65,7 @@ export default function useBrandMetrics(viewer) {
             if (!grouped[metric]) grouped[metric] = [];
           });
           cacheRef.current = { ...cacheRef.current, ...grouped };
-          setLoaded((current) => {
-            const next = { ...current };
-            toFetch.forEach((metric) => { next[metric] = true; });
-            return next;
-          });
+          markLoaded(toFetch);
           setRows(Object.values(cacheRef.current).flat());
           setMeta((current) => {
             const waves = (data.waves?.length ? data.waves : current?.waves) || [];
@@ -75,7 +97,20 @@ export default function useBrandMetrics(viewer) {
             return waveList.at(-1) || '';
           });
         })
-        .catch(() => setError('Could not load this section.'))
+        .catch((err) => {
+          // Mark attempted so the section leaves the endless loading state.
+          // Soft retry: clearFailed() on page revisit will refetch these.
+          toFetch.forEach((metric) => {
+            failedRef.current.add(metric);
+            if (!Object.prototype.hasOwnProperty.call(cacheRef.current, metric)) {
+              cacheRef.current[metric] = [];
+            }
+          });
+          markLoaded(toFetch);
+          setRows(Object.values(cacheRef.current).flat());
+          const message = err?.response?.data?.message || 'Could not load this section.';
+          setError(message);
+        })
         .finally(() => {
           toFetch.forEach((metric) => inflight.current.delete(metric));
         });
@@ -92,6 +127,7 @@ export default function useBrandMetrics(viewer) {
 
   useEffect(() => {
     ensure([...new Set([...KPI_METRICS, ...GROUPS[0].metrics])]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const ensureChunked = async (metrics) => {
@@ -102,17 +138,22 @@ export default function useBrandMetrics(viewer) {
   };
 
   useEffect(() => {
+    clearFailed(GROUPS[page].metrics);
+    setError('');
     ensureChunked(GROUPS[page].metrics);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page]);
 
+  // Prefetch next section once per page change (do not key on rows — that re-fired endlessly).
   useEffect(() => {
     const next = GROUPS[page + 1];
     if (!next) return undefined;
     const timer = window.setTimeout(() => {
       ensureChunked(next.metrics);
-    }, 400);
+    }, 800);
     return () => window.clearTimeout(timer);
-  }, [page, rows]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
 
   const group = GROUPS[page];
   const pageReady = group.metrics.every((metric) => loaded[metric]);

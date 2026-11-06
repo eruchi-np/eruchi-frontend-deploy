@@ -33,10 +33,30 @@ export default function BrandGoogleButton({ onCredential, disabled = false, labe
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const callbackRef = useRef(onCredential);
+  const clientIdRef = useRef('');
   callbackRef.current = onCredential;
 
   useEffect(() => {
     let cancelled = false;
+    let observer;
+
+    const paint = () => {
+      const host = hostRef.current;
+      if (cancelled || !host || !window.google?.accounts?.id || !clientIdRef.current) return;
+      const width = Math.max(200, Math.floor(host.getBoundingClientRect().width || host.offsetWidth || 320));
+      host.innerHTML = '';
+      window.google.accounts.id.renderButton(host, {
+        type: 'standard',
+        theme: 'outline',
+        size: 'large',
+        text: 'continue_with',
+        shape: 'pill',
+        locale: 'en',
+        width,
+      });
+      if (!cancelled) setReady(true);
+    };
+
     (async () => {
       try {
         const { data } = await axios.get(`${API_BASE_URL}/auth/google-config`, { withCredentials: true });
@@ -45,6 +65,7 @@ export default function BrandGoogleButton({ onCredential, disabled = false, labe
           if (!cancelled) setError('Google sign-in is not configured');
           return;
         }
+        clientIdRef.current = clientId;
         await loadGis();
         if (cancelled || !hostRef.current || !window.google?.accounts?.id) return;
         window.google.accounts.id.initialize({
@@ -56,26 +77,30 @@ export default function BrandGoogleButton({ onCredential, disabled = false, labe
           auto_select: false,
           cancel_on_tap_outside: true,
         });
-        hostRef.current.innerHTML = '';
-        window.google.accounts.id.renderButton(hostRef.current, {
-          type: 'standard',
-          theme: 'outline',
-          size: 'large',
-          text: 'continue_with',
-          shape: 'pill',
-          locale: 'en',
-          width: hostRef.current.offsetWidth || 320,
-        });
-        if (!cancelled) setReady(true);
+        paint();
+        if (typeof ResizeObserver !== 'undefined' && hostRef.current) {
+          let last = 0;
+          observer = new ResizeObserver(() => {
+            const next = Math.floor(hostRef.current?.getBoundingClientRect().width || 0);
+            if (Math.abs(next - last) < 4) return;
+            last = next;
+            paint();
+          });
+          observer.observe(hostRef.current);
+        }
       } catch {
         if (!cancelled) setError('Could not load Google sign-in');
       }
     })();
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+      observer?.disconnect();
+    };
   }, []);
 
   return (
-    <div className="w-full">
+    <div className="ri-auth-google-wrap">
       {error ? (
         <p className="text-sm text-[var(--ink-3)]">{error}</p>
       ) : (

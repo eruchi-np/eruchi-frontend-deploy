@@ -80,7 +80,8 @@ const Signup = () => {
     mode: "onBlur",
     reValidateMode: "onBlur",
     defaultValues: {
-      promotionalEmails: false,
+      termsAccepted: true,
+      promotionalEmails: true,
     },
   });
 
@@ -239,7 +240,7 @@ const Signup = () => {
             <div className="onboard-terms-row">
               <input type="checkbox" id="promotionalEmails" {...register("promotionalEmails")} />
               <label htmlFor="promotionalEmails">
-                I would like to receive promotional emails from eRuchi
+                I would like to receive promotional messages from eRuchi
               </label>
             </div>
           </div>

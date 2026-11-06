@@ -20,6 +20,7 @@ export default function AdminBrandTracker() {
   const [selected, setSelected] = useState(Array.isArray(prefs.selected) ? prefs.selected : []);
   const [error, setError] = useState('');
   const [status, setStatus] = useState(null);
+  const [booting, setBooting] = useState(true);
   const [importMsg, setImportMsg] = useState('');
   const [importBusy, setImportBusy] = useState(false);
   const [reloadToken, setReloadToken] = useState(0);
@@ -105,7 +106,8 @@ export default function AdminBrandTracker() {
         setSelected(nextSelected.length ? nextSelected : (nextBrand ? [nextBrand] : []));
         setReloadToken((value) => value + 1);
       })
-      .catch(() => setError('Could not load the brand list.'));
+      .catch(() => setError('Could not load the brand list.'))
+      .finally(() => setBooting(false));
   }, []);
 
   useEffect(() => {
@@ -242,10 +244,20 @@ export default function AdminBrandTracker() {
   if (error) {
     return <p className="py-24 text-center text-sm text-rose-600">{error}</p>;
   }
-  if (!current || (mode === 'one' && !brand)) {
+  if (booting) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f4f7fb]">
         <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+  if (!current || !brands.length || (mode === 'one' && !brand)) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#f4f7fb] p-6 text-center">
+        <p className="text-lg font-semibold text-gray-900">No brands in live metrics yet</p>
+        <p className="max-w-md text-sm text-gray-600">
+          Import metrics for {current?.label || 'this category'} first, then open the tracker again.
+        </p>
       </div>
     );
   }
@@ -312,6 +324,7 @@ export default function AdminBrandTracker() {
         toolbar,
         adminChrome: true,
         dataSource: 'live',
+        allowInsights: true,
         fetchMetrics: (metrics) => adminAPI.getBrandMetrics(category, apiBrand, metrics, { skipErrorToast: true }),
       }}
     />

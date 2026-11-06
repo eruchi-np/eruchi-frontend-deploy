@@ -2,12 +2,32 @@ import React, { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { useInsightsApi } from './insightsApiContext.jsx';
 
+const CATALOG_COLORS = {
+  'Red Bull': '#DB0A40',
+  'X-treme': '#6B2D8B',
+  'Max Tiger': '#F5A623',
+  Monster: '#8BC53F',
+  Sting: '#F5C518',
+  Dove: '#003591',
+  Pantene: '#C9A227',
+  Himalaya: '#006B3F',
+  "L'Oréal": '#1A1A1A',
+  "Pond's": '#E8A0BF',
+  Nivea: '#001489',
+  Garnier: '#009639',
+  Sunsilk: '#7B2D8E',
+  'Clinic Plus': '#E31837',
+  Mamaearth: '#7CB342',
+  Biotique: '#2E7D32',
+  Parachute: '#1565C0',
+};
+
 const emptyForm = {
   name: '',
   category: 'FB',
   companyId: '',
   logoUrl: '',
-  color: '#3399ff',
+  color: '#DB0A40',
   sortOrder: 0,
   active: true,
 };
@@ -115,7 +135,7 @@ export default function InsightsBrands() {
     setBusy(true);
     try {
       const { data } = await adminAPI.seedInsightBrands({ skipErrorToast: true });
-      toast.success(`Seeded catalog (${data.upserted || 0} new)`);
+      toast.success(`Seeded catalog (${data.upserted || 0} new, ${data.modified || 0} colors refreshed)`);
       setBrands(data.brands || []);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Could not seed brands');
@@ -205,7 +225,18 @@ export default function InsightsBrands() {
             <form className="ri-admin-form" onSubmit={save}>
               <label>
                 Name
-                <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
+                <input
+                  value={form.name}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    setForm((f) => ({
+                      ...f,
+                      name,
+                      color: CATALOG_COLORS[name] || f.color,
+                    }));
+                  }}
+                  required
+                />
               </label>
               <label>
                 Category

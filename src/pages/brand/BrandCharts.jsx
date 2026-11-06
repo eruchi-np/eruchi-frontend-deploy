@@ -35,9 +35,10 @@ import {
   BAR_PALETTE,
   TOKEN_HEX,
   colorForBrand as tokenColorForBrand,
+  NAMED_BRAND_COLORS,
 } from './ruchiChartColors';
 
-export { YOU, ALL, LOW, COMPARE_COLORS, BRAND_COLORS, TOKEN_HEX };
+export { YOU, ALL, LOW, COMPARE_COLORS, BRAND_COLORS, TOKEN_HEX, NAMED_BRAND_COLORS };
 
 const HEIGHT = {
   sm: 250,
@@ -45,6 +46,32 @@ const HEIGHT = {
   lg: 340,
   xl: 420,
 };
+
+/** Click a legend name → solo that series; click again → show all. */
+function useLegendSolo(series) {
+  const [solo, setSolo] = React.useState(null);
+  const signature = (series || []).map((entry) => entry.key || entry.name).join('|');
+  React.useEffect(() => setSolo(null), [signature]);
+  const all = series || [];
+  const plot = solo ? all.filter((entry) => entry.name === solo) : all;
+  const onLegendClick = (entry) => {
+    const name = entry?.value || entry?.payload?.value || entry?.dataKey;
+    if (!name) return;
+    setSolo((current) => (current === name ? null : name));
+  };
+  const legendPayload = all.map((entry) => ({
+    value: entry.name,
+    type: 'line',
+    id: entry.key,
+    color: entry.color,
+  }));
+  const legendFormatter = (value) => (
+    <span style={{ opacity: solo && solo !== value ? 0.38 : 1, fontWeight: solo === value ? 650 : 500 }}>
+      {value}
+    </span>
+  );
+  return { solo, plot, onLegendClick, legendPayload, legendFormatter, multi: all.length > 1 };
+}
 
 /** Optional InsightBrand.color overrides from metrics meta. */
 let brandColorMap = {};
@@ -59,6 +86,7 @@ export function colorForBrand(index) {
 
 export function colorForNamedBrand(name, fallbackIndex = 0) {
   if (name && brandColorMap[name]) return brandColorMap[name];
+  if (name && NAMED_BRAND_COLORS[name]) return NAMED_BRAND_COLORS[name];
   return colorForBrand(fallbackIndex);
 }
 
@@ -256,8 +284,7 @@ export function ChartCard({
 export function SeriesChart({ data, metric, item, series, kind = 'line', height = HEIGHT.lg, onBrandClick = null }) {
   const Chart = kind === 'area' ? AreaChart : LineChart;
   const Mark = kind === 'area' ? Area : Line;
-  const visible = series || [];
-  const multi = visible.length > 1;
+  const { plot: visible, multi, onLegendClick, legendPayload, legendFormatter } = useLegendSolo(series);
   const plot = multi ? Math.max(180, height - 28) : height;
   const yTitle = yAxisTitle(metric, item);
   const clickable = typeof onBrandClick === 'function';
@@ -277,11 +304,10 @@ export function SeriesChart({ data, metric, item, series, kind = 'line', height 
             <Legend
               verticalAlign="top"
               height={28}
-              wrapperStyle={{ fontSize: 12, cursor: clickable ? 'pointer' : undefined }}
-              onClick={clickable ? (entry) => {
-                const name = entry?.value;
-                if (name && name !== 'Category') onBrandClick(name);
-              } : undefined}
+              payload={legendPayload}
+              formatter={legendFormatter}
+              wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
+              onClick={onLegendClick}
             />
           ) : null}
           {visible.map((entry) => (
@@ -303,6 +329,9 @@ export function SeriesChart({ data, metric, item, series, kind = 'line', height 
           ))}
         </Chart>
       </ResponsiveContainer>
+      {multi ? (
+        <p className="mt-1 text-[0.7rem] text-[var(--ink-3)]">Click a legend name to show that brand only · click again for all</p>
+      ) : null}
     </div>
   );
 }
@@ -566,14 +595,13 @@ export function BrandBars({ data, metric, item, height = HEIGHT.sm, onBrandClick
 
 export function GroupedBars({ data, metric, series, pageSize = 5, height = HEIGHT.lg, onBrandClick = null }) {
   const [page, setPage] = React.useState(0);
-  const visible = series || [];
-  const signature = `${(data || []).map((row) => row.name).join('|')}|${visible.map((entry) => entry.key).join('|')}`;
+  const { plot: visible, multi, onLegendClick, legendPayload, legendFormatter } = useLegendSolo(series);
+  const signature = `${(data || []).map((row) => row.name).join('|')}|${(series || []).map((entry) => entry.key).join('|')}`;
   React.useEffect(() => setPage(0), [signature]);
   const pages = Math.max(1, Math.ceil((data?.length || 0) / pageSize));
   const safePage = Math.min(page, pages - 1);
   const slice = (data || []).slice(safePage * pageSize, safePage * pageSize + pageSize);
-  const multi = visible.length > 1;
-  const footer = (multi ? 28 : 0) + (pages > 1 ? 36 : 0);
+  const footer = (multi ? 28 : 0) + (pages > 1 ? 36 : 0) + (multi ? 18 : 0);
   const plot = Math.max(180, height - footer);
   const yTitle = yAxisTitle(metric);
   const xTitle = metric === 'occasion_usage' ? 'Occasion' : metric === 'switch_reason' ? 'Reason' : 'Brand';
@@ -597,7 +625,16 @@ export function GroupedBars({ data, metric, series, pageSize = 5, height = HEIGH
             <YAxisLabel value={yTitle} />
           </YAxis>
           <Tooltip content={<Tip metric={metric} />} />
-          {multi ? <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} /> : null}
+          {multi ? (
+            <Legend
+              verticalAlign="top"
+              height={28}
+              payload={legendPayload}
+              formatter={legendFormatter}
+              wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
+              onClick={onLegendClick}
+            />
+          ) : null}
           {visible.map((entry) => (
             <Bar
               key={entry.key}
@@ -623,15 +660,17 @@ export function GroupedBars({ data, metric, series, pageSize = 5, height = HEIGH
           <button type="button" className="rounded-full px-3 py-1 hover:bg-slate-100 disabled:opacity-40" disabled={safePage >= pages - 1} onClick={() => setPage(safePage + 1)}>Next</button>
         </div>
       ) : null}
+      {multi ? (
+        <p className="mt-1 text-[0.7rem] text-[var(--ink-3)]">Click a legend name to show that brand only · click again for all</p>
+      ) : null}
     </div>
   );
 }
 
 export function HorizontalGroupedBars({ data, metric, series, height = HEIGHT.lg }) {
-  const visible = series || [];
+  const { plot: visible, multi, onLegendClick, legendPayload, legendFormatter } = useLegendSolo(series);
   const rows = data || [];
-  const multi = visible.length > 1;
-  const plot = Math.max(200, height - (multi ? 28 : 0));
+  const plot = Math.max(200, height - (multi ? 46 : 0));
   const valueTitle = yAxisTitle(metric);
   return (
     <div className="w-full min-w-0 max-w-full">
@@ -643,7 +682,16 @@ export function HorizontalGroupedBars({ data, metric, series, height = HEIGHT.lg
           </XAxis>
           <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
           <Tooltip content={<Tip metric={metric} />} />
-          {multi ? <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} /> : null}
+          {multi ? (
+            <Legend
+              verticalAlign="top"
+              height={28}
+              payload={legendPayload}
+              formatter={legendFormatter}
+              wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
+              onClick={onLegendClick}
+            />
+          ) : null}
           {visible.map((entry) => (
             <Bar
               key={entry.key}
@@ -657,6 +705,9 @@ export function HorizontalGroupedBars({ data, metric, series, height = HEIGHT.lg
           ))}
         </BarChart>
       </ResponsiveContainer>
+      {multi ? (
+        <p className="mt-1 text-[0.7rem] text-[var(--ink-3)]">Click a legend name to show that brand only · click again for all</p>
+      ) : null}
     </div>
   );
 }
@@ -782,9 +833,8 @@ export function SharePie({ data, metric, prominent = false, height = HEIGHT.lg }
 }
 
 export function SensoryRadar({ data, series, height = HEIGHT.lg }) {
-  const visible = series || [];
-  const multi = visible.length > 1;
-  const plot = multi ? Math.max(200, height - 28) : height;
+  const { plot: visible, multi, onLegendClick, legendPayload, legendFormatter } = useLegendSolo(series);
+  const plot = multi ? Math.max(200, height - 46) : height;
   return (
     <div className="w-full min-w-0 max-w-full overflow-hidden">
       <ResponsiveContainer width="100%" height={plot} debounce={50}>
@@ -793,7 +843,16 @@ export function SensoryRadar({ data, series, height = HEIGHT.lg }) {
           <PolarAngleAxis dataKey="name" tick={{ fontSize: 11 }} />
           <PolarRadiusAxis domain={[1, 5]} tick={{ fontSize: 10 }} />
           <Tooltip content={<Tip metric="sensory_mean" />} />
-          {multi ? <Legend verticalAlign="top" height={28} wrapperStyle={{ fontSize: 12 }} /> : null}
+          {multi ? (
+            <Legend
+              verticalAlign="top"
+              height={28}
+              payload={legendPayload}
+              formatter={legendFormatter}
+              wrapperStyle={{ fontSize: 12, cursor: 'pointer' }}
+              onClick={onLegendClick}
+            />
+          ) : null}
           {visible.map((entry) => (
             <Radar
               key={entry.key}
@@ -807,6 +866,9 @@ export function SensoryRadar({ data, series, height = HEIGHT.lg }) {
           ))}
         </RadarChart>
       </ResponsiveContainer>
+      {multi ? (
+        <p className="mt-1 text-[0.7rem] text-[var(--ink-3)]">Click a legend name to show that brand only · click again for all</p>
+      ) : null}
     </div>
   );
 }
