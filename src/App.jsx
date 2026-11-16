@@ -48,7 +48,6 @@ const VoucherDetail = lazy(() => import('./pages/user/VoucherDetail'));
 const EditProfile = lazy(() => import('./pages/user/EditProfile'));
 const Terms = lazy(() => import('./pages/public/Terms'));
 const PrivacyPolicy = lazy(() => import('./pages/public/LegalNotice'));
-const CompleteAdditionalProfile = lazy(() => import('./pages/user/CompleteAdditionalProfile'));
 const SecProfile = lazy(() => import('./pages/user/SecProfile'));
 const EditProfiles = lazy(() => import('./pages/user/EditProfiles'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
@@ -90,6 +89,12 @@ const NotFound = lazy(() => import('./pages/public/NotFound'));
 
 import { AnimationProvider } from './components/animations/AnimationContext';
 import PageTransition from './components/animations/PageTransition';
+
+function LegacyAdditionalProfileRedirect() {
+  const { user, loading } = useAuth();
+  if (loading || !user) return null;
+  return <Navigate to={user.secCompletedAt ? '/sec-profile/edit' : '/sec-profile'} replace />;
+}
 
 function AppChrome({ children }) {
   const { pathname } = useLocation();
@@ -266,7 +271,7 @@ function App() {
               path="/refresh-additional-profile"
               element={
                 <ProtectedRoute>
-                  <CompleteAdditionalProfile mode="refresh" />
+                  <LegacyAdditionalProfileRedirect />
                 </ProtectedRoute>
               }
             />
@@ -559,7 +564,7 @@ function App() {
             path="/additional-profile"
             element={
               <ProtectedRoute>
-                <CompleteAdditionalProfile />
+                <LegacyAdditionalProfileRedirect />
               </ProtectedRoute>
             }
           />

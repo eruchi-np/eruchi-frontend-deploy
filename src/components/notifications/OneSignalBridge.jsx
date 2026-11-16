@@ -1,41 +1,46 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import {
+  canOpenSurveys,
   initOneSignal,
   isOneSignalConfigured,
   loginOneSignalUser,
   logoutOneSignalUser,
+  promptSubscribeSlidedown,
 } from '../../utils/oneSignal';
 
 /**
- * Boots OneSignal when VITE_ONESIGNAL_APP_ID is set and maps auth user → External ID.
+ * Boots OneSignal only for accounts that can open Surveys.
+ * The Subscribe card is shown after login, because the automatic prompt
+ * is dropped when the anonymous visitor becomes a known user.
  */
 export default function OneSignalBridge() {
   const { user, loading } = useAuth();
   const loggedInId = useRef(null);
 
   useEffect(() => {
-    if (!isOneSignalConfigured()) return;
-    initOneSignal();
-  }, []);
-
-  useEffect(() => {
     if (!isOneSignalConfigured() || loading) return;
 
-    const externalId = user?.id || user?._id || null;
-
-    if (externalId) {
-      if (loggedInId.current === String(externalId)) return;
-      loggedInId.current = String(externalId);
-      loginOneSignalUser(externalId);
+    if (!canOpenSurveys(user)) {
+      if (loggedInId.current) {
+        loggedInId.current = null;
+        logoutOneSignalUser();
+      }
       return;
     }
 
-    if (loggedInId.current) {
-      loggedInId.current = null;
-      logoutOneSignalUser();
-    }
-  }, [user?.id, user?._id, loading]);
+    const externalId = String(user.id || user._id || '');
+    if (!externalId || loggedInId.current === externalId) return;
+    loggedInId.current = externalId;
+
+    (async () => {
+      const ok = await initOneSignal();
+      if (!ok || loggedInId.current !== externalId) return;
+      await loginOneSignalUser(externalId);
+      if (loggedInId.current !== externalId) return;
+      await promptSubscribeSlidedown();
+    })();
+  }, [user, loading]);
 
   return null;
 }

@@ -6,6 +6,7 @@ import { useLocation } from 'react-router-dom';
 import {
   dismissPushPrompt,
   getPushPermission,
+  canOpenSurveys,
   isOneSignalConfigured,
   isPushOptedIn,
   isPushPilotEligible,
@@ -29,7 +30,7 @@ function trackPush(event, detail = {}) {
 }
 
 /**
- * Android pilot soft prompt — only after survey complete.
+ * Android pilot soft prompt — survey complete, accounts that can open Surveys.
  * iOS A2HS + desktop are deferred.
  */
 export default function PushPrompt() {
@@ -44,7 +45,7 @@ export default function PushPrompt() {
       setVisible(false);
       return;
     }
-    if (!isOneSignalConfigured() || loading || !user) {
+    if (!isOneSignalConfigured() || loading || !canOpenSurveys(user)) {
       setVisible(false);
       return;
     }

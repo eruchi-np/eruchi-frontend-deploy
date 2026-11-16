@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { Loader2 } from 'lucide-react';
+import { getPostLoginPath, persistAuthSession } from '../../utils/auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -14,7 +15,19 @@ const VerifyEmail = () => {
   useEffect(() => {
     const verify = async () => {
       try {
-        await axios.put(`${API_BASE_URL}/auth/verify-email/${token}`);
+        const response = await axios.put(
+          `${API_BASE_URL}/auth/verify-email/${token}`,
+          null,
+          { withCredentials: true }
+        );
+        const userData = response?.data?.data?.user;
+        if (userData) {
+          persistAuthSession(userData);
+          setStatus('success');
+          toast.success('Email verified successfully!');
+          navigate(getPostLoginPath(userData), { replace: true });
+          return;
+        }
         setStatus('success');
         toast.success('Email verified successfully!');
         setTimeout(() => navigate('/login'), 3000);
@@ -40,7 +53,7 @@ const VerifyEmail = () => {
         {status === 'success' && (
           <>
             <h2 className="text-2xl font-bold mb-4 text-green-600">Verification Successful!</h2>
-            <p className="text-gray-600">Redirecting to login...</p>
+            <p className="text-gray-600">Taking you to the next step...</p>
           </>
         )}
         {status === 'error' && (

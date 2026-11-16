@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Bell, BellOff } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 import {
   clearPushPromptDismiss,
   getPushPermission,
+  canOpenSurveys,
   isOneSignalConfigured,
   isPushOptedIn,
   isPushPilotEligible,
@@ -16,10 +18,12 @@ import { healthSessionId, trackHealthEvent } from '../../utils/healthEvents';
 import './pushPrompt.css';
 
 /**
- * Phase-1 Profile toggle — Android only. Always visible on Android when App ID
- * is set so a failed OneSignal init never blank-hides the section.
+ * Profile push toggle — Android, accounts that can open Surveys.
+ * Stays hidden until OneSignal can boot, so a failed init never blank-hides it.
  */
 export default function PushSettings() {
+  const { user, loading } = useAuth();
+  const activated = canOpenSurveys(user);
   const [ready, setReady] = useState(false);
   const [supported, setSupported] = useState(false);
   const [optedIn, setOptedIn] = useState(false);
@@ -27,8 +31,8 @@ export default function PushSettings() {
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!isOneSignalConfigured() || !isPushPilotEligible()) {
-      setReady(true);
+    if (loading || !activated || !isOneSignalConfigured() || !isPushPilotEligible()) {
+      setReady(!loading);
       setSupported(false);
       return;
     }
@@ -41,7 +45,7 @@ export default function PushSettings() {
     setOptedIn(opt);
     setPermission(perm);
     setReady(true);
-  }, []);
+  }, [activated, loading]);
 
   useEffect(() => {
     refresh();
@@ -58,7 +62,7 @@ export default function PushSettings() {
     });
   }, [ready]);
 
-  if (!isOneSignalConfigured() || !isPushPilotEligible() || !ready) return null;
+  if (!activated || !isOneSignalConfigured() || !isPushPilotEligible() || !ready) return null;
 
   const unavailable = !supported;
   const blocked = permission === 'denied';

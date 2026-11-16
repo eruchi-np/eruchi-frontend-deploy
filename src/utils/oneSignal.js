@@ -1,4 +1,5 @@
 import OneSignal from 'react-onesignal';
+import { isStaffAdmin } from './adminRoles';
 
 const APP_ID = String(import.meta.env.VITE_ONESIGNAL_APP_ID || '').trim();
 const DISMISS_KEY = 'eruchi_push_prompt_dismissed_at';
@@ -34,6 +35,19 @@ export function isAndroidDevice() {
 /** Phase-1 pilot: soft-prompt Android only (no desktop, no iOS yet). */
 export function isPushPilotEligible() {
   return isAndroidDevice();
+}
+
+/**
+ * Same gate as the Surveys page: signed in, basic details, and About you.
+ * PC2 is optional on that page, so it does not block this.
+ * Guests and unfinished signups never boot OneSignal.
+ */
+export function canOpenSurveys(user) {
+  if (!user || isStaffAdmin(user.role)) return false;
+  return Boolean(
+    user.isRegistrationComplete
+    && user.isProfileComplete
+  );
 }
 
 /** iOS Safari tab: push only after Add to Home Screen. */
@@ -85,14 +99,26 @@ export function initOneSignal() {
       allowLocalhostAsSecureOrigin: import.meta.env.DEV,
       serviceWorkerPath: 'OneSignalSDKWorker.js',
       serviceWorkerParam: { scope: '/' },
-      // Custom PushPrompt owns the soft ask — never show OneSignal Subscribe UI.
       notifyButton: { enable: false },
       welcomeNotification: {
         disable: true,
       },
+      // Dashboard auto-prompt fires before login and then gets dropped.
+      // Keep the same card, and show it ourselves after the user is known.
       promptOptions: {
         slidedown: {
-          prompts: [],
+          prompts: [
+            {
+              type: 'push',
+              autoPrompt: false,
+              delay: { pageViews: 1, timeDelay: 0 },
+              text: {
+                actionMessage: 'Subscribe to our notifications for the latest news and updates. You can disable anytime.',
+                acceptButton: 'Subscribe',
+                cancelButton: 'Later',
+              },
+            },
+          ],
         },
       },
     });
@@ -114,6 +140,20 @@ export async function loginOneSignalUser(externalId) {
     await OneSignal.login(String(externalId));
   } catch (err) {
     console.warn('[OneSignal] login failed', err);
+  }
+}
+
+/** Subscribe / Later card. No-op when already allowed, blocked, or recently dismissed. */
+export async function promptSubscribeSlidedown() {
+  const ok = await initOneSignal();
+  if (!ok) return;
+  try {
+    const permission = OneSignal.Notifications?.permissionNative;
+    if (permission === 'granted' || permission === 'denied') return;
+    if (OneSignal.User?.PushSubscription?.optedIn) return;
+    await OneSignal.Slidedown.promptPush();
+  } catch (err) {
+    console.warn('[OneSignal] subscribe prompt failed', err);
   }
 }
 

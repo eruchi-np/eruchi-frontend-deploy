@@ -42,6 +42,7 @@ export default function HomeNav({ variant = "page", sidebarOffset = false }) {
         "/additional-profile",
         "/refresh-profile",
         "/refresh-additional-profile",
+        "/sec-profile",
         "/profile",
       ]);
       const threshold = shortSkyPaths.has(pathname) ? 120 : window.innerHeight * 0.62;

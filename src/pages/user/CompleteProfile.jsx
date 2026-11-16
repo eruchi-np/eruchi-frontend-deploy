@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import DemographicsWizard from "../../components/demographics/DemographicsWizard";
 import OnboardingShell from "../../components/onboarding/OnboardingShell";
 import CreditRewardBadge from "../../components/onboarding/CreditRewardBadge";
-import { PROFILE_COMPLETION_1_CREDITS, PROFILE_COMPLETION_3_CREDITS } from "../../utils/onboardingCredits";
+import { PROFILE_COMPLETION_1_CREDITS } from "../../utils/onboardingCredits";
 import { PROFILE_REFRESH_BODY } from "../../utils/profileRefreshCopy";
 import { useAuth } from "../../context/AuthContext";
 
@@ -14,17 +14,14 @@ const CompleteProfile = ({ mode = "registration" }) => {
   const refreshPays = isRefresh && user?.profileOutdated;
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const handleProfileComplete = async (awarded) => {
+  const handleProfileComplete = async () => {
     window.dispatchEvent(new Event("profileComplete"));
     await refreshUser();
     if (isRefresh) {
-      navigate("/refresh-additional-profile", {
-        replace: true,
-        state: { demographicsSaved: Number(awarded) > 0 },
-      });
+      navigate("/profile", { replace: true });
       return;
     }
-    navigate("/additional-profile", { replace: true });
+    navigate("/standalone-surveys", { replace: true });
   };
 
   const handleLogout = async () => {
@@ -48,7 +45,7 @@ const CompleteProfile = ({ mode = "registration" }) => {
         <h1 className="onboard-title">{isRefresh ? "Update your profile" : "Complete your profile"}</h1>
         <p className="onboard-copy">
           {refreshPays
-            ? `${PROFILE_REFRESH_BODY} Your current answers are filled in. Confirm same or change each one, then submit to earn ${PROFILE_COMPLETION_1_CREDITS} Ruchi Credits. The next part earns ${PROFILE_COMPLETION_3_CREDITS} more.`
+            ? `${PROFILE_REFRESH_BODY} Your current answers are filled in. Confirm same or change each one, then submit to earn ${PROFILE_COMPLETION_1_CREDITS} Ruchi Credits.`
             : isRefresh
             ? "Your current answers are filled in. Confirm same or change each one, then submit."
             : `Tell us more about you — earn ${PROFILE_COMPLETION_1_CREDITS} Ruchi Credits, and we'll match you to more relevant surveys.`}

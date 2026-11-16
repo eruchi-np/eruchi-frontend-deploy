@@ -2,8 +2,10 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Bell, BellOff, X } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../../context/AuthContext';
 import {
   clearPushPromptDismiss,
+  canOpenSurveys,
   isOneSignalConfigured,
   isPushOptedIn,
   isPushPilotEligible,
@@ -34,6 +36,8 @@ function formatWhen(iso) {
  */
 export default function NavPushBell({ light = false }) {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
+  const activated = canOpenSurveys(user);
   const rootRef = useRef(null);
   const [ready, setReady] = useState(false);
   const [optedIn, setOptedIn] = useState(false);
@@ -43,15 +47,15 @@ export default function NavPushBell({ light = false }) {
   const [loadingList, setLoadingList] = useState(false);
 
   const refreshOptIn = useCallback(async () => {
-    if (!isOneSignalConfigured() || !isPushPilotEligible()) {
-      setReady(true);
+    if (loading || !activated || !isOneSignalConfigured() || !isPushPilotEligible()) {
+      setReady(!loading);
       setOptedIn(false);
       return;
     }
     const opt = await isPushOptedIn();
     setOptedIn(opt);
     setReady(true);
-  }, []);
+  }, [activated, loading]);
 
   useEffect(() => {
     refreshOptIn();
@@ -92,7 +96,7 @@ export default function NavPushBell({ light = false }) {
     if (open && optedIn) loadList();
   }, [open, optedIn, loadList]);
 
-  if (!ready || !isOneSignalConfigured() || !isPushPilotEligible()) return null;
+  if (!activated || !ready || !isOneSignalConfigured() || !isPushPilotEligible()) return null;
 
   const onBellClick = () => setOpen((v) => !v);
 

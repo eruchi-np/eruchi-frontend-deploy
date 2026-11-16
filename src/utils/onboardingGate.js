@@ -21,7 +21,7 @@ export const isOnboardingEscapePath = (pathname = "") =>
 export const isProfileOnboardingLocked = (user) =>
   Boolean(user) &&
   !isStaffAdmin(user.role) &&
-  (!user.isProfileComplete || !user.isAdditionalProfileComplete);
+  !user.isProfileComplete;
 
 export const getOnboardingRedirectPath = (user, pathname = "") => {
   if (!user || isStaffAdmin(user.role)) return null;
@@ -30,8 +30,5 @@ export const getOnboardingRedirectPath = (user, pathname = "") => {
 
   if (!user.isRegistrationComplete) return "/complete-basic-info";
   if (!user.isProfileComplete) return "/complete-profile";
-  if (!user.isAdditionalProfileComplete && pathname !== "/additional-profile") {
-    return "/additional-profile";
-  }
   return null;
 };

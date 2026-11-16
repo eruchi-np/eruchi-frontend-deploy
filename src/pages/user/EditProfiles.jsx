@@ -69,20 +69,6 @@ const EditProfiles = () => {
               </button>
             </div>
           ))}
-
-          <div className="profile-survey">
-            <div className="profile-survey-copy">
-              <h3>Lifestyle</h3>
-              <p>Your day-to-day living situation.</p>
-            </div>
-            <button
-              type="button"
-              className="profile-btn profile-btn-outline profile-survey-view"
-              onClick={() => navigate('/additional-profile')}
-            >
-              Edit
-            </button>
-          </div>
         </div>
       </main>
     </ProfileShell>
