@@ -5,7 +5,6 @@ import toast from 'react-hot-toast';
 import {
   SATISFACTION_SCALE,
   DEFAULT_MATRIX_ROWS,
-  EMPTY_QUESTION,
   createEmptyFormData,
   questionTypes,
   metricTagOptions,
@@ -25,6 +24,7 @@ import {
   validateSurveyForm,
   buildSurveyQuestions,
 } from './surveyFormPersist.js';
+import { surveyToFormData } from './surveyToFormData.js';
 
 const AUTOSAVE_MS = 15000;
 
@@ -36,17 +36,6 @@ const moveItem = (list, from, to) => {
   return next;
 };
 
-const mapLoadedQuestions = (questions) =>
-  questions?.length
-    ? questions.map((q) => ({
-      ...q,
-      options: Array.isArray(q.options) ? q.options : [],
-      rows: Array.isArray(q.rows) ? q.rows : [],
-      metricTag: q.metricTag === 'cep' || q.metricTag === 'nps' ? q.metricTag : 'none',
-      randomizeOptions: Boolean(q.randomizeOptions),
-    }))
-    : [{ ...EMPTY_QUESTION }];
-
 export default function useSepSurveyForm() {
   const navigate = useNavigate();
   const [pendingAction, setPendingAction] = useState(null);
@@ -56,6 +45,9 @@ export default function useSepSurveyForm() {
   const [formData, setFormData] = useState(createEmptyFormData);
   const [autosaveLabel, setAutosaveLabel] = useState('');
   const [isDirty, setIsDirty] = useState(false);
+  const [savedDrafts, setSavedDrafts] = useState([]);
+  const [savedDraftsLoading, setSavedDraftsLoading] = useState(false);
+  const [loadingSavedId, setLoadingSavedId] = useState(null);
 
   const params = useParams();
   const [searchParams] = useSearchParams();
@@ -116,6 +108,37 @@ export default function useSepSurveyForm() {
   }, [isSprint]);
 
   useEffect(() => {
+    if (isSprint || routeSurveyId) {
+      setSavedDrafts([]);
+      return undefined;
+    }
+    let cancelled = false;
+    const loadSavedDrafts = async () => {
+      setSavedDraftsLoading(true);
+      try {
+        const res = await sepSurveyAPI.getAvailable({
+          manage: 1,
+          limit: 500,
+          skipErrorToast: true,
+        });
+        if (cancelled) return;
+        const rows = res.data?.data || [];
+        setSavedDrafts(
+          rows
+            .filter((s) => s.status === 'draft')
+            .sort((a, b) => new Date(b.updatedAt || b.createdAt) - new Date(a.updatedAt || a.createdAt))
+        );
+      } catch {
+        if (!cancelled) setSavedDrafts([]);
+      } finally {
+        if (!cancelled) setSavedDraftsLoading(false);
+      }
+    };
+    loadSavedDrafts();
+    return () => { cancelled = true; };
+  }, [isSprint, routeSurveyId]);
+
+  useEffect(() => {
     if (!routeSurveyId) {
       const createScope = surveyCacheScope({ isSprint, sprintDay, surveyId: null });
       const cached = loadSurveyFormCache(createScope);
@@ -143,29 +166,7 @@ export default function useSepSurveyForm() {
           });
         if (cancelled) return;
         const survey = res.data.data;
-
-        const startDate = survey.startDate ? new Date(survey.startDate) : new Date();
-        const endDate = survey.endDate ? new Date(survey.endDate) : null;
-        const availableDays = endDate
-          ? Math.max(1, Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)))
-          : 7;
-
-        const next = {
-          title: survey.title || '',
-          description: survey.description || '',
-          status: survey.status || 'published',
-          credits: survey.credits ?? 50,
-          kind: survey.kind === 'daily' ? 'daily' : 'normal',
-          publishedAt: startDate.toISOString().slice(0, 16),
-          availableDays,
-          estimatedMinutes: survey.estimatedMinutes ?? '',
-          visibility: survey.visibility || 'public',
-          validityDays: survey.validityDays ?? 7,
-          alsoPublishToOthers: Boolean(survey.alsoPublishToOthers),
-          clusterSendAt: new Date().toISOString().slice(0, 16),
-          clusterIds: [],
-          questions: mapLoadedQuestions(survey.questions),
-        };
+        const next = surveyToFormData(survey);
 
         const editScope = surveyCacheScope({ isSprint, sprintDay, surveyId: routeSurveyId });
         const cached = loadSurveyFormCache(editScope);
@@ -191,6 +192,39 @@ export default function useSepSurveyForm() {
     fetchSurvey();
     return () => { cancelled = true; };
   }, [routeSurveyId, isSprint, sprintDay, navigate, markClean]);
+
+  const applySavedSurvey = useCallback(async (surveyId) => {
+    if (!surveyId || isSprint || routeSurveyId) return;
+    setLoadingSavedId(surveyId);
+    try {
+      const res = await sepSurveyAPI.getById(surveyId, {
+        params: { manage: 1 },
+        skipErrorToast: true,
+      });
+      const survey = res.data?.data;
+      if (!survey) throw new Error('Survey not found');
+
+      const next = {
+        ...surveyToFormData(survey),
+        status: 'draft',
+        clusterIds: [],
+        clusterSendAt: new Date().toISOString().slice(0, 16),
+      };
+
+      // New copy — next Save/Create posts a new survey
+      setActiveSurveyId(null);
+      clearSurveyFormCache(surveyCacheScope({ isSprint, sprintDay, surveyId: null }));
+      setFormData(next);
+      savedSnapshotRef.current = snapshotForm(createEmptyFormData());
+      setIsDirty(true);
+      toast.success('Loaded saved survey into the form');
+    } catch (err) {
+      console.error('Failed to load saved survey', err);
+      toast.error(err.response?.data?.message || 'Failed to load saved survey');
+    } finally {
+      setLoadingSavedId(null);
+    }
+  }, [isSprint, routeSurveyId, sprintDay]);
 
   useEffect(() => {
     if (initialLoading) return;
@@ -603,6 +637,11 @@ export default function useSepSurveyForm() {
     initialLoading,
     backTo,
     navigate,
+    savedDrafts,
+    savedDraftsLoading,
+    loadingSavedId,
+    applySavedSurvey,
+    canLoadSavedSurvey: !isSprint && !routeSurveyId,
     questionTypes,
     metricTagOptions,
     statusOptions,

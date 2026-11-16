@@ -45,9 +45,15 @@ const CreateSepSurvey = () => {
     leaveWithoutSaving,
     getMinPublishedDate,
     getQuestionTypeData,
+    savedDrafts,
+    savedDraftsLoading,
+    loadingSavedId,
+    applySavedSurvey,
+    canLoadSavedSurvey,
   } = useSepSurveyForm();
 
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [selectedSavedId, setSelectedSavedId] = useState('');
 
   const requestLeave = () => {
     if (!isDirty) {
@@ -154,6 +160,49 @@ const CreateSepSurvey = () => {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-28">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {canLoadSavedSurvey ? (
+            <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-5">
+              <label htmlFor="saved-survey-template" className="block text-sm font-medium text-gray-900">
+                Load saved survey
+              </label>
+              <p className="text-sm text-gray-500 mt-1">
+                Pick a draft to fill this form. Saving still creates a new survey.
+              </p>
+              <div className="mt-3 flex flex-col sm:flex-row gap-3 sm:items-center">
+                <select
+                  id="saved-survey-template"
+                  value={selectedSavedId}
+                  disabled={savedDraftsLoading || Boolean(loadingSavedId) || loading}
+                  onChange={async (event) => {
+                    const id = event.target.value;
+                    setSelectedSavedId(id);
+                    if (id) await applySavedSurvey(id);
+                  }}
+                  className="w-full sm:max-w-md rounded-xl border border-gray-300 px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:bg-gray-50 disabled:text-gray-400"
+                >
+                  <option value="">
+                    {savedDraftsLoading
+                      ? 'Loading saved surveys…'
+                      : savedDrafts.length
+                        ? 'Select a saved survey…'
+                        : 'No saved surveys yet'}
+                  </option>
+                  {savedDrafts.map((draft) => (
+                    <option key={draft._id} value={draft._id}>
+                      {draft.title?.trim() || 'Untitled draft'}
+                    </option>
+                  ))}
+                </select>
+                {loadingSavedId ? (
+                  <span className="inline-flex items-center gap-2 text-sm text-gray-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Loading…
+                  </span>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
           <SurveySettings
             clusters={clusters}
             clustersLoading={clustersLoading}

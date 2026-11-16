@@ -58,6 +58,8 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
   const [editCursor, setEditCursor] = useState(0);
   const startedAtRef = useRef(new Date().toISOString());
   const submittingRef = useRef(false);
+  const [stepId, setStepId] = useState(null);
+  const stepPinned = useRef(false);
 
   useEffect(() => {
     let cancel = false;
@@ -117,19 +119,32 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
 
   const visible = useMemo(() => (spec ? visibleIds(spec, answers) : []), [spec, answers]);
   const unanswered = useMemo(() => (spec ? nextQuestion(spec, answers) : null), [spec, answers]);
+  const screens = useMemo(() => {
+    const unique = [];
+    for (const id of visible) {
+      const screen = screenIdsFor(id)[0];
+      if (!unique.includes(screen)) unique.push(screen);
+    }
+    return unique;
+  }, [visible]);
+
+  useEffect(() => {
+    if (!spec || loading || isEdit || stepPinned.current) return;
+    stepPinned.current = true;
+    const first = nextQuestion(spec, answers);
+    setStepId(first ? screenIdsFor(first)[0] : null);
+  }, [spec, loading, isEdit, answers]);
+
   const qid = useMemo(() => {
     if (!spec) return null;
     if (isEdit) {
       // Walk every visible screen even when answers are already filled.
-      const uniqueScreens = [];
-      for (const id of visible) {
-        const screen = screenIdsFor(id)[0];
-        if (!uniqueScreens.includes(screen)) uniqueScreens.push(screen);
-      }
-      return uniqueScreens[editCursor] || null;
+      return screens[editCursor] || null;
     }
+    // Stay on a tick-all question after the first selection. Continue moves on.
+    if (stepId && screens.includes(stepId)) return stepId;
     return unanswered;
-  }, [spec, isEdit, visible, editCursor, unanswered]);
+  }, [spec, isEdit, screens, editCursor, stepId, unanswered]);
   const screenIds = qid ? screenIdsFor(qid) : [];
   const progress = spec
     ? (isEdit
@@ -185,12 +200,9 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
       setEditCursor((c) => Math.max(0, c - 1));
       return;
     }
-    const answered = (spec.questions || []).map((q) => q.id).filter((id) => id in answers);
-    if (!answered.length) return;
-    const last = answered[answered.length - 1];
-    const back = { ...answers };
-    for (const id of screenIdsFor(last)) delete back[id];
-    setAnswers(pruneAnswers(spec, back));
+    const current = qid ? screenIdsFor(qid)[0] : null;
+    const idx = screens.indexOf(current);
+    if (idx > 0) setStepId(screens[idx - 1]);
   };
 
   const submit = async () => {
@@ -280,7 +292,14 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
       setEditCursor((c) => c + 1);
       return;
     }
+    const current = qid ? screenIdsFor(qid)[0] : null;
+    const idx = screens.indexOf(current);
+    if (idx >= 0 && idx < screens.length - 1) {
+      setStepId(screens[idx + 1]);
+      return;
+    }
     if (nextQuestion(spec, after) == null) finishOrSoftCheck(after);
+    else setStepId(screenIdsFor(nextQuestion(spec, after))[0]);
   };
 
   if (loading || !spec) {

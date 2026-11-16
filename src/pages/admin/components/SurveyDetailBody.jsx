@@ -67,7 +67,7 @@ export default function SurveyDetailBody({ survey, NAVY, refetchSurveys, onDelet
               Also public
             </span>
           )}
-          {isScheduled(survey.startDate) && (
+          {status !== "draft" && isScheduled(survey.startDate) && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200">
               Scheduled
             </span>
