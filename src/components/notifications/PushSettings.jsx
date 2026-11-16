@@ -1,14 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Bell, BellOff, Share } from 'lucide-react';
+import { Bell, BellOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
   clearPushPromptDismiss,
   getPushPermission,
-  isAndroidDevice,
   isOneSignalConfigured,
   isPushOptedIn,
+  isPushPilotEligible,
   isWebPushSupported,
-  needsIosHomeScreenInstall,
   optInPush,
   optOutPush,
   requestPushSubscription,
@@ -16,25 +15,21 @@ import {
 import { healthSessionId, trackHealthEvent } from '../../utils/healthEvents';
 import './pushPrompt.css';
 
+/**
+ * Phase-1 Profile toggle — Android only. Always visible on Android when App ID
+ * is set so a failed OneSignal init never blank-hides the section.
+ */
 export default function PushSettings() {
   const [ready, setReady] = useState(false);
   const [supported, setSupported] = useState(false);
   const [optedIn, setOptedIn] = useState(false);
   const [permission, setPermission] = useState('default');
   const [busy, setBusy] = useState(false);
-  const iosInstall = needsIosHomeScreenInstall();
 
   const refresh = useCallback(async () => {
-    if (!isOneSignalConfigured()) {
+    if (!isOneSignalConfigured() || !isPushPilotEligible()) {
       setReady(true);
       setSupported(false);
-      return;
-    }
-    if (iosInstall) {
-      setSupported(true);
-      setOptedIn(false);
-      setPermission('default');
-      setReady(true);
       return;
     }
     const [sup, opt, perm] = await Promise.all([
@@ -46,7 +41,7 @@ export default function PushSettings() {
     setOptedIn(opt);
     setPermission(perm);
     setReady(true);
-  }, [iosInstall]);
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -63,12 +58,14 @@ export default function PushSettings() {
     });
   }, [ready]);
 
-  if (!isOneSignalConfigured() || !ready) return null;
-  if (!supported && !iosInstall) return null;
+  if (!isOneSignalConfigured() || !isPushPilotEligible() || !ready) return null;
+
+  const unavailable = !supported;
+  const blocked = permission === 'denied';
 
   const onToggle = async () => {
-    if (!supported && !iosInstall) {
-      toast.error('Push notifications are not supported in this browser');
+    if (unavailable) {
+      toast.error('Push is unavailable in this browser right now');
       return;
     }
     setBusy(true);
@@ -85,21 +82,16 @@ export default function PushSettings() {
       }
 
       clearPushPromptDismiss();
-      const result = iosInstall
-        ? { ok: false, reason: 'ios_needs_homescreen' }
-        : permission === 'granted'
+      const result =
+        permission === 'granted'
           ? await optInPush()
           : await requestPushSubscription();
 
-      if (result.reason === 'ios_needs_homescreen') {
-        toast('Add eRuchi to your Home Screen first, then open that icon');
-        return;
-      }
       if (result.ok) {
         trackHealthEvent('push_prompt_accepted', {
           detail: {
             sessionId: healthSessionId(),
-            platform: isAndroidDevice() ? 'android' : 'web',
+            platform: 'android',
             source: 'profile',
           },
         });
@@ -120,6 +112,16 @@ export default function PushSettings() {
     }
   };
 
+  let help =
+    'Get reminders for surveys and rewards.';
+  if (unavailable) {
+    help = 'Push isn’t available in this browser yet. Open eRuchi in Chrome on Android.';
+  } else if (optedIn) {
+    help = 'You will get reminders for surveys and rewards.';
+  } else if (blocked) {
+    help = 'Blocked in browser settings — re-enable there to use push.';
+  }
+
   return (
     <section
       id="push-notifications"
@@ -133,38 +135,27 @@ export default function PushSettings() {
           </div>
           <div>
             <h2 id="push-notifications-title">Push notifications</h2>
-            <p>
-              {iosInstall
-                ? 'Install eRuchi to your Home Screen to enable alerts on iPhone.'
-                : optedIn
-                  ? 'You will get reminders for surveys and rewards.'
-                  : permission === 'denied'
-                    ? 'Blocked in browser settings — re-enable there to use push.'
-                    : 'Get reminders for surveys and rewards.'}
-            </p>
+            <p>{help}</p>
           </div>
         </div>
       </div>
 
-      {iosInstall ? (
-        <div className="push-settings-ios">
-          <p>
-            <Share size={14} aria-hidden="true" /> Safari → Share →{' '}
-            <strong>Add to Home Screen</strong>, then open the icon and come back here.
-          </p>
-        </div>
-      ) : (
-        <div className="profile-section-cta">
-          <button
-            type="button"
-            className={`home-pill home-pill-lg ${optedIn ? 'home-pill-blue' : 'home-pill-navy'}`}
-            onClick={onToggle}
-            disabled={busy || permission === 'denied'}
-          >
-            {busy ? 'Working…' : optedIn ? 'Turn off notifications' : 'Enable notifications'}
-          </button>
-        </div>
-      )}
+      <div className="profile-section-cta">
+        <button
+          type="button"
+          className={`home-pill home-pill-lg ${optedIn ? 'home-pill-blue' : 'home-pill-navy'}`}
+          onClick={onToggle}
+          disabled={busy || unavailable || blocked}
+        >
+          {busy
+            ? 'Working…'
+            : unavailable
+              ? 'Unavailable here'
+              : optedIn
+                ? 'Turn off notifications'
+                : 'Enable notifications'}
+        </button>
+      </div>
     </section>
   );
 }

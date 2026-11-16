@@ -85,23 +85,14 @@ export function initOneSignal() {
       allowLocalhostAsSecureOrigin: import.meta.env.DEV,
       serviceWorkerPath: 'OneSignalSDKWorker.js',
       serviceWorkerParam: { scope: '/' },
+      // Custom PushPrompt owns the soft ask — never show OneSignal Subscribe UI.
       notifyButton: { enable: false },
       welcomeNotification: {
         disable: true,
       },
       promptOptions: {
         slidedown: {
-          prompts: [
-            {
-              type: 'push',
-              autoPrompt: false,
-              text: {
-                actionMessage: 'Get reminders when new surveys and rewards are ready.',
-                acceptButton: 'Allow',
-                cancelButton: 'Not now',
-              },
-            },
-          ],
+          prompts: [],
         },
       },
     });

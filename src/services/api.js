@@ -112,6 +112,7 @@ export const userAPI = {
   updateAdditionalProfile: (data, config = {}) => api.put('/users/me/additional-profile', data, config),
   purchaseStreakGuard: (days, config = {}) => api.post('/users/me/streak-guard', { days }, config),
   getActivity: (options = {}) => getRequest('/users/me/activity', options),
+  getNotifications: (options = {}) => getRequest('/users/me/notifications', options),
 };
 
 /** PC2 SEC household survey + shared profile-survey list. */

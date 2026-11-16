@@ -16,25 +16,7 @@ import {
 import { healthSessionId, trackHealthEvent } from '../../utils/healthEvents';
 import './pushPrompt.css';
 
-const QUIET_PATHS = [
-  '/login',
-  '/signup',
-  '/email-verification',
-  '/complete-basic-info',
-  '/complete-profile',
-  '/additional-profile',
-  '/refresh-profile',
-  '/refresh-additional-profile',
-  '/business',
-  '/brand',
-  '/admin',
-];
-
-function isQuietPath(pathname) {
-  return QUIET_PATHS.some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`)
-  );
-}
+const SURVEY_COMPLETE_PATH = '/survey-complete';
 
 function trackPush(event, detail = {}) {
   trackHealthEvent(event, {
@@ -47,7 +29,8 @@ function trackPush(event, detail = {}) {
 }
 
 /**
- * Android pilot soft prompt. iOS A2HS + desktop are deferred.
+ * Android pilot soft prompt — only after survey complete.
+ * iOS A2HS + desktop are deferred.
  */
 export default function PushPrompt() {
   const { user, loading } = useAuth();
@@ -57,15 +40,15 @@ export default function PushPrompt() {
   const shownRef = useRef(false);
 
   useEffect(() => {
+    if (pathname !== SURVEY_COMPLETE_PATH) {
+      setVisible(false);
+      return;
+    }
     if (!isOneSignalConfigured() || loading || !user) {
       setVisible(false);
       return;
     }
-    if (!isPushPilotEligible()) {
-      setVisible(false);
-      return;
-    }
-    if (isQuietPath(pathname) || wasPushPromptDismissed()) {
+    if (!isPushPilotEligible() || wasPushPromptDismissed()) {
       setVisible(false);
       return;
     }
@@ -86,7 +69,7 @@ export default function PushPrompt() {
         shownRef.current = true;
         trackPush('push_prompt_shown');
       }
-    }, 4500);
+    }, 1200);
 
     return () => {
       cancelled = true;
@@ -152,8 +135,8 @@ export default function PushPrompt() {
       </div>
       <h2 id="push-prompt-title">Stay in the loop</h2>
       <p>
-        Get a nudge when new surveys drop or your streak needs you — even if
-        you&apos;re not on the site.
+        Don&apos;t miss out on your streak! Enable notifications to be reminded
+        when new surveys are available.
       </p>
       <div className="push-prompt-actions">
         <button
@@ -170,7 +153,7 @@ export default function PushPrompt() {
           onClick={onEnable}
           disabled={busy}
         >
-          {busy ? 'Working…' : 'Enable'}
+          {busy ? 'Working…' : 'Remind Me'}
         </button>
       </div>
     </div>

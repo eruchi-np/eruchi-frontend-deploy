@@ -71,6 +71,41 @@
   box-shadow: 0 1px 0 rgba(12, 21, 32, 0.06);
 }
 
+.home-nav-push-wrap {
+  position: relative;
+}
+
+.home-nav-push {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  background: transparent;
+  transition: transform 0.2s ease, background-color 0.2s ease, border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.home-nav-push:hover {
+  transform: translateY(-1px);
+}
+
+.home-nav-push-light {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.92);
+  background: transparent;
+}
+
+.home-nav-push-dark {
+  color: #fff;
+  background: var(--navy);
+  border-color: var(--navy);
+}
+
 .home-nav-avatar {
   width: 42px;
   height: 42px;
@@ -1479,6 +1514,11 @@ button.streak-badge {
 }
 
 @media (max-width: 1024px) {
+  /* Leave a curve of white sheet visible so scroll is obvious. */
+  .home-hero-pin {
+    --home-sheet-peek: 88px;
+  }
+
   .home-nav-inner {
     grid-template-columns: 1fr auto;
   }

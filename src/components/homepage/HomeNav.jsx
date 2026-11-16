@@ -6,6 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 import { trackEvent } from "../../utils/visitorEvents";
 import { adminHomePath, isStaffAdmin } from "../../utils/adminRoles";
 import { businessAPI } from "../../services/api";
+import NavPushBell from "../notifications/NavPushBell";
 import "./homepage.css";
 
 export default function HomeNav({ variant = "page", sidebarOffset = false }) {
@@ -189,6 +190,7 @@ export default function HomeNav({ variant = "page", sidebarOffset = false }) {
                 Log out
               </button>
             )}
+            {isLoggedIn && !isBusiness ? <NavPushBell light={lightNav} /> : null}
             {isLoggedIn || isBusiness ? (
               <button
                 type="button"
