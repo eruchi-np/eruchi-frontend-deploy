@@ -2,6 +2,7 @@ import React from "react";
 
 function isSurveyOpen(survey) {
   const now = new Date();
+  if (survey.isProfileSurvey) return true;
   if (survey.isMerchantFeedback) return true;
   if (survey.status !== "published") return false;
   if (survey.startDate && now < new Date(survey.startDate)) return false;
@@ -46,6 +47,11 @@ export default function SurveyRow({ survey, onView, actionLabel }) {
           ) : null}
           {survey.kind === "daily" ? (
             <span className="surveys-row-tag">Daily</span>
+          ) : null}
+          {survey.isProfileSurvey ? (
+            <span className="surveys-row-tag">
+              {survey.profileState === "refresh" ? "Refresh" : "Profile"}
+            </span>
           ) : null}
         </h3>
         <p>{survey.description}</p>

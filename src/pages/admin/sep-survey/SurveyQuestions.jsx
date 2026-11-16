@@ -285,6 +285,22 @@ export default function SurveyQuestions({
                               />
                             </div>
                           )}
+
+                          {(q.questionType === 'single_checkbox' || q.questionType === 'multiple_checkbox') && (
+                            <div className="mt-4 pt-4 border-t border-green-100 space-y-2">
+                              <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                                <input
+                                  type="checkbox"
+                                  checked={!!q.randomizeOptions}
+                                  onChange={(e) => handleQuestionChange(idx, 'randomizeOptions', e.target.checked)}
+                                />
+                                Randomise options
+                              </label>
+                              <p className="text-xs text-gray-500">
+                                Each respondent sees the options in a shuffled order. The order stays the same if they reopen the survey.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       )}
 
@@ -292,7 +308,21 @@ export default function SurveyQuestions({
                       {q.questionType === 'matrix_radio' && (
                         <div className="space-y-4">
                           <p className="text-xs text-gray-500">
-                            Edit every row label and every scale column (Completely satisfied, Not applicable, and the rest). Respondents see this grid as-is.
+                            Edit every row label and every scale column (Completely satisfied, Not applicable, and the rest).
+                            {q.randomizeOptions
+                              ? ' Respondents see the rows shuffled; columns stay in this order.'
+                              : ' Respondents see this grid as-is unless you turn on row randomisation below.'}
+                          </p>
+                          <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
+                            <input
+                              type="checkbox"
+                              checked={!!q.randomizeOptions}
+                              onChange={(e) => handleQuestionChange(idx, 'randomizeOptions', e.target.checked)}
+                            />
+                            Randomise rows
+                          </label>
+                          <p className="text-xs text-gray-500 -mt-2">
+                            Only the row order is shuffled. Scale columns are never randomised.
                           </p>
                           <div className="p-5 bg-sky-50 rounded-xl border border-sky-100">
                             <div className="flex justify-between items-center mb-4 gap-3">
@@ -492,6 +522,9 @@ export default function SurveyQuestions({
                               </label>
                             ))}
                             {q.questionType === 'attention_check' && (
+                              <p className="text-xs text-gray-500">Respondents see these options in a random order.</p>
+                            )}
+                            {(q.questionType === 'single_checkbox' || q.questionType === 'multiple_checkbox') && q.randomizeOptions && (
                               <p className="text-xs text-gray-500">Respondents see these options in a random order.</p>
                             )}
                           </div>

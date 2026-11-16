@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
 import { authAPI } from '../services/api';
 import { clearHealthSession, trackSessionStart } from '../utils/healthEvents';
+import { stashAgeGateReminderToken } from '../utils/ageGate';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -41,6 +42,13 @@ export const AuthProvider = ({ children }) => {
       trackSessionStart();
     } catch (err) {
       console.error('Failed to fetch user:', err);
+
+      if (err.response?.data?.code === 'AGE_RESTRICTED') {
+        stashAgeGateReminderToken(err.response?.data?.data?.reminderToken);
+        clearSessionHint();
+        setUser(null);
+        return;
+      }
 
       if (err.response?.status === 401) {
         clearSessionHint();

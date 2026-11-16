@@ -8,11 +8,13 @@ import CreditArc, { pageWindow } from "../../components/shop/CreditArc";
 import HomeFooter from "../../components/homepage/HomeFooter";
 import { flipShopCatalog, initShopCinema, scrollShopToCatalog } from "../../components/shop/shopCinema";
 import { useAuth } from "../../context/AuthContext";
+import { rememberReturnPath } from "../../utils/auth";
 import { toast } from "react-hot-toast";
 import { isOfferAvailable, matchesOfferSearch } from "../../utils/pickSurveyOffers";
 import { parsePage, writeSearchParams } from "../../utils/searchParams";
 import { trackEvent } from "../../utils/visitorEvents";
 import { healthSessionId, trackHealthEvent } from "../../utils/healthEvents";
+import { getShopShuffleSeed, shuffleOffersForSession } from "../../utils/shopShuffle";
 import skyBg from "../../assets/home/sky.jpg";
 import "../../components/homepage/homepage.css";
 import "../../components/shop/shop.css";
@@ -26,9 +28,11 @@ export default function Shop() {
   const gridRef = useRef(null);
   const rectsRef = useRef(new Map());
   const lastCatalogPage = useRef(null);
+  const shuffleSeedRef = useRef(getShopShuffleSeed());
   const [searchParams, setSearchParams] = useSearchParams();
   const search = searchParams.get("q") || "";
-  const sortOrder = searchParams.get("sort") || "latest";
+  const rawSort = searchParams.get("sort");
+  const sortOrder = !rawSort || rawSort === "default" ? "mixed" : rawSort;
   const catalogPage = parsePage(searchParams.get("page"));
   const [searchDraft, setSearchDraft] = useState(search);
   const [selectedOffer, setSelectedOffer] = useState(null);
@@ -38,6 +42,7 @@ export default function Shop() {
   const [recommendedOffers, setRecommendedOffers] = useState([]);
   const [recommendedTick, setRecommendedTick] = useState(0);
   const [userCredits, setUserCredits] = useState(Number(user?.credits) || 0);
+  const [avgSurveyCredits, setAvgSurveyCredits] = useState(null);
   const [loadingOffers, setLoadingOffers] = useState(true);
   const [fetchError, setFetchError] = useState(null);
   const [retryTick, setRetryTick] = useState(0);
@@ -48,7 +53,7 @@ export default function Shop() {
     (patch) =>
       writeSearchParams(setSearchParams, patch, {
         q: "",
-        sort: "latest",
+        sort: "mixed",
         page: 1,
       }),
     [setSearchParams]
@@ -131,6 +136,8 @@ export default function Shop() {
         const offersRes = offersResult.value;
         const responseData = offersRes.data?.data || offersRes.data;
         setVoucherOffers(Array.isArray(responseData) ? responseData : []);
+        const avg = Number(offersRes.data?.avgSurveyCredits);
+        setAvgSurveyCredits(Number.isFinite(avg) && avg > 0 ? avg : null);
 
         if (profileResult.status === "fulfilled" && profileResult.value) {
           const profileRes = profileResult.value;
@@ -192,6 +199,9 @@ export default function Shop() {
   const handleSelectOffer = (offer, index = 0, receivedVia = "shop") => {
     if (!user) {
       toast.error("Please log in to redeem vouchers.");
+      rememberReturnPath(
+        `${window.location.pathname}${window.location.search}${window.location.hash}`
+      );
       navigate("/login");
       return;
     }
@@ -241,10 +251,13 @@ export default function Shop() {
             isOfferAvailable(offer) && (Number(offer.creditsRequired) || 0) <= credits
         )
         .sort((a, b) => (a.creditsRequired || 0) - (b.creditsRequired || 0));
-    } else {
+    } else if (sortOrder === "latest") {
       vouchers = [...vouchers].sort((a, b) =>
         String(b.createdAt || "").localeCompare(String(a.createdAt || ""))
       );
+    } else {
+      // Default "mixed": session-stable random order (recommended section is separate).
+      vouchers = shuffleOffersForSession(vouchers, shuffleSeedRef.current);
     }
 
     return vouchers;
@@ -335,6 +348,8 @@ export default function Shop() {
                     <RewardCard
                       offer={offer}
                       index={idx}
+                      userCredits={isLoggedIn ? userCredits : undefined}
+                      avgSurveyCredits={avgSurveyCredits}
                       onRedeem={(offer, index) => handleSelectOffer(offer, index, "shop_recommended")}
                       onViewStore={(businessId) => navigate(`/shop/merchant/${businessId}`)}
                     />
@@ -381,9 +396,10 @@ export default function Shop() {
             <label className="shop-sort">
               <span>Sort by:</span>
               <select
-                value={sortOrder === "default" ? "latest" : sortOrder}
+                value={sortOrder}
                 onChange={(event) => setShopParams({ sort: event.target.value, page: 1 })}
               >
+                <option value="mixed">Mixed order</option>
                 <option value="latest">Latest Rewards</option>
                 <option value="affordable">Affordable</option>
                 <option value="asc">Credits: Low to High</option>
@@ -431,6 +447,8 @@ export default function Shop() {
                     <RewardCard
                       offer={offer}
                       index={rangeStart + idx}
+                      userCredits={isLoggedIn ? userCredits : undefined}
+                      avgSurveyCredits={avgSurveyCredits}
                       onRedeem={handleSelectOffer}
                       onViewStore={(businessId) => navigate(`/shop/merchant/${businessId}`)}
                     />
@@ -482,7 +500,7 @@ export default function Shop() {
               <button
                 type="button"
                 className="home-pill home-pill-sm home-pill-navy"
-                onClick={() => setShopParams({ q: "", sort: "latest", page: 1 })}
+                onClick={() => setShopParams({ q: "", sort: "mixed", page: 1 })}
               >
                 Clear filters
               </button>

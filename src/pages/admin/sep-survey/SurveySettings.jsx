@@ -304,7 +304,7 @@ export default function SurveySettings({
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2 flex items-center gap-1.5">
                   <Clock className="h-4 w-4 text-gray-500" />
-                  Estimated Time to Complete (minutes)
+                  Estimated Time to Complete (minutes) <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -313,10 +313,10 @@ export default function SurveySettings({
                   onChange={e => handleInputChange('estimatedMinutes', e.target.value)}
                   className="w-full max-w-[200px] px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   placeholder="e.g., 3"
+                  required
                 />
                 <p className="text-xs text-gray-500 mt-1.5">
                   Shown to users on the survey card (e.g. "~3 min") so they know what they're signing up for.
-                  Leave blank if unsure.
                 </p>
               </div>
             </div>

@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { adminHomePath, hasPermission, isStaffAdmin } from '../../utils/adminRoles';
+import { rememberReturnPath } from '../../utils/auth';
 
 const AdminRoute = ({ children, permission }) => {
   const { user, loading } = useAuth();
@@ -17,6 +18,7 @@ const AdminRoute = ({ children, permission }) => {
   }
 
   if (!user) {
+    rememberReturnPath(location);
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

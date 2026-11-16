@@ -1,4 +1,5 @@
 import { readAcquisition } from "./acquisition";
+import { peekReturnPath } from "./auth";
 import { ensureVisitorId } from "./healthEvents";
 
 const ATTEMPT_KEY = "eruchi_google_oauth_attempt";
@@ -20,12 +21,14 @@ export const startGoogleRedirectOAuth = () => {
   const params = new URLSearchParams();
   const visitorId = ensureVisitorId();
   const acquisition = readAcquisition();
+  const returnPath = peekReturnPath();
   if (visitorId) params.set("visitorId", visitorId);
   if (acquisition?.source) params.set("utm_source", acquisition.source);
   if (acquisition?.medium) params.set("utm_medium", acquisition.medium);
   if (acquisition?.campaign) params.set("utm_campaign", acquisition.campaign);
   if (acquisition?.content) params.set("utm_content", acquisition.content);
   if (acquisition?.term) params.set("utm_term", acquisition.term);
+  if (returnPath) params.set("next", returnPath);
   const qs = params.toString();
   window.location.assign(`${getGoogleRedirectUrl()}${qs ? `?${qs}` : ""}`);
 };

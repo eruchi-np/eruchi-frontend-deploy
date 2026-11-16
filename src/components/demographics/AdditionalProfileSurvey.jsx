@@ -3,7 +3,7 @@ import { Check } from 'lucide-react';
 import useAdditionalProfile from '../../hooks/useAdditionalProfile';
 import { userAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { PROFILE_COMPLETION_2_CREDITS } from '../../utils/onboardingCredits';
+import { PROFILE_COMPLETION_3_CREDITS } from '../../utils/onboardingCredits';
 import { additionalProfileSchema, parseStep } from '../../utils/onboardingSchemas';
 import ConfirmSame, { hasSavedValue, valuesMatch } from './ConfirmSame';
 import '../onboarding/onboarding.css';
@@ -77,7 +77,7 @@ const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
   const [seedState, setSeedState] = useState(isRefresh ? 'loading' : 'ready');
 
   useEffect(() => {
-    trackOnboardingView('pc2');
+    trackOnboardingView('pc3');
   }, []);
 
   useEffect(() => {
@@ -136,7 +136,7 @@ const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
     const fieldErrors = parseStep(additionalProfileSchema, formData);
     if (Object.keys(fieldErrors).length) {
       setErrors(fieldErrors);
-      Object.keys(fieldErrors).forEach((field) => trackOnboardingError('pc2', field));
+      Object.keys(fieldErrors).forEach((field) => trackOnboardingError('pc3', field));
       setSubmitError(
         isRefresh
           ? 'Please answer every question.'
@@ -172,9 +172,9 @@ const AdditionalProfileSurvey = ({ onComplete, mode = 'registration' }) => {
             ? `${awarded} Ruchi Credits added.`
             : isRefresh
               ? 'Profile updated.'
-              : `${PROFILE_COMPLETION_2_CREDITS} Ruchi Credits added.`
+              : `${PROFILE_COMPLETION_3_CREDITS} Ruchi Credits added.`
         );
-        trackOnboardingSubmit('pc2');
+        trackOnboardingSubmit('pc3');
         onComplete?.();
       } else {
         setSubmitError(response.data.message || 'Failed to save your answers');

@@ -1,6 +1,8 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 import { attachCsrf } from '../utils/csrf';
+import { rememberReturnPath } from '../utils/auth';
+import { stashAgeGateReminderToken } from '../utils/ageGate';
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api';
 
@@ -19,6 +21,19 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const skipToast = error.config?.skipErrorToast;
 
+    if (error.response?.data?.code === 'AGE_RESTRICTED') {
+      stashAgeGateReminderToken(error.response?.data?.data?.reminderToken);
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('email');
+      localStorage.removeItem('username');
+      localStorage.removeItem('user_id');
+      localStorage.removeItem('auth_method');
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
+    }
+
     if (status === 401 && !error.config?.skipAuthRedirect) {
       const url = error.config?.url || '';
       const isBrandRequest = url.includes('/brand/');
@@ -31,6 +46,9 @@ api.interceptors.response.use(
       } else if (isBusinessRequest) {
         localStorage.removeItem('is_business');
         localStorage.removeItem('business_name');
+        rememberReturnPath(
+          `${window.location.pathname}${window.location.search}${window.location.hash}`
+        );
         window.location.href = '/login';
       } else {
         localStorage.removeItem('access_token');
@@ -38,6 +56,9 @@ api.interceptors.response.use(
         localStorage.removeItem('username');
         localStorage.removeItem('user_id');
         localStorage.removeItem('auth_method');
+        rememberReturnPath(
+          `${window.location.pathname}${window.location.search}${window.location.hash}`
+        );
         window.location.href = '/login';
       }
     } else if (!skipToast) {
@@ -91,6 +112,14 @@ export const userAPI = {
   updateAdditionalProfile: (data, config = {}) => api.put('/users/me/additional-profile', data, config),
   purchaseStreakGuard: (days, config = {}) => api.post('/users/me/streak-guard', { days }, config),
   getActivity: (options = {}) => getRequest('/users/me/activity', options),
+};
+
+/** PC2 SEC household survey + shared profile-survey list. */
+export const secAPI = {
+  getQuestionnaire: (config = {}) => api.get('/v1/sec/questionnaire', { params: { locale: 'en' }, ...config }),
+  getProfileSurveys: (config = {}) => api.get('/v1/me/profile-surveys', config),
+  getCurrent: (config = {}) => api.get('/v1/me/sec/current', config),
+  submit: (data, config = {}) => api.post('/v1/me/sec/submissions', data, config),
 };
 
 export const adminAPI = {
@@ -239,8 +268,14 @@ export const clusterAPI = {
 
 export const sepSurveyAPI = {
   getAvailable: (options = {}) => getRequest('/sepsurveys', options),
+  getNextAvailable: (options = {}) => getRequest('/sepsurveys/next-available', options),
+  remindWhenAvailable: (config = {}) => api.post('/sepsurveys/remind-when-available', {}, config),
   getById: (surveyId, config = {}) => api.get(`/sepsurveys/${surveyId}`, config),
-  submit: (surveyId, responses, timingData, config = {}) => api.post(`/sepsurveys/${surveyId}/submit`, { responses, timingData }, config),
+  submit: (surveyId, responses, timingData, sessionId, config = {}) => api.post(`/sepsurveys/${surveyId}/submit`, {
+    responses,
+    timingData,
+    ...(sessionId ? { sessionId } : {}),
+  }, config),
   skip: (surveyId, config = {}) => api.post(`/sepsurveys/${surveyId}/skip`, {}, config),
   getHistory: (options = {}) => getRequest('/sepsurveys/history', options),
   create: (data, config = {}) => api.post('/sepsurveys', data, config),
@@ -269,11 +304,12 @@ export const fifteenDaySurveyAPI = {
         ...(Number.isInteger(Number(wave)) && Number(wave) >= 1 ? { wave: Number(wave) } : {}),
       },
     }),
-  submit: (surveyId, responses, timingData, wave) =>
+  submit: (surveyId, responses, timingData, wave, sessionId) =>
     api.post(`/fifteen-day/take/${surveyId}/submit`, {
       responses,
       timingData,
       ...(Number.isInteger(Number(wave)) && Number(wave) >= 1 ? { wave: Number(wave) } : {}),
+      ...(sessionId ? { sessionId } : {}),
     }),
 };
 

@@ -30,6 +30,27 @@ export function monthsOf(waves) {
   return [...new Set((waves || []).map(monthKey))].filter((key) => key.length === 7).sort();
 }
 
+/** Keep in sync with backend constants/brandClients.js */
+const CATALOG_BRANDS = {
+  FB: ['Red Bull', 'X-treme', 'Max Tiger', 'Monster', 'Sting'],
+  PC: [
+    'Dove',
+    'Pantene',
+    'Himalaya',
+    "L'Oréal",
+    "Pond's",
+    'Nivea',
+    'Garnier',
+    'Sunsilk',
+    'Clinic Plus',
+    'Mamaearth',
+    'Biotique',
+    'Parachute',
+  ],
+};
+
+const ALL_CATALOG_BRANDS = new Set(Object.values(CATALOG_BRANDS).flat());
+
 /** Legacy spellings → live metric brand names (keep in sync with backend brandClients). */
 const BRAND_ALIASES = {
   Xtreme: 'X-treme',
@@ -47,7 +68,12 @@ export function canonicalBrand(brand) {
   if (BRAND_ALIASES[trimmed]) return BRAND_ALIASES[trimmed];
   const lower = trimmed.toLowerCase();
   const hit = Object.entries(BRAND_ALIASES).find(([key]) => key.toLowerCase() === lower);
-  return hit ? hit[1] : trimmed;
+  if (hit) return hit[1];
+  for (const list of Object.values(CATALOG_BRANDS)) {
+    const exact = list.find((name) => name === trimmed || name.toLowerCase() === lower);
+    if (exact) return exact;
+  }
+  return trimmed;
 }
 
 export function findRow(rows, metric, brand, wave, item = null) {
@@ -105,6 +131,8 @@ export function isSelectableBrand(name) {
   if (!brand) return false;
   if (ROLLUP_BRANDS.has(brand)) return false;
   if (brand.startsWith('(') && brand.endsWith(')')) return false;
+  // Compare / focus pickers only list real tracker brands, not survey answer labels.
+  if (!ALL_CATALOG_BRANDS.has(brand) && !ALL_CATALOG_BRANDS.has(canonicalBrand(brand))) return false;
   return true;
 }
 

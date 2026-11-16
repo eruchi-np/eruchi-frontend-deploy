@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import toast from "react-hot-toast";
-import { getPostLoginPath, persistAuthSession } from "../../utils/auth";
+import { getPostLoginPath, persistAuthSession, rememberReturnPath } from "../../utils/auth";
 import { useAuth } from "../../context/AuthContext";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
@@ -11,6 +11,8 @@ import { Loader2, Eye, EyeOff } from "lucide-react";
 import { businessAPI } from "../../services/api";
 import GoogleOAuthHint from "../../components/auth/GoogleOAuthHint";
 import GoogleSignInButton from "../../components/auth/GoogleSignInButton";
+import AgeGateModal from "../../components/auth/AgeGateModal";
+import { consumeAgeGateReminderToken } from "../../utils/ageGate";
 import { consumeIncompleteGoogleOAuthAttempt } from "../../utils/googleOAuth";
 import { ensureCsrfToken } from "../../utils/csrf";
 import { readVisitorId } from "../../utils/healthEvents";
@@ -42,15 +44,28 @@ const businessLoginSchema = z.object({
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState("user");
   const [loginError, setLoginError] = useState("");
   const [googleOAuthHint, setGoogleOAuthHint] = useState(false);
+  const [ageGate, setAgeGate] = useState(null);
+
+  useEffect(() => {
+    if (location.state?.from) rememberReturnPath(location.state.from);
+    const next = searchParams.get("next");
+    if (next) rememberReturnPath(next);
+  }, [location.state, searchParams]);
 
   useEffect(() => {
     const oauthError = searchParams.get("error");
+    const reminderToken = searchParams.get("rt") || consumeAgeGateReminderToken();
     const bouncedBack = consumeIncompleteGoogleOAuthAttempt();
+    if (oauthError === "age_restricted" || reminderToken) {
+      setAgeGate({ reminderToken: reminderToken || "" });
+      return;
+    }
     if (oauthError === "google_auth_failed" || bouncedBack) {
       setGoogleOAuthHint(true);
     } else if (oauthError) {
@@ -64,9 +79,12 @@ const Login = () => {
       return;
     }
     if (!authLoading && user) {
-      navigate(getPostLoginPath(user), { replace: true });
+      navigate(
+        getPostLoginPath(user, location.state?.from || searchParams.get("next")),
+        { replace: true }
+      );
     }
-  }, [navigate, user, authLoading]);
+  }, [navigate, user, authLoading, location.state, searchParams]);
 
   const [isLoading, setIsLoading] = useState(false);
   const [needsVerification, setNeedsVerification] = useState(false);
@@ -121,10 +139,20 @@ const Login = () => {
 
       persistAuthSession(userData);
       toast.success("Login successful!");
-      navigate(getPostLoginPath(userData), { replace: true });
+      navigate(
+        getPostLoginPath(userData, location.state?.from || searchParams.get("next")),
+        { replace: true }
+      );
     } catch (error) {
       if (!error.response) {
         setLoginError(LOGIN_NETWORK_MESSAGE);
+        return;
+      }
+
+      if (error.response?.data?.code === "AGE_RESTRICTED") {
+        setAgeGate({
+          reminderToken: error.response?.data?.data?.reminderToken || "",
+        });
         return;
       }
 
@@ -195,6 +223,12 @@ const Login = () => {
 
   return (
     <OnboardingShell>
+      {ageGate && (
+        <AgeGateModal
+          reminderToken={ageGate.reminderToken}
+          onClose={() => setAgeGate(null)}
+        />
+      )}
       <div className="onboard-card onboard-card--auth">
         <div className="onboard-auth-head">
           <h1 className="onboard-title">Please sign in to continue</h1>

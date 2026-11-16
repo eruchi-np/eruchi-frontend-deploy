@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm, Controller } from "react-hook-form";
 import { z } from "zod";
@@ -10,7 +10,13 @@ import { useAuth } from "../../context/AuthContext";
 import OnboardingShell from "../../components/onboarding/OnboardingShell";
 import CreditRewardBadge from "../../components/onboarding/CreditRewardBadge";
 import { BASIC_DETAILS_CREDITS } from "../../utils/onboardingCredits";
-import { formatNepalPhone, phoneFormatError } from "../../utils/phoneFormat";
+import {
+  caretAfterNepalPhoneFormat,
+  formatNepalPhone,
+  localPhoneDigits,
+  phoneDigits,
+  phoneFormatError,
+} from "../../utils/phoneFormat";
 import { trackOnboardingError, trackOnboardingSubmit, trackOnboardingView } from "../../utils/healthEvents";
 import { getPostLoginPath } from "../../utils/auth";
 import { clearStoredReferralCode, digitsOnly, readStoredReferralCode, storeReferralCode } from "../../utils/referral";
@@ -32,8 +38,8 @@ const schema = z.object({
       let age = today.getFullYear() - birth.getFullYear();
       const m = today.getMonth() - birth.getMonth();
       if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age -= 1;
-      return age >= 13;
-    }, "You must be at least 13 years old"),
+      return age >= 16;
+    }, "You must be at least 16 years old"),
   gender: z
     .string()
     .min(1, "Please select your gender")
@@ -53,11 +59,15 @@ const CompleteBasicInfo = () => {
   const [hasReferral, setHasReferral] = useState(storedReferral ? "yes" : "no");
   const [referralCode, setReferralCode] = useState(storedReferral);
   const canEnterReferral = !user?.referralStatus;
+  const hydratedUserIdRef = useRef(null);
+  const phoneInputRef = useRef(null);
+  const phoneCaretRef = useRef(null);
 
   const {
     register,
     handleSubmit,
     control,
+    watch,
     formState: { errors },
     reset,
   } = useForm({
@@ -73,31 +83,48 @@ const CompleteBasicInfo = () => {
     },
   });
 
+  const phoneValue = watch("phone");
+
   useEffect(() => {
     if (authLoading || !user) return;
     trackOnboardingView("step2");
-  }, [authLoading, user]);
+  }, [authLoading, user?.id]);
 
   useEffect(() => {
     if (authLoading) return;
 
     if (!user) {
+      hydratedUserIdRef.current = null;
       navigate("/login", { replace: true });
       return;
     }
 
-    if (user?.isRegistrationComplete) {
+    if (user.isRegistrationComplete) {
       navigate(getPostLoginPath(user), { replace: true });
     }
+  }, [user, authLoading, navigate]);
 
+  useEffect(() => {
+    if (authLoading || !user) return;
+    const userId = String(user.id || "");
+    if (!userId || hydratedUserIdRef.current === userId) return;
+    hydratedUserIdRef.current = userId;
     reset({
-      phone: formatNepalPhone(user?.phone || ""),
-      dateOfBirth: user?.dateOfBirth
+      phone: formatNepalPhone(user.phone || ""),
+      dateOfBirth: user.dateOfBirth
         ? new Date(user.dateOfBirth).toISOString().split("T")[0]
         : "",
-      gender: user?.gender || "",
+      gender: user.gender || "",
     });
-  }, [user, authLoading, navigate, reset]);
+  }, [user, authLoading, reset]);
+
+  useLayoutEffect(() => {
+    const input = phoneInputRef.current;
+    const caret = phoneCaretRef.current;
+    if (!input || caret == null || document.activeElement !== input) return;
+    input.setSelectionRange(caret, caret);
+    phoneCaretRef.current = null;
+  }, [phoneValue]);
 
   const onSubmit = async (data) => {
     setSubmitting(true);
@@ -121,7 +148,7 @@ const CompleteBasicInfo = () => {
       await axios.put(
         `${API_BASE_URL}/users/me/basic-profile`,
         {
-          phone: data.phone.trim(),
+          phone: localPhoneDigits(data.phone),
           dateOfBirth: data.dateOfBirth,
           gender: data.gender,
           ...(canEnterReferral && hasReferral === "yes" ? { referralCode: enteredCode } : {}),
@@ -202,12 +229,25 @@ const CompleteBasicInfo = () => {
                   id="phone"
                   type="tel"
                   inputMode="tel"
-                  autoComplete="tel"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck={false}
                   placeholder="98XXXXXXXX"
                   value={field.value}
-                  onChange={(event) => field.onChange(formatNepalPhone(event.target.value))}
+                  onChange={(event) => {
+                    const input = event.target;
+                    const caret = input.selectionStart ?? input.value.length;
+                    const digitsBefore = phoneDigits(input.value.slice(0, caret)).length;
+                    const next = formatNepalPhone(input.value);
+                    phoneCaretRef.current = caretAfterNepalPhoneFormat(next, digitsBefore);
+                    field.onChange(next);
+                  }}
                   onBlur={field.onBlur}
-                  ref={field.ref}
+                  name={field.name}
+                  ref={(element) => {
+                    phoneInputRef.current = element;
+                    field.ref(element);
+                  }}
                 />
               )}
             />

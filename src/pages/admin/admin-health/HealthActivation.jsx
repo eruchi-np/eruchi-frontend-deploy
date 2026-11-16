@@ -38,7 +38,7 @@ const pointsText = (value) => {
   return `${rounded > 0 ? '+' : ''}${rounded} points`;
 };
 
-const ONBOARD_STEPS = { step2: 'Step 2', pc1: 'Profile 1', pc2: 'Profile 2' };
+const ONBOARD_STEPS = { step2: 'Step 2', pc1: 'Profile 1', pc2: 'Profile 2 (SEC)' };
 
 function StepList({ metric, title }) {
   if (!metric) return null;

@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import toast from "react-hot-toast";
 import { fifteenDaySurveyAPI, sepSurveyAPI } from "../../../services/api";
 import useSurveyTimer from "../../../hooks/userSurveyTimer";
-import { trackHealthEvent, useSurveyVisit } from "../../../utils/healthEvents";
+import { healthSessionId, trackHealthEvent, useSurveyVisit } from "../../../utils/healthEvents";
 import { useAuth } from "../../../context/AuthContext";
 import {
   PROFILE_REFRESH_BLOCKED,
@@ -251,14 +251,16 @@ export default function useStandaloneSurvey() {
           payload[q.questionText] = "";
         }
       });
+      const sessionId = healthSessionId() || undefined;
       const res = isSprint
         ? await fifteenDaySurveyAPI.submit(
             surveyId,
             payload,
             timingData,
-            survey.wave
+            survey.wave,
+            sessionId
           )
-        : await sepSurveyAPI.submit(surveyId, payload, timingData);
+        : await sepSurveyAPI.submit(surveyId, payload, timingData, sessionId);
       setConfirmOpen(false);
       markSurveySaved();
       window.dispatchEvent(new Event("authChange"));

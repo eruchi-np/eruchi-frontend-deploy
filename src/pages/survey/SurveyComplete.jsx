@@ -11,6 +11,7 @@ import skyBg from "../../assets/home/sky.jpg";
 import CreditArc from "./surveyComplete/CreditArc.jsx";
 import StreakChip from "./surveyComplete/StreakChip.jsx";
 import useSurveyCompleteOffers from "./surveyComplete/useSurveyCompleteOffers.js";
+import SurveysEmptyReminder from "../../components/survey/SurveysEmptyReminder.jsx";
 import "../../components/homepage/homepage.css";
 import "../../components/shop/shop.css";
 
@@ -32,6 +33,7 @@ export default function SurveyComplete() {
 
   const {
     credits,
+    avgSurveyCredits,
     loading,
     fetchError,
     selectedOffer,
@@ -160,11 +162,8 @@ export default function SurveyComplete() {
                       <ShopDots />
                       <h2 id="ad-h">You completed all your surveys!</h2>
                     </div>
-                    <p className="shop-head-copy !max-w-none">
-                      Come back tomorrow for more surveys. New ones are added
-                      every day!
-                    </p>
-                    <p className="shop-head-copy !max-w-none">
+                    <SurveysEmptyReminder copyClassName="shop-head-copy !max-w-none" />
+                    <p className="shop-head-copy !max-w-none mt-4">
                       In the meantime, check out the rewards picked for you
                       below, or{" "}
                       <Link
@@ -185,18 +184,14 @@ export default function SurveyComplete() {
               <div className="shop-title-row">
                 <ShopDots />
                 <h2 id="rw-h">
-                  {almostThere ? "Almost there" : "Rewards you can claim now"}
+                  {almostThere
+                    ? "You’re close to your first reward!"
+                    : "Rewards you can claim now"}
                 </h2>
               </div>
               <p className="shop-head-copy shop-recommended-copy">
                 {almostThere ? (
-                  <>
-                    You have{" "}
-                    <b className="font-semibold tabular-nums text-[#0c1520]">
-                      {credits.toLocaleString()} Ruchi Credits
-                    </b>
-                    . These are the closest.
-                  </>
+                  <>We think you’ll love these!</>
                 ) : (
                   <>
                     You have{" "}
@@ -263,6 +258,8 @@ export default function SurveyComplete() {
                       <RewardCard
                         offer={offer}
                         index={index}
+                        userCredits={credits}
+                        avgSurveyCredits={avgSurveyCredits}
                         onRedeem={handleSelectOffer}
                         onViewStore={(businessId) =>
                           navigate(`/shop/merchant/${businessId}`)

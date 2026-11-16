@@ -95,6 +95,20 @@ const EditProfile = () => {
   };
 
   const handleSaveBasic = async () => {
+    if (basic.dateOfBirth) {
+      const birth = new Date(basic.dateOfBirth);
+      if (!Number.isNaN(birth.getTime())) {
+        const today = new Date();
+        let age = today.getFullYear() - birth.getFullYear();
+        const m = today.getMonth() - birth.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age -= 1;
+        if (age < 16) {
+          showToast("error", "You must be at least 16 years old to use eRuchi.");
+          return;
+        }
+      }
+    }
+
     setSaving(true);
     try {
       await userAPI.updateBasicProfile({

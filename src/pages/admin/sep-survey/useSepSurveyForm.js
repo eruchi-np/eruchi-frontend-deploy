@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { sepSurveyAPI, fifteenDaySurveyAPI, clusterAPI } from '../../../services/api';
 import toast from 'react-hot-toast';
-import { plainSurveyText, sanitizeSurveyMarkup } from '../../../utils/surveyMarkup';
 import {
   SATISFACTION_SCALE,
   DEFAULT_MATRIX_ROWS,
@@ -14,6 +13,20 @@ import {
   visibilityOptions,
   kindOptions,
 } from './sepSurveyDefaults.js';
+import {
+  surveyCacheScope,
+  loadSurveyFormCache,
+  saveSurveyFormCache,
+  clearSurveyFormCache,
+  formHasQuestionDraft,
+} from './surveyFormCache.js';
+import {
+  snapshotForm,
+  validateSurveyForm,
+  buildSurveyQuestions,
+} from './surveyFormPersist.js';
+
+const AUTOSAVE_MS = 15000;
 
 const moveItem = (list, from, to) => {
   if (to < 0 || to >= list.length) return list;
@@ -23,21 +36,66 @@ const moveItem = (list, from, to) => {
   return next;
 };
 
+const mapLoadedQuestions = (questions) =>
+  questions?.length
+    ? questions.map((q) => ({
+      ...q,
+      options: Array.isArray(q.options) ? q.options : [],
+      rows: Array.isArray(q.rows) ? q.rows : [],
+      metricTag: q.metricTag === 'cep' || q.metricTag === 'nps' ? q.metricTag : 'none',
+      randomizeOptions: Boolean(q.randomizeOptions),
+    }))
+    : [{ ...EMPTY_QUESTION }];
+
 export default function useSepSurveyForm() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
+  const [pendingAction, setPendingAction] = useState(null);
+  const loading = pendingAction != null;
   const [clusters, setClusters] = useState([]);
   const [clustersLoading, setClustersLoading] = useState(false);
   const [formData, setFormData] = useState(createEmptyFormData);
+  const [autosaveLabel, setAutosaveLabel] = useState('');
+  const [isDirty, setIsDirty] = useState(false);
 
   const params = useParams();
   const [searchParams] = useSearchParams();
-  const surveyId = params.surveyId || params.id;
+  const routeSurveyId = params.surveyId || params.id;
   const isSprint = searchParams.get('sprint') === '1';
   const sprintDay = Number(searchParams.get('day'));
-  const isEditMode = Boolean(surveyId);
-  const [initialLoading, setInitialLoading] = useState(isEditMode);
+  const [activeSurveyId, setActiveSurveyId] = useState(routeSurveyId || null);
+  const isEditMode = Boolean(activeSurveyId);
+  const [initialLoading, setInitialLoading] = useState(Boolean(routeSurveyId));
   const backTo = isSprint ? '/admin/15-day-survey' : '/admin';
+
+  const savedSnapshotRef = useRef(null);
+  const formDataRef = useRef(formData);
+  const activeSurveyIdRef = useRef(activeSurveyId);
+  const pendingActionRef = useRef(pendingAction);
+  const isDirtyRef = useRef(isDirty);
+  const autosavingRef = useRef(false);
+  const allowLeaveRef = useRef(false);
+
+  formDataRef.current = formData;
+  activeSurveyIdRef.current = activeSurveyId;
+  pendingActionRef.current = pendingAction;
+  isDirtyRef.current = isDirty;
+
+  const cacheScope = surveyCacheScope({
+    isSprint,
+    sprintDay,
+    surveyId: activeSurveyId || routeSurveyId,
+  });
+
+  const needsPublicWindow =
+    !isSprint && (
+      formData.visibility === 'public'
+      || (formData.visibility === 'targeted' && formData.alsoPublishToOthers)
+    );
+
+  const markClean = useCallback((nextForm = formDataRef.current) => {
+    savedSnapshotRef.current = snapshotForm(nextForm);
+    setIsDirty(false);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -58,16 +116,32 @@ export default function useSepSurveyForm() {
   }, [isSprint]);
 
   useEffect(() => {
-    if (!isEditMode) return;
+    if (!routeSurveyId) {
+      const createScope = surveyCacheScope({ isSprint, sprintDay, surveyId: null });
+      const cached = loadSurveyFormCache(createScope);
+      if (cached?.formData && formHasQuestionDraft(cached.formData)) {
+        setFormData(cached.formData);
+        markClean(cached.formData);
+        toast.success('Restored your draft from this browser');
+      } else {
+        const empty = createEmptyFormData();
+        setFormData(empty);
+        markClean(empty);
+      }
+      setInitialLoading(false);
+      return undefined;
+    }
 
+    let cancelled = false;
     const fetchSurvey = async () => {
       try {
         const res = isSprint
-          ? await fifteenDaySurveyAPI.getById(surveyId, { skipErrorToast: true })
-          : await sepSurveyAPI.getById(surveyId, {
-              params: { manage: 1 },
-              skipErrorToast: true,
-            });
+          ? await fifteenDaySurveyAPI.getById(routeSurveyId, { skipErrorToast: true })
+          : await sepSurveyAPI.getById(routeSurveyId, {
+            params: { manage: 1 },
+            skipErrorToast: true,
+          });
+        if (cancelled) return;
         const survey = res.data.data;
 
         const startDate = survey.startDate ? new Date(survey.startDate) : new Date();
@@ -76,7 +150,7 @@ export default function useSepSurveyForm() {
           ? Math.max(1, Math.round((endDate - startDate) / (1000 * 60 * 60 * 24)))
           : 7;
 
-        setFormData({
+        const next = {
           title: survey.title || '',
           description: survey.description || '',
           status: survey.status || 'published',
@@ -90,29 +164,250 @@ export default function useSepSurveyForm() {
           alsoPublishToOthers: Boolean(survey.alsoPublishToOthers),
           clusterSendAt: new Date().toISOString().slice(0, 16),
           clusterIds: [],
-          questions: survey.questions?.length ? survey.questions.map((q) => ({
-            ...q,
-            options: Array.isArray(q.options) ? q.options : [],
-            rows: Array.isArray(q.rows) ? q.rows : [],
-            metricTag: q.metricTag === 'cep' || q.metricTag === 'nps' ? q.metricTag : 'none'
-          })) : [
-            { ...EMPTY_QUESTION }
-          ]
-        });
+          questions: mapLoadedQuestions(survey.questions),
+        };
+
+        const editScope = surveyCacheScope({ isSprint, sprintDay, surveyId: routeSurveyId });
+        const cached = loadSurveyFormCache(editScope);
+        if (cached?.formData && formHasQuestionDraft(cached.formData)) {
+          setFormData(cached.formData);
+          savedSnapshotRef.current = snapshotForm(next);
+          setIsDirty(snapshotForm(cached.formData) !== savedSnapshotRef.current);
+          toast.success('Restored unsaved edits from this browser');
+        } else {
+          setFormData(next);
+          markClean(next);
+        }
+        setActiveSurveyId(routeSurveyId);
       } catch (err) {
         console.error('Failed to load survey for editing', err);
         toast.error('Failed to load survey');
         navigate(isSprint ? '/admin/15-day-survey' : '/admin');
       } finally {
-        setInitialLoading(false);
+        if (!cancelled) setInitialLoading(false);
       }
     };
 
     fetchSurvey();
-  }, [isEditMode, isSprint, surveyId, navigate]);
+    return () => { cancelled = true; };
+  }, [routeSurveyId, isSprint, sprintDay, navigate, markClean]);
+
+  useEffect(() => {
+    if (initialLoading) return;
+    if (savedSnapshotRef.current == null) {
+      savedSnapshotRef.current = snapshotForm(formData);
+      return;
+    }
+    setIsDirty(snapshotForm(formData) !== savedSnapshotRef.current);
+  }, [formData, initialLoading]);
+
+  useEffect(() => {
+    if (initialLoading) return;
+    if (!formHasQuestionDraft(formData)) return;
+    const timer = setTimeout(() => {
+      saveSurveyFormCache(cacheScope, formData);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [formData, cacheScope, initialLoading]);
+
+  const persistSurvey = useCallback(async ({
+    asDraft = false,
+    silent = false,
+    stay = false,
+  } = {}) => {
+    const current = formDataRef.current;
+    const surveyId = activeSurveyIdRef.current;
+    const needsWindow =
+      !isSprint && (
+        current.visibility === 'public'
+        || (current.visibility === 'targeted' && current.alsoPublishToOthers)
+      );
+
+    const checked = validateSurveyForm(current, {
+      asDraft,
+      isSprint,
+      sprintDay,
+      needsPublicWindow: needsWindow,
+      silent,
+    });
+    if (!checked.ok) {
+      if (!silent && checked.message) toast.error(checked.message);
+      return { ok: false };
+    }
+
+    const { trimmedTitle, trimmedDesc, status, minutes } = checked;
+    if (!silent) setPendingAction(asDraft ? 'save' : 'publish');
+
+    try {
+      const availableDays = Number(current.availableDays) || 7;
+      const publishedAt = current.publishedAt
+        ? new Date(current.publishedAt)
+        : new Date();
+      const derivedEndDate = new Date(publishedAt);
+      derivedEndDate.setDate(derivedEndDate.getDate() + availableDays);
+      const questions = buildSurveyQuestions(current.questions);
+
+      if (isSprint) {
+        const sprintPayload = {
+          daySlot: sprintDay,
+          title: trimmedTitle,
+          description: trimmedDesc,
+          status,
+          credits: Number(current.credits),
+          estimatedMinutes: minutes,
+          questions,
+        };
+        let savedId = surveyId;
+        if (surveyId) {
+          await fifteenDaySurveyAPI.update(surveyId, sprintPayload, { skipErrorToast: silent });
+          if (!silent) toast.success(asDraft ? '15-day survey saved' : '15-day survey updated');
+        } else {
+          const res = await fifteenDaySurveyAPI.create(sprintPayload, { skipErrorToast: silent });
+          savedId = res.data?.data?._id || null;
+          if (savedId) setActiveSurveyId(String(savedId));
+          if (!silent) toast.success(asDraft ? '15-day survey saved' : '15-day survey created');
+        }
+        markClean(current);
+        clearSurveyFormCache(cacheScope);
+        if (savedId) {
+          clearSurveyFormCache(surveyCacheScope({ isSprint, sprintDay, surveyId: savedId }));
+        }
+        if (!stay) {
+          allowLeaveRef.current = true;
+          navigate('/admin/15-day-survey');
+        } else if (silent) {
+          setAutosaveLabel(`Draft saved ${new Date().toLocaleTimeString()}`);
+        }
+        return { ok: true, id: savedId };
+      }
+
+      const payload = {
+        title: trimmedTitle,
+        description: trimmedDesc,
+        status,
+        credits: Number(current.credits),
+        estimatedMinutes: minutes,
+        kind: current.kind === 'daily' ? 'daily' : 'normal',
+        startDate: publishedAt.toISOString(),
+        endDate: needsWindow ? derivedEndDate.toISOString() : null,
+        visibility: current.visibility,
+        alsoPublishToOthers:
+          current.visibility === 'targeted' ? Boolean(current.alsoPublishToOthers) : false,
+        validityDays: Number(current.validityDays) || 7,
+        clusterIds:
+          current.visibility === 'targeted' && status === 'published'
+            ? current.clusterIds
+            : [],
+        clusterSendAt:
+          current.visibility === 'targeted'
+          && status === 'published'
+          && current.clusterIds.length > 0
+            ? new Date(current.clusterSendAt).toISOString()
+            : undefined,
+        questions,
+      };
+
+      let sends = [];
+      let savedId = surveyId;
+      if (surveyId) {
+        const res = await sepSurveyAPI.update(surveyId, payload, { skipErrorToast: silent });
+        sends = res.data?.sends || [];
+        if (!silent) toast.success(asDraft ? 'Survey saved' : 'Survey updated successfully!');
+      } else {
+        const res = await sepSurveyAPI.create(payload, { skipErrorToast: silent });
+        sends = res.data?.sends || [];
+        savedId = res.data?.data?._id || null;
+        if (savedId) setActiveSurveyId(String(savedId));
+        if (!silent) toast.success(asDraft ? 'Survey saved' : 'Standalone survey created successfully!');
+      }
+
+      if (!silent) {
+        const failedSends = sends.filter((s) => !s.ok);
+        const okSends = sends.filter((s) => s.ok);
+        if (okSends.length) {
+          const firstWhen = okSends.find((s) => s.scheduledFor)?.scheduledFor;
+          const scheduledDate = firstWhen ? new Date(firstWhen) : null;
+          const future =
+            scheduledDate
+            && !Number.isNaN(scheduledDate.getTime())
+            && scheduledDate.getTime() > Date.now();
+          toast.success(
+            future
+              ? `Scheduled send to ${okSends.length} cluster${okSends.length === 1 ? '' : 's'} for ${scheduledDate.toLocaleString()}`
+              : `Queued send to ${okSends.length} cluster${okSends.length === 1 ? '' : 's'}`
+          );
+        }
+        if (failedSends.length) {
+          toast.error(
+            `Could not send to ${failedSends.length} cluster${failedSends.length === 1 ? '' : 's'}: ${
+              failedSends.map((s) => s.message).join('; ')
+            }`
+          );
+        }
+      }
+
+      markClean(current);
+      clearSurveyFormCache(cacheScope);
+      if (savedId) {
+        clearSurveyFormCache(surveyCacheScope({ isSprint, sprintDay, surveyId: savedId }));
+      }
+      if (!stay) {
+        allowLeaveRef.current = true;
+        navigate('/admin');
+      } else if (silent) {
+        setAutosaveLabel(`Draft saved ${new Date().toLocaleTimeString()}`);
+      }
+      return { ok: true, id: savedId };
+    } catch (err) {
+      console.error('Create sep survey error:', err);
+      if (!silent) {
+        const data = err.response?.data;
+        const detail =
+          Array.isArray(data?.errors) && data.errors.length
+            ? data.errors.join('. ')
+            : null;
+        const msg =
+          detail
+          || data?.message
+          || (surveyId ? 'Failed to update survey' : 'Failed to create survey');
+        toast.error(msg);
+      }
+      return { ok: false };
+    } finally {
+      if (!silent) setPendingAction(null);
+    }
+  }, [isSprint, sprintDay, navigate, markClean, cacheScope]);
+
+  useEffect(() => {
+    if (initialLoading) return undefined;
+    const timer = setInterval(async () => {
+      if (autosavingRef.current) return;
+      if (pendingActionRef.current) return;
+      if (!isDirtyRef.current) return;
+      if (!formHasQuestionDraft(formDataRef.current)) return;
+
+      autosavingRef.current = true;
+      try {
+        await persistSurvey({ asDraft: true, silent: true, stay: true });
+      } finally {
+        autosavingRef.current = false;
+      }
+    }, AUTOSAVE_MS);
+    return () => clearInterval(timer);
+  }, [initialLoading, persistSurvey]);
+
+  useEffect(() => {
+    const onBeforeUnload = (event) => {
+      if (allowLeaveRef.current || !isDirtyRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => window.removeEventListener('beforeunload', onBeforeUnload);
+  }, []);
 
   const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const toggleCluster = (clusterId) => {
@@ -123,16 +418,10 @@ export default function useSepSurveyForm() {
         ...prev,
         clusterIds: has
           ? prev.clusterIds.filter((c) => c !== id)
-          : [...prev.clusterIds, id]
+          : [...prev.clusterIds, id],
       };
     });
   };
-
-  const needsPublicWindow =
-    !isSprint && (
-      formData.visibility === 'public' ||
-      (formData.visibility === 'targeted' && formData.alsoPublishToOthers)
-    );
 
   const handleQuestionChange = (index, field, value) => {
     const updated = [...formData.questions];
@@ -181,7 +470,7 @@ export default function useSepSurveyForm() {
       }
     }
 
-    setFormData(prev => ({ ...prev, questions: updated }));
+    setFormData((prev) => ({ ...prev, questions: updated }));
   };
 
   const handleOptionChange = (qIndex, optIndex, value) => {
@@ -191,7 +480,7 @@ export default function useSepSurveyForm() {
     if (updated[qIndex].attentionAnswer === previous) {
       updated[qIndex].attentionAnswer = value;
     }
-    setFormData(prev => ({ ...prev, questions: updated }));
+    setFormData((prev) => ({ ...prev, questions: updated }));
   };
 
   const addOption = (qIndex) => {
@@ -199,7 +488,7 @@ export default function useSepSurveyForm() {
     const next = updated[qIndex].options.length + 1;
     const label = updated[qIndex].questionType === 'likert' ? String(next) : `Option ${next}`;
     updated[qIndex].options.push(label);
-    setFormData(prev => ({ ...prev, questions: updated }));
+    setFormData((prev) => ({ ...prev, questions: updated }));
   };
 
   const removeOption = (qIndex, optIndex) => {
@@ -210,7 +499,7 @@ export default function useSepSurveyForm() {
       if (updated[qIndex].attentionAnswer === removed) {
         updated[qIndex].attentionAnswer = '';
       }
-      setFormData(prev => ({ ...prev, questions: updated }));
+      setFormData((prev) => ({ ...prev, questions: updated }));
     }
   };
 
@@ -218,44 +507,44 @@ export default function useSepSurveyForm() {
     const updated = [...formData.questions];
     if (!Array.isArray(updated[qIndex].rows)) updated[qIndex].rows = [];
     updated[qIndex].rows[rowIndex] = value;
-    setFormData(prev => ({ ...prev, questions: updated }));
+    setFormData((prev) => ({ ...prev, questions: updated }));
   };
 
   const addRow = (qIndex) => {
     const updated = [...formData.questions];
     if (!Array.isArray(updated[qIndex].rows)) updated[qIndex].rows = [];
     updated[qIndex].rows.push(`Aspect ${updated[qIndex].rows.length + 1}`);
-    setFormData(prev => ({ ...prev, questions: updated }));
+    setFormData((prev) => ({ ...prev, questions: updated }));
   };
 
   const removeRow = (qIndex, rowIndex) => {
     const updated = [...formData.questions];
     if ((updated[qIndex].rows || []).length > 1) {
       updated[qIndex].rows.splice(rowIndex, 1);
-      setFormData(prev => ({ ...prev, questions: updated }));
+      setFormData((prev) => ({ ...prev, questions: updated }));
     }
   };
 
   const moveRow = (qIndex, from, to) => {
     const updated = [...formData.questions];
     updated[qIndex].rows = moveItem(updated[qIndex].rows || [], from, to);
-    setFormData(prev => ({ ...prev, questions: updated }));
+    setFormData((prev) => ({ ...prev, questions: updated }));
   };
 
   const moveOption = (qIndex, from, to) => {
     const updated = [...formData.questions];
     updated[qIndex].options = moveItem(updated[qIndex].options || [], from, to);
-    setFormData(prev => ({ ...prev, questions: updated }));
+    setFormData((prev) => ({ ...prev, questions: updated }));
   };
 
   const applySatisfactionScale = (qIndex) => {
     const updated = [...formData.questions];
     updated[qIndex].options = [...SATISFACTION_SCALE];
-    setFormData(prev => ({ ...prev, questions: updated }));
+    setFormData((prev) => ({ ...prev, questions: updated }));
   };
 
   const addQuestion = () => {
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
       questions: [
         ...prev.questions,
@@ -270,272 +559,41 @@ export default function useSepSurveyForm() {
           isRequired: true,
           attentionCheck: false,
           attentionAnswer: '',
-          metricTag: 'none'
-        }
-      ]
+          metricTag: 'none',
+        },
+      ],
     }));
   };
 
   const removeQuestion = (index) => {
     if (formData.questions.length > 1) {
       const updated = formData.questions.filter((_, i) => i !== index);
-      setFormData(prev => ({ ...prev, questions: updated }));
+      setFormData((prev) => ({ ...prev, questions: updated }));
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e, { asDraft = false } = {}) => {
     e.preventDefault();
+    await persistSurvey({ asDraft, silent: false, stay: false });
+  };
 
-    const trimmedTitle = formData.title.trim();
-    const trimmedDesc = formData.description.trim();
-
-    if (!trimmedTitle) return toast.error('Survey title is required');
-    if (!trimmedDesc) return toast.error('Description is required');
-
-    if (isSprint && (!Number.isInteger(sprintDay) || sprintDay < 1 || sprintDay > 15)) {
-      return toast.error('Pick a day from 1 to 15');
+  const leaveWithoutSaving = () => {
+    allowLeaveRef.current = true;
+    if (formHasQuestionDraft(formDataRef.current)) {
+      saveSurveyFormCache(cacheScope, formDataRef.current);
     }
-
-    if (!isSprint && needsPublicWindow) {
-      if (!formData.publishedAt) return toast.error('Published date is required');
-      if (!formData.availableDays || Number(formData.availableDays) < 1) {
-        return toast.error('Available days must be at least 1');
-      }
-    }
-
-    if (formData.estimatedMinutes !== '' && formData.estimatedMinutes != null) {
-      const minutes = Number(formData.estimatedMinutes);
-      if (!Number.isFinite(minutes) || minutes < 1) {
-        return toast.error('Estimated time must be at least 1 minute');
-      }
-    }
-
-    if (!Number.isFinite(Number(formData.credits)) || Number(formData.credits) < 0) {
-      return toast.error('Credits must be zero or more');
-    }
-
-    if (!isSprint && formData.visibility === 'targeted' && (!formData.validityDays || Number(formData.validityDays) < 1)) {
-      return toast.error('Validity days must be at least 1');
-    }
-
-    if (
-      !isSprint &&
-      formData.visibility === 'targeted' &&
-      formData.status === 'published' &&
-      formData.clusterIds.length > 0 &&
-      !formData.clusterSendAt
-    ) {
-      return toast.error('Cluster send date/time is required');
-    }
-
-    const questionTexts = formData.questions.map((q) => plainSurveyText(q.questionText));
-    if (questionTexts.some((text) => !text)) return toast.error('All questions must have text');
-    if (questionTexts.some((text) => text.length > 200)) {
-      return toast.error('Question text must be 200 characters or less');
-    }
-    if (new Set(questionTexts).size !== questionTexts.length) {
-      return toast.error('Each question needs its own wording');
-    }
-
-    const invalidCheckboxes = formData.questions.filter(q =>
-      (q.questionType === 'single_checkbox' || q.questionType === 'multiple_checkbox' || q.questionType === 'attention_check') &&
-      !(q.options || []).map((option) => option.trim()).filter(Boolean).length
-    );
-    if (invalidCheckboxes.length) return toast.error('Checkbox questions need at least one option');
-
-    const blankLikert = formData.questions.some((q) =>
-      q.questionType === 'likert' &&
-      (!(q.options || []).length || (q.options || []).some((option) => !String(option).trim()))
-    );
-    if (blankLikert) return toast.error('Each Likert option needs text');
-
-    const invalidMatrices = formData.questions.filter(q =>
-      q.questionType === 'matrix_radio' &&
-      (!(q.rows || []).map(r => r.trim()).filter(Boolean).length ||
-        !(q.options || []).map(o => o.trim()).filter(Boolean).length)
-    );
-    if (invalidMatrices.length) {
-      return toast.error('Matrix questions need at least one row and one column option');
-    }
-
-    const duplicateLabels = formData.questions.some((q) => {
-      if (!['single_checkbox', 'multiple_checkbox', 'attention_check', 'likert', 'matrix_radio'].includes(q.questionType)) return false;
-      const options = (q.options || []).map((option) => option.trim()).filter(Boolean);
-      if (new Set(options).size !== options.length) return true;
-      if (q.questionType !== 'matrix_radio') return false;
-      const rows = (q.rows || []).map((row) => row.trim()).filter(Boolean);
-      return new Set(rows).size !== rows.length;
-    });
-    if (duplicateLabels) return toast.error('Options and matrix rows must be unique');
-
-    const invalidSliders = formData.questions.filter((q) => {
-      if (q.questionType !== 'slider') return false;
-      const min = Number(q.minValue);
-      const max = Number(q.maxValue);
-      return !Number.isFinite(min) || !Number.isFinite(max) || max <= min;
-    });
-    if (invalidSliders.length) return toast.error('Slider max must be greater than min');
-
-    const badAttention = formData.questions.some((q) => {
-      const marked = q.questionType === 'attention_check' || (q.questionType === 'single_checkbox' && q.attentionCheck);
-      if (!marked) return false;
-      const options = (q.options || []).map((option) => option.trim()).filter(Boolean);
-      return !options.includes(String(q.attentionAnswer || '').trim());
-    });
-    if (badAttention) return toast.error('An attention check needs its correct option');
-
-    setLoading(true);
-
-    try {
-      const availableDays = Number(formData.availableDays) || 7;
-      const publishedAt = formData.publishedAt
-        ? new Date(formData.publishedAt)
-        : new Date();
-      const derivedEndDate = new Date(publishedAt);
-      derivedEndDate.setDate(derivedEndDate.getDate() + availableDays);
-
-      const questions = formData.questions.map(q => {
-          const base = {
-            questionText: sanitizeSurveyMarkup(q.questionText),
-            questionType: q.questionType,
-            isRequired: q.isRequired !== false,
-            metricTag: q.metricTag === 'cep' || q.metricTag === 'nps' ? q.metricTag : 'none'
-          };
-          if (['single_checkbox', 'multiple_checkbox', 'attention_check'].includes(q.questionType)) {
-            base.options = q.options.map(o => o.trim()).filter(Boolean);
-            base.maxSelections = q.questionType === 'multiple_checkbox' ? q.maxSelections : 1;
-          }
-          if (q.questionType === 'attention_check') {
-            base.attentionCheck = true;
-            base.attentionAnswer = String(q.attentionAnswer || '').trim();
-          }
-          if (q.questionType === 'likert') {
-            base.options = q.options.map(o => o.trim());
-            base.maxSelections = 1;
-          }
-          if (q.questionType === 'single_checkbox' && q.attentionCheck) {
-            base.attentionCheck = true;
-            base.attentionAnswer = String(q.attentionAnswer || '').trim();
-          }
-          if (q.questionType === 'matrix_radio') {
-            base.options = (q.options || []).map(o => o.trim()).filter(Boolean);
-            base.rows = (q.rows || []).map(r => r.trim()).filter(Boolean);
-            base.maxSelections = 1;
-          }
-          if (q.questionType === 'slider') {
-            base.minValue = Number(q.minValue);
-            base.maxValue = Number(q.maxValue);
-          }
-          return base;
-        });
-
-      if (isSprint) {
-        const sprintPayload = {
-          daySlot: sprintDay,
-          title: trimmedTitle,
-          description: trimmedDesc,
-          status: formData.status,
-          credits: Number(formData.credits),
-          questions
-        };
-        if (formData.estimatedMinutes !== '' && formData.estimatedMinutes != null) {
-          sprintPayload.estimatedMinutes = Number(formData.estimatedMinutes);
-        }
-        if (isEditMode) {
-          await fifteenDaySurveyAPI.update(surveyId, sprintPayload);
-          toast.success('15-day survey updated');
-        } else {
-          await fifteenDaySurveyAPI.create(sprintPayload);
-          toast.success('15-day survey saved');
-        }
-        navigate('/admin/15-day-survey');
-        return;
-      }
-
-      const payload = {
-        title: trimmedTitle,
-        description: trimmedDesc,
-        status: formData.status,
-        credits: Number(formData.credits),
-        kind: formData.kind === 'daily' ? 'daily' : 'normal',
-        startDate: publishedAt.toISOString(),
-        endDate: needsPublicWindow ? derivedEndDate.toISOString() : null,
-        visibility: formData.visibility,
-        alsoPublishToOthers:
-          formData.visibility === 'targeted' ? Boolean(formData.alsoPublishToOthers) : false,
-        validityDays: Number(formData.validityDays) || 7,
-        clusterIds:
-          formData.visibility === 'targeted' && formData.status === 'published'
-            ? formData.clusterIds
-            : [],
-        clusterSendAt:
-          formData.visibility === 'targeted' &&
-          formData.status === 'published' &&
-          formData.clusterIds.length > 0
-            ? new Date(formData.clusterSendAt).toISOString()
-            : undefined,
-        questions
-      };
-      if (formData.estimatedMinutes !== '' && formData.estimatedMinutes != null) {
-        payload.estimatedMinutes = Number(formData.estimatedMinutes);
-      }
-
-      let sends = [];
-      if (isEditMode) {
-        const res = await sepSurveyAPI.update(surveyId, payload);
-        sends = res.data?.sends || [];
-        toast.success('Survey updated successfully!');
-      } else {
-        const res = await sepSurveyAPI.create(payload);
-        sends = res.data?.sends || [];
-        toast.success('Standalone survey created successfully!');
-      }
-
-      const failedSends = sends.filter((s) => !s.ok);
-      const okSends = sends.filter((s) => s.ok);
-      if (okSends.length) {
-        const firstWhen = okSends.find((s) => s.scheduledFor)?.scheduledFor;
-        const scheduledDate = firstWhen ? new Date(firstWhen) : null;
-        const future =
-          scheduledDate && !Number.isNaN(scheduledDate.getTime()) && scheduledDate.getTime() > Date.now();
-        toast.success(
-          future
-            ? `Scheduled send to ${okSends.length} cluster${okSends.length === 1 ? '' : 's'} for ${scheduledDate.toLocaleString()}`
-            : `Queued send to ${okSends.length} cluster${okSends.length === 1 ? '' : 's'}`
-        );
-      }
-      if (failedSends.length) {
-        toast.error(
-          `Could not send to ${failedSends.length} cluster${failedSends.length === 1 ? '' : 's'}: ${
-            failedSends.map((s) => s.message).join('; ')
-          }`
-        );
-      }
-
-      navigate('/admin');
-    } catch (err) {
-      console.error('Create sep survey error:', err);
-      const data = err.response?.data;
-      const detail =
-        Array.isArray(data?.errors) && data.errors.length
-          ? data.errors.join('. ')
-          : null;
-      const msg =
-        detail ||
-        data?.message ||
-        (isEditMode ? 'Failed to update survey' : 'Failed to create survey');
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
+    navigate(backTo);
   };
 
   const getMinPublishedDate = () => new Date().toISOString().slice(0, 16);
 
-  const getQuestionTypeData = (type) => questionTypes.find(qt => qt.value === type);
+  const getQuestionTypeData = (type) => questionTypes.find((qt) => qt.value === type);
 
   return {
     loading,
+    pendingAction,
+    autosaveLabel,
+    isDirty,
     clusters,
     clustersLoading,
     formData,
@@ -566,6 +624,7 @@ export default function useSepSurveyForm() {
     addQuestion,
     removeQuestion,
     handleSubmit,
+    leaveWithoutSaving,
     getMinPublishedDate,
     getQuestionTypeData,
   };

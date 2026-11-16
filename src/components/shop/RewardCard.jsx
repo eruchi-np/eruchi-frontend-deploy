@@ -1,5 +1,9 @@
 import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getOfferStock } from "../../utils/pickSurveyOffers";
+import {
+  canAffordOffer,
+  surveysAwayLabel,
+} from "../../utils/surveysAway";
 
 export const CARD_COLORS = ["#003049", "#FF006E", "#F77F00", "#007F5F", "#E39B0E", "#7251B5"];
 
@@ -14,6 +18,16 @@ function daysLeftLabel(offer) {
     return `Valid ${offer.expiryDays} days once claimed`;
   }
   return "";
+}
+
+function cardMetaLabel(offer, userCredits, avgSurveyCredits) {
+  if (userCredits != null && !canAffordOffer(userCredits, offer)) {
+    return (
+      surveysAwayLabel(userCredits, offer.creditsRequired, avgSurveyCredits) ||
+      daysLeftLabel(offer)
+    );
+  }
+  return daysLeftLabel(offer);
 }
 
 function discountLabel(offer) {
@@ -99,7 +113,14 @@ function canHoverReveal() {
   );
 }
 
-export default function RewardCard({ offer, index = 0, onRedeem, onViewStore }) {
+export default function RewardCard({
+  offer,
+  index = 0,
+  onRedeem,
+  onViewStore,
+  userCredits,
+  avgSurveyCredits,
+}) {
   const [flipped, setFlipped] = useState(false);
   const stockInfo = useMemo(() => getOfferStock(offer), [offer]);
   const isOut = stockInfo !== null && stockInfo.remaining === 0;
@@ -107,7 +128,7 @@ export default function RewardCard({ offer, index = 0, onRedeem, onViewStore }) 
   const brandLogo = offer.business?.logo || offer.business?.logoUrl || null;
   const businessId = offer.business?._id;
   const color = CARD_COLORS[Math.abs(index) % CARD_COLORS.length];
-  const meta = daysLeftLabel(offer);
+  const meta = cardMetaLabel(offer, userCredits, avgSurveyCredits);
   const deal = discountLabel(offer);
   const blurb = offerBlurb(offer);
 

@@ -4,6 +4,7 @@ import { ArrowLeft, Clock, Instagram, Globe, MapPin, Phone, Loader2, Star } from
 import toast from 'react-hot-toast';
 import { businessAPI, userAPI } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { rememberReturnPath } from '../../utils/auth';
 import VoucherRedeemModal from '../../components/widgets/VoucherRedeemModal';
 import { instagramUrl, instagramLabel, websiteUrl } from '../../utils/merchantLinks';
 import usePageMeta from '../../hooks/usePageMeta';
@@ -82,6 +83,9 @@ export default function MerchantPublicProfile() {
   const handleRedeem = (offer) => {
     if (!user) {
       toast.error('Please log in to redeem vouchers.');
+      rememberReturnPath(
+        `${window.location.pathname}${window.location.search}${window.location.hash}`
+      );
       navigate('/login');
       return;
     }

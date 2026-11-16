@@ -3,9 +3,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import AdditionalProfileSurvey from "../../components/demographics/AdditionalProfileSurvey";
 import OnboardingShell from "../../components/onboarding/OnboardingShell";
 import CreditRewardBadge from "../../components/onboarding/CreditRewardBadge";
-import { PROFILE_COMPLETION_2_CREDITS, PROFILE_COMPLETION_2_QUESTION_COUNT } from "../../utils/onboardingCredits";
+import { PROFILE_COMPLETION_3_CREDITS, PROFILE_COMPLETION_3_QUESTION_COUNT } from "../../utils/onboardingCredits";
 import { PROFILE_REFRESH_BODY } from "../../utils/profileRefreshCopy";
 import { useAuth } from "../../context/AuthContext";
+import { consumeReturnPath, getPostLoginPath } from "../../utils/auth";
 
 const CompleteAdditionalProfile = ({ mode = "registration" }) => {
   const isRefresh = mode === "refresh";
@@ -27,8 +28,8 @@ const CompleteAdditionalProfile = ({ mode = "registration" }) => {
 
   useEffect(() => {
     if (leavingRef.current || isRefresh || !user?.isAdditionalProfileComplete) return;
-    navigate("/", { replace: true });
-  }, [isRefresh, user?.isAdditionalProfileComplete, navigate]);
+    navigate(getPostLoginPath(user), { replace: true });
+  }, [isRefresh, user, navigate]);
 
   const handleComplete = async () => {
     leavingRef.current = true;
@@ -38,6 +39,11 @@ const CompleteAdditionalProfile = ({ mode = "registration" }) => {
       return;
     }
     await refreshUser();
+    const next = consumeReturnPath();
+    if (next) {
+      navigate(next, { replace: true });
+      return;
+    }
     navigate("/standalone-surveys", {
       replace: true,
       state: { scrollToCatalog: true, firstSurveyNudge: true },
@@ -61,16 +67,16 @@ const CompleteAdditionalProfile = ({ mode = "registration" }) => {
       <div className="onboard-card">
         {(!isRefresh || refreshPays) && (
           <div className="onboard-kicker">
-            <CreditRewardBadge amount={PROFILE_COMPLETION_2_CREDITS} />
+            <CreditRewardBadge amount={PROFILE_COMPLETION_3_CREDITS} />
           </div>
         )}
         <h1 className="onboard-title">{isRefresh ? "Update your profile" : "Final few questions"}</h1>
         <p className="onboard-copy">
           {refreshPays
-            ? `${PROFILE_REFRESH_BODY} Your current answers are filled in. Confirm same or change each one, then submit to earn ${PROFILE_COMPLETION_2_CREDITS} Ruchi Credits.`
+            ? `${PROFILE_REFRESH_BODY} Your current answers are filled in. Confirm same or change each one, then submit to earn ${PROFILE_COMPLETION_3_CREDITS} Ruchi Credits.`
             : isRefresh
             ? "Your current answers are filled in. Confirm same or change each one, then submit."
-            : `Earn ${PROFILE_COMPLETION_2_CREDITS} Ruchi Credits — ${PROFILE_COMPLETION_2_QUESTION_COUNT} quick questions about your daily life. Takes about 2 minutes.`}
+            : `Earn ${PROFILE_COMPLETION_3_CREDITS} Ruchi Credits — ${PROFILE_COMPLETION_3_QUESTION_COUNT} quick questions about your daily life. Takes about 2 minutes.`}
         </p>
         <AdditionalProfileSurvey mode={mode} onComplete={handleComplete} />
       </div>

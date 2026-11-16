@@ -24,6 +24,8 @@ import { rememberLandingVisit, rememberMailClick } from './utils/healthEvents';
 import { identifyClarity, installClarity } from './utils/clarity';
 import { useAuth } from './context/AuthContext';
 import { isProfileOnboardingLocked } from './utils/onboardingGate';
+import OneSignalBridge from './components/notifications/OneSignalBridge';
+import PushPrompt from './components/notifications/PushPrompt';
 
 const Homepage = lazy(() => import('./pages/public/Homepage'));
 const ForBusiness = lazy(() => import('./pages/public/ForBusiness.jsx'));
@@ -47,6 +49,8 @@ const EditProfile = lazy(() => import('./pages/user/EditProfile'));
 const Terms = lazy(() => import('./pages/public/Terms'));
 const PrivacyPolicy = lazy(() => import('./pages/public/LegalNotice'));
 const CompleteAdditionalProfile = lazy(() => import('./pages/user/CompleteAdditionalProfile'));
+const SecProfile = lazy(() => import('./pages/user/SecProfile'));
+const EditProfiles = lazy(() => import('./pages/user/EditProfiles'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
 const CreateSepSurvey = lazy(() => import('./pages/admin/sep-survey/CreateSepSurvey.jsx'));
 const FifteenDaySurveyAdmin = lazy(() => import('./pages/admin/FifteenDaySurveyAdmin.jsx'));
@@ -106,7 +110,10 @@ function AppChrome({ children }) {
     pathname === '/complete-profile' ||
     pathname === '/additional-profile' ||
     pathname === '/refresh-profile' ||
-    pathname === '/refresh-additional-profile';
+    pathname === '/refresh-additional-profile' ||
+    pathname === '/sec-profile' ||
+    pathname === '/sec-profile/refresh' ||
+    pathname === '/sec-profile/edit';
   const isOnboarding =
     isProfileCompletion ||
     pathname === '/login' ||
@@ -193,6 +200,8 @@ function App() {
       >
         <RouteChangeHandler />
         <ScrollToTop />
+        <OneSignalBridge />
+        <PushPrompt />
         <AppChrome>
         <OnboardingGate />
         <RouteErrorBoundary>
@@ -258,6 +267,39 @@ function App() {
               element={
                 <ProtectedRoute>
                   <CompleteAdditionalProfile mode="refresh" />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="/sec-profile"
+              element={
+                <ProtectedRoute>
+                  <SecProfile mode="first" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/sec-profile/refresh"
+              element={
+                <ProtectedRoute>
+                  <SecProfile mode="refresh" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/sec-profile/edit"
+              element={
+                <ProtectedRoute>
+                  <SecProfile mode="edit" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/edit-profiles"
+              element={
+                <ProtectedRoute>
+                  <EditProfiles />
                 </ProtectedRoute>
               }
             />

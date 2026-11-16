@@ -3,6 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { isStaffAdmin } from '../../utils/adminRoles';
+import { rememberReturnPath } from '../../utils/auth';
 
 const ProtectedRoute = ({ children, requireProfileComplete = false }) => {
   const { user, loading } = useAuth();
@@ -20,6 +21,7 @@ const ProtectedRoute = ({ children, requireProfileComplete = false }) => {
   }
 
   if (!user) {
+    rememberReturnPath(location);
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
@@ -35,10 +37,12 @@ const ProtectedRoute = ({ children, requireProfileComplete = false }) => {
   }
 
   if (!user.isRegistrationComplete) {
+    rememberReturnPath(location);
     return <Navigate to="/complete-basic-info" state={{ from: location }} replace />;
   }
 
   if (requireProfileComplete && !user.isProfileComplete) {
+    rememberReturnPath(location);
     return <Navigate to="/complete-profile" state={{ from: location }} replace />;
   }
 

@@ -667,6 +667,10 @@
   line-height: 1.55;
 }
 
+.shop-surveys-done .home-pill {
+  margin-top: 4px;
+}
+
 .shop-status-link {
   border: 0;
   padding: 0;

@@ -1,6 +1,6 @@
 // Create or edit a standalone survey. Settings, questions, and publish.
 
-import React from 'react';
+import React, { useState } from 'react';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import SurveySettings from './SurveySettings.jsx';
 import SurveyQuestions from './SurveyQuestions.jsx';
@@ -11,6 +11,9 @@ export { SATISFACTION_SCALE } from './sepSurveyDefaults.js';
 const CreateSepSurvey = () => {
   const {
     loading,
+    pendingAction,
+    autosaveLabel,
+    isDirty,
     clusters,
     clustersLoading,
     formData,
@@ -18,8 +21,6 @@ const CreateSepSurvey = () => {
     sprintDay,
     isEditMode,
     initialLoading,
-    backTo,
-    navigate,
     questionTypes,
     metricTagOptions,
     statusOptions,
@@ -41,9 +42,75 @@ const CreateSepSurvey = () => {
     addQuestion,
     removeQuestion,
     handleSubmit,
+    leaveWithoutSaving,
     getMinPublishedDate,
     getQuestionTypeData,
   } = useSepSurveyForm();
+
+  const [leaveOpen, setLeaveOpen] = useState(false);
+
+  const requestLeave = () => {
+    if (!isDirty) {
+      leaveWithoutSaving();
+      return;
+    }
+    setLeaveOpen(true);
+  };
+
+  const kindLabel = kindOptions.find((o) => o.value === formData.kind)?.label || formData.kind;
+  const visibilityLabel = visibilityOptions.find((o) => o.value === formData.visibility)?.label || formData.visibility;
+  const statusLabel = statusOptions.find((o) => o.value === formData.status)?.label || formData.status;
+  const selectedClusters = clusters.filter((c) => formData.clusterIds.includes(String(c._id)));
+  const descriptionPreview = formData.description?.trim()
+    ? (formData.description.trim().length > 120
+      ? `${formData.description.trim().slice(0, 120)}…`
+      : formData.description.trim())
+    : '—';
+  const formatDateTime = (value) => {
+    if (!value) return '—';
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
+  };
+
+  const summaryItems = [
+    { label: 'Title', value: formData.title?.trim() || '—' },
+    { label: 'Description', value: descriptionPreview },
+    ...(!isSprint ? [{ label: 'Survey type', value: kindLabel }] : []),
+    ...(!isSprint ? [{ label: 'Visibility', value: visibilityLabel }] : []),
+    { label: 'Status', value: statusLabel },
+    { label: 'Credits', value: String(formData.credits ?? 0) },
+    { label: 'Estimated time', value: formData.estimatedMinutes ? `${formData.estimatedMinutes} min` : '—' },
+    ...(!isSprint && formData.visibility === 'targeted'
+      ? [
+          { label: 'Validity after send', value: `${formData.validityDays} day${formData.validityDays !== 1 ? 's' : ''}` },
+          {
+            label: 'Clusters',
+            value: selectedClusters.length
+              ? selectedClusters.map((c) => c.name).join(', ')
+              : 'None selected',
+          },
+          ...(formData.clusterIds.length > 0
+            ? [{ label: 'Send to clusters on', value: formatDateTime(formData.clusterSendAt) }]
+            : []),
+          {
+            label: 'Also publish to others',
+            value: formData.alsoPublishToOthers ? 'Yes' : 'No',
+          },
+        ]
+      : []),
+    ...(needsPublicWindow
+      ? [
+          {
+            label: formData.visibility === 'targeted' ? 'Publish to others on' : 'Published date',
+            value: formatDateTime(formData.publishedAt),
+          },
+          {
+            label: 'Available for',
+            value: `${formData.availableDays} day${formData.availableDays !== 1 ? 's' : ''}`,
+          },
+        ]
+      : []),
+  ];
 
   if (initialLoading) {
     return (
@@ -61,12 +128,12 @@ const CreateSepSurvey = () => {
           <div className="flex items-center gap-3 sm:gap-4 min-w-0">
             <button
               type="button"
-              onClick={() => navigate(backTo)}
+              onClick={requestLeave}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors shrink-0"
             >
               <ArrowLeft className="h-5 w-5 text-gray-600" />
             </button>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
                 {isSprint
                   ? `${isEditMode ? 'Edit' : 'Create'} 15-day survey · Day ${sprintDay}`
@@ -77,6 +144,9 @@ const CreateSepSurvey = () => {
                   ? 'This preset stays on Daily Sprint until the user finishes it'
                   : (isEditMode ? 'Admins and customer admins can edit questions, rows, and scale labels any time' : 'Independent survey (not tied to a campaign)')}
               </p>
+              {autosaveLabel ? (
+                <p className="text-xs text-gray-400 mt-1">{autosaveLabel}</p>
+              ) : null}
             </div>
           </div>
         </div>
@@ -119,47 +189,121 @@ const CreateSepSurvey = () => {
 
           {/* Submit Bar */}
           <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 sticky bottom-16 md:bottom-0 shadow-lg">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">
-                  Ready to Publish?
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Survey with {formData.questions.length} question{formData.questions.length !== 1 ? 's' : ''}
-                </p>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Ready to Publish?
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    Survey with {formData.questions.length} question{formData.questions.length !== 1 ? 's' : ''}
+                  </p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Save keeps a private draft. Only you can open it until it is published. Drafts also autosave every 15 seconds when ready.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+                  <button
+                    type="button"
+                    onClick={requestLeave}
+                    className="px-8 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-all"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(event) => handleSubmit(event, { asDraft: true })}
+                    disabled={loading}
+                    className="flex items-center justify-center gap-2 px-8 py-3 border-2 border-indigo-600 text-indigo-700 rounded-xl font-medium hover:bg-indigo-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    {pendingAction === 'save' ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-5 w-5" />
+                        Save
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="flex items-center justify-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
+                  >
+                    {pendingAction === 'publish' ? (
+                      <>
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                        {isEditMode ? 'Saving...' : 'Creating...'}
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-5 w-5" />
+                        {isEditMode ? 'Save Changes' : 'Create Survey'}
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3">
-                <button
-                  type="button"
-                  onClick={() => navigate(backTo)}
-                  className="px-8 py-3 border-2 border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-all"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex items-center justify-center gap-2 px-8 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      {isEditMode ? 'Saving...' : 'Creating...'}
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-5 w-5" />
-                      {isEditMode ? 'Save Changes' : 'Create Survey'}
-                    </>
-                  )}
-                </button>
+              <div className="border-t border-gray-100 pt-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">
+                  Survey information
+                </p>
+                <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                  {summaryItems.map((item) => (
+                    <div key={item.label} className="min-w-0">
+                      <dt className="text-xs text-gray-500">{item.label}</dt>
+                      <dd className="text-sm text-gray-900 break-words">{item.value}</dd>
+                    </div>
+                  ))}
+                </dl>
               </div>
             </div>
           </div>
         </form>
       </div>
+
+      {leaveOpen ? (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/40">
+          <div
+            className="bg-white w-full max-w-md rounded-2xl shadow-xl p-5 sm:p-6"
+            role="dialog"
+            aria-labelledby="leave-survey-title"
+          >
+            <h2 id="leave-survey-title" className="text-lg font-bold text-gray-900">
+              Leave without saving?
+            </h2>
+            <p className="text-sm text-gray-600 mt-2">
+              Your questions stay in this browser so you can come back. A server draft only updates when the form is complete enough to autosave.
+            </p>
+            <div className="mt-5 flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setLeaveOpen(false)}
+                className="px-5 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50"
+              >
+                Stay
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLeaveOpen(false);
+                  leaveWithoutSaving();
+                }}
+                className="px-5 py-2.5 rounded-xl bg-red-600 text-white font-medium hover:bg-red-700"
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

@@ -14,6 +14,8 @@ import { trackSurveyCards } from "../../utils/healthEvents";
 import { PROFILE_REFRESH_BLOCKED, PROFILE_REFRESH_BODY, PROFILE_REFRESH_TITLE } from "../../utils/profileRefreshCopy";
 import { AnimationContext } from "../../components/animations/AnimationContext";
 import SurveyRow, { isSurveyOpen } from "../../components/survey/SurveyRow";
+import SurveysEmptyReminder from "../../components/survey/SurveysEmptyReminder";
+import ProfileSurveySection from "../../components/sec/ProfileSurveySection";
 import skyBg from "../../assets/home/sky.jpg";
 import "../../components/homepage/homepage.css";
 import "../../components/shop/shop.css";
@@ -285,6 +287,7 @@ export default function StandaloneSurveys() {
                 </button>
               </div>
             ) : null}
+            {!user?.profileSurveyBlocked ? <ProfileSurveySection /> : null}
             {!user?.profileSurveyBlocked && !loading && sprintSurveys.length > 0 ? (
               <div className="mb-12">
                 <div className="shop-head mb-6">
@@ -415,10 +418,7 @@ export default function StandaloneSurveys() {
                   </svg>
                 </span>
                 <h3>You completed all your surveys!</h3>
-                <p>
-                  Come back tomorrow for more surveys. New ones are added every
-                  day!
-                </p>
+                <SurveysEmptyReminder />
               </div>
             )}
 

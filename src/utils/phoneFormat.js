@@ -19,6 +19,19 @@ export function formatNepalPhone(value) {
   return digits;
 }
 
+/** Caret index in a formatted phone string after `digitCount` digit characters. */
+export function caretAfterNepalPhoneFormat(formatted, digitCount) {
+  if (digitCount <= 0) return 0;
+  let seen = 0;
+  for (let i = 0; i < formatted.length; i += 1) {
+    if (/\d/.test(formatted[i])) {
+      seen += 1;
+      if (seen >= digitCount) return i + 1;
+    }
+  }
+  return formatted.length;
+}
+
 export function localPhoneDigits(value) {
   const digits = phoneDigits(value);
   return digits.startsWith('977') ? digits.slice(3) : digits;

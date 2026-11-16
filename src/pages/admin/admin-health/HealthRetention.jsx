@@ -252,8 +252,8 @@ export function Retention({ data }) {
           </table>
         </div>
       </Card>
-      <Card metricId="L4" title="Lifecycle" summary="How many people are onboarding, active, at risk, or dormant each complete week, and who changed since the earlier Sunday." note={`Change from ${data.L4.transition.from} to ${data.L4.transition.to}. ${data.L4.gaps?.[0] || ''}`}>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+      <Card metricId="L4" title="Lifecycle" summary="How many people are onboarding, stalled, 3- or 7-day active, at risk, or dormant each complete week, and who changed since the earlier Sunday." note={`Change from ${data.L4.transition.from} to ${data.L4.transition.to}. Saved Sunday history. ${data.L4.gaps?.[0] || ''}`}>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {Object.entries(STATE_LABELS).map(([key, label]) => (
             <Mini key={key} label={label} value={int(data.L4.current.counts[key])} sub={STATE_DEFINITIONS[key]} tone={STATE_TONE[key]} />
           ))}
@@ -271,6 +271,7 @@ export function Retention({ data }) {
                 week: row.week,
                 onboarding: row.counts?.onboarding ?? 0,
                 stalled: row.counts?.stalled ?? 0,
+                active3: row.counts?.active3 ?? 0,
                 active: row.counts?.active ?? 0,
                 atRisk: row.counts?.atRisk ?? 0,
                 dormant: row.counts?.dormant ?? 0,
@@ -280,7 +281,8 @@ export function Retention({ data }) {
               lines={[
                 { key: 'onboarding', label: 'Onboarding', axis: 'left', color: '#0284C7' },
                 { key: 'stalled', label: 'Stalled', axis: 'left', color: '#D97706' },
-                { key: 'active', label: 'Active', axis: 'left', color: '#059669' },
+                { key: 'active3', label: '3-Day Active', axis: 'left', color: '#10B981' },
+                { key: 'active', label: '7-Day Active', axis: 'left', color: '#059669' },
                 { key: 'atRisk', label: 'At risk', axis: 'left', color: '#7C3AED' },
                 { key: 'dormant', label: 'Dormant', axis: 'left', color: '#DC2626' },
               ]}

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { businessAPI } from '../../services/api';
+import { rememberReturnPath } from '../../utils/auth';
 
 const BusinessProtectedRoute = ({ children }) => {
   const [status, setStatus] = useState('loading'); // 'loading' | 'authed' | 'unauthed'
@@ -28,6 +29,7 @@ const BusinessProtectedRoute = ({ children }) => {
   }
 
   if (status === 'unauthed') {
+    rememberReturnPath(location);
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 

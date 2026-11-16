@@ -16,6 +16,8 @@ import "../../components/homepage/homepage.css";
 import "../../components/profile/profile.css";
 import { adminHomePath, isStaffAdmin } from "../../utils/adminRoles";
 import { PROFILE_REFRESH_BLOCKED, PROFILE_REFRESH_BODY, PROFILE_REFRESH_TITLE } from "../../utils/profileRefreshCopy";
+import { ProfileSurveyPrompt } from "../../components/sec/ProfileSurveySection";
+import PushSettings from "../../components/notifications/PushSettings";
 
 const WEEK_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
 const VOUCHER_COLORS = ["#16365c", "#e91e63", "#f5a623", "#16365c"];
@@ -366,6 +368,7 @@ export default function Profile() {
             </span>
           </button>
         )}
+        {!(user.profileSurveyBlocked || user.profileOutdated) ? <ProfileSurveyPrompt /> : null}
         <section className="profile-hero">
           <div>
             <div className="profile-hero-name">
@@ -387,7 +390,7 @@ export default function Profile() {
               A few credits at a time, it adds up. Here&apos;s everything you&apos;ve earned and claimed so far.
             </p>
             <div className="profile-hero-actions">
-              <button type="button" className="profile-btn profile-btn-outline" onClick={() => navigate("/edit-profile")}>
+              <button type="button" className="profile-btn profile-btn-outline" onClick={() => navigate("/edit-profiles")}>
                 Edit Profile
               </button>
               <button type="button" className="profile-btn profile-btn-logout" onClick={handleLogout}>
@@ -465,6 +468,8 @@ export default function Profile() {
             </button>
           </section>
         )}
+
+        <PushSettings />
 
         <section className="profile-section">
           <div className="profile-section-head">

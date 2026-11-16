@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { fifteenDaySurveyAPI, sepSurveyAPI, userAPI, voucherAPI } from "../../../services/api";
+import { fifteenDaySurveyAPI, sepSurveyAPI, secAPI, userAPI, voucherAPI } from "../../../services/api";
 import { useAuth } from "../../../context/AuthContext";
 import { isSurveyOpen } from "../../../components/survey/SurveyRow";
 import {
@@ -8,11 +8,42 @@ import {
   matchesOfferSearch,
   pickSuggestedOffers,
 } from "../../../utils/pickSurveyOffers";
+import { canAffordOffer } from "../../../utils/surveysAway";
 import { trackHealthEvent } from "../../../utils/healthEvents";
 
 const SEARCH_LIMIT = 8;
 
+function profileSurveyAsRow(item) {
+  return {
+    _id: `profile-${item.code}`,
+    title: item.title,
+    description: item.description,
+    credits: item.credits,
+    estimatedMinutes: item.minutes,
+    isProfileSurvey: true,
+    profileCode: item.code,
+    profileState: item.state,
+    status: "published",
+  };
+}
+
+async function lookupNextProfileSurvey() {
+  try {
+    const res = await secAPI.getProfileSurveys({ skipErrorToast: true });
+    const items = res.data?.items || [];
+    if (!items.length) return null;
+    // Lowest n first — API already sorts; take the first actionable tile.
+    return profileSurveyAsRow(items[0]);
+  } catch {
+    return null;
+  }
+}
+
 async function lookupNextSurvey() {
+  // Profile surveys sit above market surveys (pinned section / first in page order).
+  const profileNext = await lookupNextProfileSurvey();
+  if (profileNext) return profileNext;
+
   const [surveysResult, sprintResult] = await Promise.allSettled([
     sepSurveyAPI.getAvailable({ page: 1, limit: 200, skipErrorToast: true }),
     fifteenDaySurveyAPI.getMine({ skipErrorToast: true }),
@@ -60,6 +91,7 @@ export default function useSurveyCompleteOffers(completion) {
   );
   const [offers, setOffers] = useState([]);
   const [recommended, setRecommended] = useState([]);
+  const [avgSurveyCredits, setAvgSurveyCredits] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
   const [search, setSearch] = useState("");
@@ -94,6 +126,8 @@ export default function useSurveyCompleteOffers(completion) {
 
         const responseData = offersRes.data?.data || offersRes.data;
         setOffers(Array.isArray(responseData) ? responseData : []);
+        const avg = Number(offersRes.data?.avgSurveyCredits);
+        setAvgSurveyCredits(Number.isFinite(avg) && avg > 0 ? avg : null);
         const recommendedData = recommendedRes?.data?.data;
         setRecommended(Array.isArray(recommendedData) ? recommendedData : []);
         setNextSurvey(next);
@@ -132,7 +166,11 @@ export default function useSurveyCompleteOffers(completion) {
 
   const showingSearch = Boolean(search.trim());
   const displayedOffers = showingSearch ? searchResults : suggested.offers;
-  const almostThere = !showingSearch && suggested.mode === "almost";
+  const canClaimSuggested =
+    !showingSearch &&
+    displayedOffers.some((offer) => canAffordOffer(credits, offer));
+  const almostThere =
+    !showingSearch && displayedOffers.length > 0 && !canClaimSuggested;
 
   const trackAction = (action, refId) => {
     if (!completion?.promptId) return;
@@ -150,6 +188,14 @@ export default function useSurveyCompleteOffers(completion) {
 
   const openNextSurvey = (survey) => {
     trackAction("next_survey", survey?._id);
+    if (survey?.isProfileSurvey) {
+      if (survey.profileCode === "PC2") {
+        navigate(
+          survey.profileState === "refresh" ? "/sec-profile/refresh" : "/sec-profile"
+        );
+      }
+      return;
+    }
     if (survey.isDailySprint) {
       const wave = Number(survey.wave) >= 1 ? Number(survey.wave) : 1;
       navigate(`/standalone-survey/${survey._id}?sprint=1&wave=${wave}`);
@@ -197,6 +243,7 @@ export default function useSurveyCompleteOffers(completion) {
 
   return {
     credits,
+    avgSurveyCredits,
     loading,
     fetchError,
     search,

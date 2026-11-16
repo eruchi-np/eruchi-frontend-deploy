@@ -35,7 +35,8 @@ const BAR_LABELS = {
   registered: 'Registered',
   step2: 'Step 2',
   pc1: 'Profile 1',
-  pc2: 'Profile 2',
+  pc2: 'Profile 2 (SEC)',
+  pc3: 'Profile 3 (lifestyle)',
   firstSurvey: 'First survey',
   activated: 'Activated',
 };
@@ -53,17 +54,19 @@ const STAGE_LABELS = {
 const STATE_LABELS = {
   onboarding: 'Onboarding',
   stalled: 'Stalled',
-  active: 'Active',
+  active3: '3-Day Active',
+  active: '7-Day Active',
   atRisk: 'At risk',
   dormant: 'Dormant',
 };
 
 const STATE_DEFINITIONS = {
-  onboarding: 'No survey yet. Signed up within the last 14 days.',
-  stalled: 'No survey yet. Signed up more than 14 days ago.',
-  active: 'Last survey was within the last 7 days.',
-  atRisk: 'Last survey was 8 to 28 days ago.',
-  dormant: 'Last survey was more than 28 days ago.',
+  onboarding: 'Registered, not activated yet. Within 2 hours of signup.',
+  stalled: 'Registered, not activated within 2 hours. Nudge audience for this card.',
+  active3: 'Activated. Last survey was within the last 3 days.',
+  active: 'Activated. Last survey was 4 to 7 days ago.',
+  atRisk: 'Activated. Last survey was 8 to 28 days ago.',
+  dormant: 'Activated. Last survey was more than 28 days ago.',
 };
 
 const BALANCE_LABELS = {
@@ -123,10 +126,10 @@ const PROMPT_LABELS = {
 };
 
 const KEY_LABELS = {
-  slipping: 'Active to at risk',
-  recovered: 'At risk to active',
-  returned: 'Dormant to active',
-  lateActivation: 'Stalled to active',
+  slipping: '3- or 7-day active to at risk',
+  recovered: 'At risk to 3- or 7-day active',
+  returned: 'Dormant to 3- or 7-day active',
+  lateActivation: 'Stalled to 3- or 7-day active',
 };
 
 const int = (value) => {
@@ -151,6 +154,7 @@ const TONE = {
 const STATE_TONE = {
   onboarding: 'info',
   stalled: 'mid',
+  active3: 'good',
   active: 'good',
   atRisk: 'mid',
   dormant: 'bad',

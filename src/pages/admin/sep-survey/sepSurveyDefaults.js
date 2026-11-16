@@ -22,7 +22,8 @@ export const EMPTY_QUESTION = {
   isRequired: true,
   metricTag: 'none',
   attentionCheck: false,
-  attentionAnswer: ''
+  attentionAnswer: '',
+  randomizeOptions: false
 };
 
 export const createEmptyFormData = () => ({

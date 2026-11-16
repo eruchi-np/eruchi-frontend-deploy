@@ -14,6 +14,8 @@ const USER_APP_PREFIXES = [
   '/additional-profile',
   '/refresh-profile',
   '/refresh-additional-profile',
+  '/sec-profile',
+  '/edit-profiles',
   '/email-verification',
 ];
 

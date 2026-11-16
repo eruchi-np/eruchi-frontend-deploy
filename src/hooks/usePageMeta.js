@@ -27,6 +27,7 @@ function upsertLink(rel, href) {
 
 export default function usePageMeta({
   title,
+  titleExact = false,
   description,
   index = true,
   canonicalPath,
@@ -35,7 +36,9 @@ export default function usePageMeta({
   useEffect(() => {
     if (skip) return;
 
-    const pageTitle = title ? `${title} | eRuchi` : 'eRuchi';
+    const pageTitle = titleExact && title
+      ? title
+      : (title ? `${title} | eRuchi` : 'eRuchi');
     document.title = pageTitle;
 
     if (description) {
@@ -76,5 +79,5 @@ export default function usePageMeta({
     } else if (jsonLd) {
       jsonLd.remove();
     }
-  }, [title, description, index, canonicalPath, skip]);
+  }, [title, titleExact, description, index, canonicalPath, skip]);
 }

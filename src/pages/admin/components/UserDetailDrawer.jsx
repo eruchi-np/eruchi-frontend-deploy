@@ -9,7 +9,8 @@ import { canAdjustCredits as userCanAdjustCredits } from "../../../utils/adminRo
 const LIFECYCLE_LABELS = {
   onboarding: "Onboarding",
   stalled: "Stalled",
-  active: "Active",
+  active3: "3-Day Active",
+  active: "7-Day Active",
   atRisk: "At risk",
   dormant: "Dormant",
 };

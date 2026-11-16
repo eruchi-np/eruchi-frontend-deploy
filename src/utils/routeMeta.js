@@ -4,7 +4,8 @@ const DEFAULT_DESCRIPTION =
 const PUBLIC_PAGES = [
   {
     test: (path) => path === '/',
-    title: 'Earn credits for sharing your opinion',
+    title: 'eRuchi | Where simple responses can earn real rewards.',
+    titleExact: true,
     description: DEFAULT_DESCRIPTION,
     index: true,
   },
@@ -70,6 +71,8 @@ const PRIVATE_TITLES = [
   { test: (path) => path.startsWith('/complete-'), title: 'Complete profile' },
   { test: (path) => path === '/additional-profile', title: 'Final few questions' },
   { test: (path) => path === '/refresh-profile' || path === '/refresh-additional-profile', title: 'Update profile' },
+  { test: (path) => path.startsWith('/sec-profile'), title: 'About your household' },
+  { test: (path) => path === '/edit-profiles', title: 'Edit profiles' },
   { test: (path) => path === '/edit-profile', title: 'Edit profile' },
 ];
 
@@ -100,6 +103,7 @@ export function getRouteMeta(pathname, searchParams) {
     const page = pathname === '/shop' ? params.get('page') : null;
     return {
       title: page && page !== '1' ? `${publicPage.title} · Page ${page}` : publicPage.title,
+      titleExact: Boolean(publicPage.titleExact) && !(page && page !== '1'),
       description: publicPage.description,
       index: publicPage.index,
       canonicalPath: canonicalSearch(pathname, params),

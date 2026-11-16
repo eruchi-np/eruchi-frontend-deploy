@@ -173,7 +173,9 @@ const FifteenDaySurveyAdmin = () => {
                   <div key={day} className="px-4 sm:px-6 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
                     <div className="w-16 shrink-0 text-sm font-bold text-gray-900">Day {day}</div>
                     <div className="flex-1 min-w-0">
-                      {survey ? (
+                      {survey?.locked ? (
+                        <p className="text-sm text-gray-400">Saved by another admin</p>
+                      ) : survey ? (
                         <>
                           <p className="font-medium text-gray-900 truncate">{survey.title}</p>
                           <p className="text-xs text-gray-500 capitalize">{survey.status} · {survey.questions?.length || 0} questions</p>
@@ -183,7 +185,7 @@ const FifteenDaySurveyAdmin = () => {
                       )}
                     </div>
                     <div className="flex gap-2">
-                      {survey ? (
+                      {survey?.locked ? null : survey ? (
                         <>
                           <button
                             type="button"

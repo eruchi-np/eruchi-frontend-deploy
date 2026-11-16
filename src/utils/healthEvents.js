@@ -136,11 +136,24 @@ const claimSend = (sendId) => {
   return true;
 };
 
+const SOCIAL = new Set(['facebook', 'instagram', 'tiktok', 'linkedin', 'twitter', 'x']);
+const CHANNELS = new Set(['email', 'messaging', 'social', 'direct', 'other']);
+
+const channelOf = (detail = {}) => {
+  if (CHANNELS.has(detail.channel)) return detail.channel;
+  if (detail.sendId || detail.medium === 'lifecycle_email') return 'email';
+  if (detail.source === 'whatsapp') return 'messaging';
+  if (SOCIAL.has(detail.source)) return 'social';
+  if (!detail.source && !detail.medium && !detail.sendId) return 'direct';
+  return 'other';
+};
+
 const detailFromClick = (click) => {
   const detail = { arrival: true };
   if (click?.source) detail.source = click.source;
   if (click?.medium) detail.medium = click.medium;
   if (click?.sendId) detail.sendId = click.sendId;
+  detail.channel = channelOf(detail);
   return detail;
 };
 
@@ -165,9 +178,10 @@ export function rememberMailClick(search = '') {
       postedSendIds: postedSendIds(),
     });
     if (plan.kind !== 'mail' || !plan.click?.sendId || !claimSend(plan.click.sendId)) return;
+    const sessionId = healthSessionId();
     trackHealthEvent('session_start', {
       eventId: `mail:${plan.click.sendId}`,
-      detail: detailFromClick(plan.click),
+      detail: { ...detailFromClick(plan.click), ...(sessionId ? { sessionId } : {}) },
     });
   } catch {
     // private mode can block sessionStorage; skip rather than break navigation
@@ -196,7 +210,7 @@ export function trackSessionStart() {
     if (plan.kind !== 'mail' || !plan.click?.sendId || !claimSend(plan.click.sendId)) return;
     trackHealthEvent('session_start', {
       eventId: `mail:${plan.click.sendId}`,
-      detail: detailFromClick(plan.click),
+      detail: { ...detailFromClick(plan.click), sessionId: eventId },
     });
   } catch {
     // private mode can block sessionStorage; skip rather than break login

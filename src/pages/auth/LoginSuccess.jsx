@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import axios from 'axios';
-import { getPostLoginPath, persistAuthSession } from '../../utils/auth';
+import { getPostLoginPath, persistAuthSession, rememberReturnPath } from '../../utils/auth';
 import { clearGoogleOAuthAttempt } from '../../utils/googleOAuth';
 
 const API_BASE_URL =
@@ -10,10 +10,14 @@ const API_BASE_URL =
 
 const LoginSuccess = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const handleGoogleLoginSuccess = async () => {
+      const next = searchParams.get('next');
+      if (next) rememberReturnPath(next);
+
       try {
         const response = await axios.get(`${API_BASE_URL}/users/me`, { withCredentials: true });
         const userData = response.data.data.user;
@@ -25,15 +29,23 @@ const LoginSuccess = () => {
         persistAuthSession(userData);
         clearGoogleOAuthAttempt();
         await new Promise((resolve) => setTimeout(resolve, 200));
-        navigate(getPostLoginPath(userData), { replace: true });
+        navigate(getPostLoginPath(userData, next), { replace: true });
       } catch (err) {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('auth_method');
+
+        if (err.response?.data?.code === 'AGE_RESTRICTED') {
+          const rt = err.response?.data?.data?.reminderToken;
+          const qs = new URLSearchParams({ error: 'age_restricted' });
+          if (rt) qs.set('rt', rt);
+          navigate(`/login?${qs.toString()}`, { replace: true });
+          return;
+        }
+
         const message = !err.response
           ? "Can't reach the login server. Check your connection and try again."
           : err.response?.data?.message || err.message || 'Authentication failed. Please try again.';
         setError(message);
-
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('auth_method');
 
         setTimeout(() => {
           navigate('/login', { replace: true });
@@ -42,7 +54,7 @@ const LoginSuccess = () => {
     };
 
     handleGoogleLoginSuccess();
-  }, [navigate]);
+  }, [navigate, searchParams]);
 
   if (error) {
     return (
