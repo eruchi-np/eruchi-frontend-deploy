@@ -145,6 +145,18 @@
   border: 1px solid rgba(12, 21, 32, 0.08);
 }
 
+/* Bell sits mid-right on mobile; a wide absolute panel overflows the left edge. */
+@media (max-width: 640px) {
+  .nav-push-panel {
+    position: fixed;
+    left: 0.75rem;
+    right: 0.75rem;
+    top: max(4.5rem, calc(env(safe-area-inset-top, 0px) + 4.25rem));
+    width: auto;
+    max-width: none;
+  }
+}
+
 .nav-push-panel-head {
   display: flex;
   align-items: center;

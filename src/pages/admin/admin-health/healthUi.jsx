@@ -35,7 +35,7 @@ const BAR_LABELS = {
   registered: 'Registered',
   step2: 'Step 2',
   pc1: 'Profile 1',
-  pc2: 'Profile 2 (SEC)',
+  pc2: 'Completed PC2 (SEC)',
   pc3: 'Profile 3 (lifestyle)',
   firstSurvey: 'First survey',
   activated: 'Activated',
@@ -68,6 +68,9 @@ const STATE_DEFINITIONS = {
   atRisk: 'Activated. Last survey was 8 to 28 days ago.',
   dormant: 'Activated. Last survey was more than 28 days ago.',
 };
+
+/** SEC household survey — tracked on L4, not part of activated. */
+const PC2_COMPLETED_DEFINITION = 'Finished the SEC household survey (PC2). Optional; does not change lifecycle state.';
 
 const BALANCE_LABELS = {
   '0': '0',
@@ -376,6 +379,7 @@ export {
   STAGE_LABELS,
   STATE_LABELS,
   STATE_DEFINITIONS,
+  PC2_COMPLETED_DEFINITION,
   BALANCE_LABELS,
   TIME_LABELS,
   CREDIT_SHARE_LABELS,

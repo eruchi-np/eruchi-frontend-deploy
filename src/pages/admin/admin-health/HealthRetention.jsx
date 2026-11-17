@@ -18,6 +18,7 @@ import {
   STATE_DEFINITIONS,
   STATE_LABELS,
   STATE_TONE,
+  PC2_COMPLETED_DEFINITION,
 } from './healthUi.jsx';
 
 function ReturnVisits({ data }) {
@@ -252,11 +253,19 @@ export function Retention({ data }) {
           </table>
         </div>
       </Card>
-      <Card metricId="L4" title="Lifecycle" summary="How many people are onboarding, stalled, 3- or 7-day active, at risk, or dormant each complete week, and who changed since the earlier Sunday." note={`Change from ${data.L4.transition.from} to ${data.L4.transition.to}. Saved Sunday history. ${data.L4.gaps?.[0] || ''}`}>
+      <Card metricId="L4" title="Lifecycle" summary="How many people are onboarding, stalled, 3- or 7-day active, at risk, or dormant each complete week, and who changed since the earlier Sunday. Completed PC2 is shown separately and does not gate activated." note={`Change from ${data.L4.transition.from} to ${data.L4.transition.to}. Saved Sunday history. ${data.L4.gaps?.[0] || ''}`}>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {Object.entries(STATE_LABELS).map(([key, label]) => (
             <Mini key={key} label={label} value={int(data.L4.current.counts[key])} sub={STATE_DEFINITIONS[key]} tone={STATE_TONE[key]} />
           ))}
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mt-3">
+          <Mini
+            label="Completed PC2"
+            value={int(data.L4.current.pc2Completed)}
+            sub={PC2_COMPLETED_DEFINITION}
+            tone="info"
+          />
         </div>
         <div className="grid sm:grid-cols-2 gap-2 mt-4">
           {Object.entries(KEY_LABELS).map(([key, label]) => (

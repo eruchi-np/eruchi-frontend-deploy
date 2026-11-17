@@ -415,7 +415,9 @@ export function Activation({ data }) {
             <thead>
               <tr className="text-left text-xs text-gray-500">
                 <th className="py-2 pr-3 font-medium">Week</th>
-                {Object.values(BAR_LABELS).map((label) => <th key={label} className="py-2 pr-3 font-medium">{label}</th>)}
+                {(data.A2.weeks[0]?.bars || []).map((bar) => (
+                  <th key={bar.id} className="py-2 pr-3 font-medium">{BAR_LABELS[bar.id] || bar.id}</th>
+                ))}
               </tr>
             </thead>
             <tbody>

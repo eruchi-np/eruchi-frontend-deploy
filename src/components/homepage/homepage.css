@@ -1514,9 +1514,13 @@ button.streak-badge {
 }
 
 @media (max-width: 1024px) {
-  /* Leave a curve of white sheet visible so scroll is obvious. */
+  /*
+   * Peek must clear the fixed bottom nav (~5.25rem + safe area) and still
+   * show the sheet's top curve. Old 88px peek sat behind the nav and read as
+   * a straight white line.
+   */
   .home-hero-pin {
-    --home-sheet-peek: 88px;
+    --home-sheet-peek: calc(5.25rem + env(safe-area-inset-bottom, 0px) + 56px);
   }
 
   .home-nav-inner {
@@ -1532,8 +1536,8 @@ button.streak-badge {
   }
 
   .home-sheet {
-    border-top-left-radius: 48px;
-    border-top-right-radius: 48px;
+    border-top-left-radius: 56px;
+    border-top-right-radius: 56px;
     margin-top: 0;
   }
 

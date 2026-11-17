@@ -122,6 +122,7 @@ export default function RewardCard({
   avgSurveyCredits,
 }) {
   const [flipped, setFlipped] = useState(false);
+  const touchRef = useRef({ x: 0, y: 0, moved: false });
   const stockInfo = useMemo(() => getOfferStock(offer), [offer]);
   const isOut = stockInfo !== null && stockInfo.remaining === 0;
   const brandName = offer.business?.brandName || offer.business?.name || "Partner";
@@ -142,10 +143,26 @@ export default function RewardCard({
     if (!isOut) onRedeem?.(offer, index);
   };
 
+  const onTouchStart = (event) => {
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    touchRef.current = { x: touch.clientX, y: touch.clientY, moved: false };
+  };
+
+  const onTouchMove = (event) => {
+    const touch = event.touches?.[0];
+    if (!touch) return;
+    const dx = Math.abs(touch.clientX - touchRef.current.x);
+    const dy = Math.abs(touch.clientY - touchRef.current.y);
+    if (dx > 8 || dy > 8) touchRef.current.moved = true;
+  };
+
   const toggleFlip = (event) => {
     if (isOut) return;
     if (event.target.closest("[data-card-action]")) return;
     if (canHoverReveal()) return;
+    // Ignore scroll gestures that end on the card
+    if (touchRef.current.moved) return;
     setFlipped((open) => !open);
   };
 
@@ -154,6 +171,8 @@ export default function RewardCard({
       className={`shop-card ${isOut ? "is-out" : ""} ${flipped ? "is-flipped" : ""}`}
       style={{ "--card": color }}
       onClick={toggleFlip}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
       onMouseLeave={() => setFlipped(false)}
     >
       <div className="shop-card-shell">

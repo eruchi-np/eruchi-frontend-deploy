@@ -121,6 +121,23 @@ export function screenIdsFor(qid) {
   return [qid];
 }
 
+export function screenList(spec, a) {
+  const unique = [];
+  for (const id of visibleIds(spec, a)) {
+    const screen = screenIdsFor(id)[0];
+    if (!unique.includes(screen)) unique.push(screen);
+  }
+  return unique;
+}
+
+/** First unanswered screen, or the last screen when a draft is already complete. */
+export function initialScreenId(spec, a) {
+  const first = nextQuestion(spec, a);
+  if (first) return screenIdsFor(first)[0];
+  const screens = screenList(spec, a);
+  return screens.length ? screens[screens.length - 1] : null;
+}
+
 export function progressFraction(spec, a) {
   const ids = visibleIds(spec, a);
   if (!ids.length) return 1;

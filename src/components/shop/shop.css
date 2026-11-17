@@ -258,7 +258,8 @@
 .shop-card {
   --arch-h: 122px;
   --panel-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --panel-time: 0.82s;
+  --panel-time: 0.28s;
+  --panel-stagger: 0.14s;
   position: relative;
   min-height: 340px;
   width: 100%;
@@ -317,27 +318,36 @@
 .shop-card-back {
   transition:
     opacity var(--panel-time) var(--panel-ease),
-    transform var(--panel-time) var(--panel-ease);
+    transform var(--panel-time) var(--panel-ease),
+    visibility 0s linear 0s;
 }
 
 .shop-card-front {
   z-index: 1;
   gap: 10px;
   opacity: 1;
+  visibility: visible;
   transform: translateY(0);
 }
 
 .shop-card.is-flipped .shop-card-front,
 .shop-card:hover .shop-card-front {
   opacity: 0;
+  visibility: hidden;
   transform: translateY(-8px);
   pointer-events: none;
+  /* Hide after fade so both faces never sit visible together */
+  transition:
+    opacity var(--panel-stagger) var(--panel-ease),
+    transform var(--panel-stagger) var(--panel-ease),
+    visibility 0s linear var(--panel-stagger);
 }
 
 .shop-card-back {
   z-index: 2;
   gap: 10px;
   opacity: 0;
+  visibility: hidden;
   transform: translateY(10px);
   pointer-events: none;
 }
@@ -345,14 +355,20 @@
 .shop-card.is-flipped .shop-card-back,
 .shop-card:hover .shop-card-back {
   opacity: 1;
+  visibility: visible;
   transform: translateY(0);
   pointer-events: auto;
-  transition-delay: 0.06s;
+  /* Show only after the front has mostly cleared */
+  transition:
+    opacity var(--panel-time) var(--panel-ease) var(--panel-stagger),
+    transform var(--panel-time) var(--panel-ease) var(--panel-stagger),
+    visibility 0s linear var(--panel-stagger);
 }
 
 .shop-card.is-out:hover .shop-card-front,
 .shop-card.is-out.is-flipped .shop-card-front {
   opacity: 1;
+  visibility: visible;
   transform: none;
   pointer-events: auto;
 }
@@ -361,31 +377,35 @@
 .shop-card.is-out:hover .shop-card-back,
 .shop-card.is-out.is-flipped .shop-card-back {
   opacity: 0;
+  visibility: hidden;
   pointer-events: none;
   transform: translateY(10px);
   transition-delay: 0s;
 }
 
 @media (hover: none), (pointer: coarse) {
+  .shop-card {
+    --arch-h: 130px;
+    --panel-time: 0.01s;
+    --panel-stagger: 0s;
+  }
+
   .shop-card:hover:not(.is-flipped) {
     transform: none;
   }
 
   .shop-card:hover:not(.is-flipped) .shop-card-front {
     opacity: 1;
+    visibility: visible;
     transform: none;
     pointer-events: auto;
   }
 
   .shop-card:hover:not(.is-flipped) .shop-card-back {
     opacity: 0;
+    visibility: hidden;
     pointer-events: none;
     transform: translateY(10px);
-    transition-delay: 0s;
-  }
-
-  .shop-card {
-    --arch-h: 130px;
   }
 
   .shop-card-view-merchant {

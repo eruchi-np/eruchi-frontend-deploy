@@ -4,6 +4,7 @@ import { secAPI } from '../../services/api';
 import ConfirmSame, { valuesMatch } from '../demographics/ConfirmSame';
 import {
   confirmSameOffer,
+  initialScreenId,
   needsProfessionalSoftCheck,
   nextQuestion,
   pruneAnswers,
@@ -11,6 +12,7 @@ import {
   questionById,
   questionText,
   screenIdsFor,
+  screenList,
   visibleIds,
   visibleOptions,
 } from '../../utils/secClient';
@@ -119,20 +121,15 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
 
   const visible = useMemo(() => (spec ? visibleIds(spec, answers) : []), [spec, answers]);
   const unanswered = useMemo(() => (spec ? nextQuestion(spec, answers) : null), [spec, answers]);
-  const screens = useMemo(() => {
-    const unique = [];
-    for (const id of visible) {
-      const screen = screenIdsFor(id)[0];
-      if (!unique.includes(screen)) unique.push(screen);
-    }
-    return unique;
-  }, [visible]);
+  const screens = useMemo(
+    () => (spec ? screenList(spec, answers) : []),
+    [spec, answers]
+  );
 
   useEffect(() => {
     if (!spec || loading || isEdit || stepPinned.current) return;
     stepPinned.current = true;
-    const first = nextQuestion(spec, answers);
-    setStepId(first ? screenIdsFor(first)[0] : null);
+    setStepId(initialScreenId(spec, answers));
   }, [spec, loading, isEdit, answers]);
 
   const qid = useMemo(() => {
@@ -143,7 +140,8 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
     }
     // Stay on a tick-all question after the first selection. Continue moves on.
     if (stepId && screens.includes(stepId)) return stepId;
-    return unanswered;
+    if (unanswered) return unanswered;
+    return screens[screens.length - 1] || null;
   }, [spec, isEdit, screens, editCursor, stepId, unanswered]);
   const screenIds = qid ? screenIdsFor(qid) : [];
   const progress = spec
@@ -260,7 +258,7 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
         toast.error('This survey is not available right now.');
         onComplete?.(0);
       } else {
-        toast.error(data?.message || 'Could not save. Try again.');
+        toast.error(data?.message || 'Could not save. Try again.', { id: 'sec-save' });
       }
     } finally {
       submittingRef.current = false;
@@ -280,11 +278,7 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
     if (!screenReady()) return;
     const after = pruneAnswers(spec, answers);
     if (isEdit) {
-      const uniqueScreens = [];
-      for (const id of visibleIds(spec, after)) {
-        const screen = screenIdsFor(id)[0];
-        if (!uniqueScreens.includes(screen)) uniqueScreens.push(screen);
-      }
+      const uniqueScreens = screenList(spec, after);
       if (editCursor >= uniqueScreens.length - 1) {
         finishOrSoftCheck(after);
         return;
@@ -346,7 +340,7 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
       <div>
         <p className="onboard-copy">Ready to save your answers.</p>
         {error ? <p className="onboard-error">{error}</p> : null}
-        <button type="button" className="home-pill home-pill-navy" disabled={submitting} onClick={submit}>
+        <button type="button" className="home-pill home-pill-lg home-pill-navy" disabled={submitting} onClick={submit}>
           {submitting ? 'Saving…' : 'Submit'}
         </button>
       </div>
