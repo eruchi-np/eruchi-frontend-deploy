@@ -23,16 +23,22 @@ export const EMPTY_QUESTION = {
   metricTag: 'none',
   attentionCheck: false,
   attentionAnswer: '',
-  randomizeOptions: false
+  randomizeOptions: false,
+  show_if: null,
+  end_after_if: null,
 };
 
 export const createEmptyFormData = () => ({
   title: '',
+  hiddenName: '',
   description: '',
   status: 'published',
   credits: 50,
   kind: 'normal',
+  isPoll: false,
   publishedAt: new Date().toISOString().slice(0, 16),
+  // Extra publish dates on create only; each becomes its own survey.
+  extraPublishedAts: [],
   availableDays: 7,
   estimatedMinutes: '',
   visibility: 'public',
@@ -42,6 +48,12 @@ export const createEmptyFormData = () => ({
   clusterIds: [],
   questions: [{ ...EMPTY_QUESTION }]
 });
+
+export const EMPTY_POLL_QUESTION = {
+  ...EMPTY_QUESTION,
+  questionType: 'single_checkbox',
+  options: ['Option 1', 'Option 2'],
+};
 
 export const questionTypes = [
   { value: 'text_short', label: 'Short Text', icon: Type, description: 'Brief text response' },

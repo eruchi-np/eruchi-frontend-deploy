@@ -15,6 +15,7 @@ import {
   requestPushSubscription,
 } from '../../utils/oneSignal';
 import { healthSessionId, trackHealthEvent } from '../../utils/healthEvents';
+import { reportPushOptIn } from '../../utils/pushOptIn';
 import './pushPrompt.css';
 
 /**
@@ -78,6 +79,7 @@ export default function PushSettings() {
         const ok = await optOutPush();
         if (ok) {
           setOptedIn(false);
+          reportPushOptIn(false);
           toast.success('Notifications turned off');
         } else {
           toast.error('Could not turn off notifications');
@@ -101,6 +103,7 @@ export default function PushSettings() {
         });
         setOptedIn(true);
         setPermission('granted');
+        reportPushOptIn(true);
         toast.success('Notifications enabled');
         return;
       }

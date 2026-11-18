@@ -12,8 +12,10 @@ import { ArrowIcon, CheckIcon, WarnIcon } from "./surveyTake/icons";
 import SliderField from "./surveyTake/SliderField";
 import MatrixFlow from "./surveyTake/MatrixFlow";
 import useStandaloneSurvey from "./surveyTake/useStandaloneSurvey";
+import { choiceLabel } from "./surveyTake/validation";
+import { questionId } from "../../utils/surveyLogic";
 
-export default function StandaloneSurvey() {
+export default function StandaloneSurvey({ previewMode = false, previewSurvey = null, onExitPreview = null }) {
   const {
     user,
     navigate,
@@ -28,6 +30,9 @@ export default function StandaloneSurvey() {
     showBanner,
     activeIndex,
     questions,
+    visibleIdSet,
+    logicEnabled,
+    previewReward,
     answeredFlags,
     answeredCount,
     requiredLeft,
@@ -41,7 +46,7 @@ export default function StandaloneSurvey() {
     requestSubmit,
     handleSubmit,
     exitSurvey,
-  } = useStandaloneSurvey();
+  } = useStandaloneSurvey({ previewMode, previewSurvey });
 
   if (loading) {
     return (
@@ -77,25 +82,39 @@ export default function StandaloneSurvey() {
 
   const mins = Number(survey.estimatedMinutes);
   const minutesChip =
-    Number.isFinite(mins) && mins > 0 ? `About ${mins} min` : null;
+    Number.isFinite(mins) && mins > 0
+      ? (logicEnabled ? `Up to ${mins} min` : `About ${mins} min`)
+      : null;
+  const visibleCount = [...visibleIdSet].length;
+  const creditLabel = logicEnabled
+    ? (previewMode ? previewReward : survey.credits || 0)
+    : (survey.credits || 0);
+  const creditChip = logicEnabled && !previewMode
+    ? `Up to +${survey.credits || 0}`
+    : `+${creditLabel}`;
 
   return (
     <div className="sf-page pg">
       <div className="mstrip">
-        <button type="button" className="x" aria-label="Exit survey" onClick={exitSurvey}>
+        <button
+          type="button"
+          className="x"
+          aria-label={previewMode ? "Close preview" : "Exit survey"}
+          onClick={previewMode && onExitPreview ? onExitPreview : exitSurvey}
+        >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
         <div className="cnt">
-          {answeredCount} of {questions.length} <span>answered</span>
+          {answeredCount} of {visibleCount} <span>answered</span>
         </div>
-        <span className="pill">+{survey.credits || 0}</span>
+        <span className="pill">{creditChip}</span>
         <div
           className="mbar"
           role="progressbar"
           aria-valuemin={0}
-          aria-valuemax={questions.length}
+          aria-valuemax={visibleCount}
           aria-valuenow={answeredCount}
           aria-label="Questions answered"
         >
@@ -141,11 +160,14 @@ export default function StandaloneSurvey() {
               {survey.kind === "daily" ? <span className="chip">Daily</span> : null}
               {minutesChip ? <span className="chip">{minutesChip}</span> : null}
               <span className="chip">
-                {questions.length} question{questions.length === 1 ? "" : "s"}
+                {visibleCount} question{visibleCount === 1 ? "" : "s"}
               </span>
               <span className="chip tert">
-                +{survey.credits || 0} Ruchi Credits on submit
+                {logicEnabled
+                  ? `Up to +${survey.credits || 0} Ruchi Credits`
+                  : `+${survey.credits || 0} Ruchi Credits on submit`}
               </span>
+              {previewMode ? <span className="chip">Preview — nothing is saved</span> : null}
             </div>
           </div>
         </div>
@@ -184,11 +206,16 @@ export default function StandaloneSurvey() {
               const val = responses[q.questionText];
               const isBad = missed.has(q.questionText);
               const optional = q.isRequired === false;
+              const isVisible = visibleIdSet.has(questionId(q, i));
+              if (!isVisible) return null;
+              const visibleNumber = questions
+                .slice(0, i + 1)
+                .filter((item, idx) => visibleIdSet.has(questionId(item, idx))).length;
 
               return (
                 <section
-                  key={qId}
-                  className={`q${isBad ? " bad" : ""}${
+                  key={q._id || qId}
+                  className={`q sf-logic-q${isBad ? " bad" : ""}${
                     q.questionType === "matrix_radio" ? " q-matrix" : ""
                   }`}
                   id={qId}
@@ -201,7 +228,7 @@ export default function StandaloneSurvey() {
                   }
                 >
                   <span className="q-n" aria-hidden="true">
-                    {i + 1}
+                    {visibleNumber}
                   </span>
                   <div>
                     <h2 className="q-t" id={titleId}>
@@ -225,19 +252,20 @@ export default function StandaloneSurvey() {
                       {(q.questionType === "single_checkbox" ||
                         q.questionType === "attention_check") && (
                         <div className="opts" role="radiogroup" aria-labelledby={titleId}>
-                          {(q.options || []).map((opt) => {
-                            const on = val === opt;
+                          {(q.options || []).map((opt, optIdx) => {
+                            const label = choiceLabel(opt);
+                            const on = val === label;
                             return (
-                              <label key={opt} className={`o${on ? " on" : ""}`}>
+                              <label key={opt?.id || `${label}-${optIdx}`} className={`o${on ? " on" : ""}`}>
                                 <input
                                   className="sr"
                                   type="radio"
                                   name={qId}
                                   checked={on}
-                                  onChange={() => handleChange(q.questionText, opt)}
+                                  onChange={() => handleChange(q.questionText, label)}
                                 />
                                 <span className="rb" />
-                                <span>{opt}</span>
+                                <span>{label}</span>
                               </label>
                             );
                           })}
@@ -260,8 +288,9 @@ export default function StandaloneSurvey() {
                             {(q.options || []).map((opt, optionIndex) => {
                               const stored = String(optionIndex + 1);
                               const on = val === stored;
+                              const label = choiceLabel(opt);
                               return (
-                                <label key={stored} className={on ? "on" : undefined}>
+                                <label key={opt?.id || stored} className={on ? "on" : undefined}>
                                   <input
                                     className="sr"
                                     type="radio"
@@ -271,7 +300,7 @@ export default function StandaloneSurvey() {
                                       handleChange(q.questionText, stored)
                                     }
                                   />
-                                  <span>{opt}</span>
+                                  <span>{label}</span>
                                 </label>
                               );
                             })}
@@ -284,9 +313,10 @@ export default function StandaloneSurvey() {
                             {(q.options || []).map((opt, optionIndex) => {
                               const stored = String(optionIndex + 1);
                               const on = val === stored;
+                              const label = choiceLabel(opt);
                               return (
                                 <label
-                                  key={`m-${stored}`}
+                                  key={`m-${opt?.id || stored}`}
                                   className={`o${on ? " on" : ""}`}
                                 >
                                   <input
@@ -299,7 +329,7 @@ export default function StandaloneSurvey() {
                                     }
                                   />
                                   <span className="rb" />
-                                  <span>{opt}</span>
+                                  <span>{label}</span>
                                 </label>
                               );
                             })}
@@ -313,10 +343,11 @@ export default function StandaloneSurvey() {
                           role="group"
                           aria-labelledby={titleId}
                         >
-                          {(q.options || []).map((opt) => {
-                            const on = Array.isArray(val) && val.includes(opt);
+                          {(q.options || []).map((opt, optIdx) => {
+                            const label = choiceLabel(opt);
+                            const on = Array.isArray(val) && val.includes(label);
                             return (
-                              <label key={opt} className={`o${on ? " on" : ""}`}>
+                              <label key={opt?.id || `${label}-${optIdx}`} className={`o${on ? " on" : ""}`}>
                                 <input
                                   className="sr"
                                   type="checkbox"
@@ -324,7 +355,7 @@ export default function StandaloneSurvey() {
                                   onChange={(e) =>
                                     handleCheckbox(
                                       q.questionText,
-                                      opt,
+                                      label,
                                       e.target.checked
                                     )
                                   }
@@ -332,7 +363,7 @@ export default function StandaloneSurvey() {
                                 <span className="cb">
                                   <CheckIcon />
                                 </span>
-                                <span>{opt}</span>
+                                <span>{label}</span>
                               </label>
                             );
                           })}
@@ -430,7 +461,7 @@ export default function StandaloneSurvey() {
             <h2>Your progress</h2>
             <div className="rail-n">
               <b>
-                {answeredCount} of {questions.length}
+                {answeredCount} of {visibleCount}
               </b>{" "}
               answered
             </div>
@@ -438,7 +469,7 @@ export default function StandaloneSurvey() {
               className="bar"
               role="progressbar"
               aria-valuemin={0}
-              aria-valuemax={questions.length}
+              aria-valuemax={visibleCount}
               aria-valuenow={answeredCount}
               aria-label="Questions answered"
             >
@@ -446,7 +477,11 @@ export default function StandaloneSurvey() {
             </div>
             <nav className="jump" aria-label="Jump to question">
               {questions.map((q, i) => {
-                const done = answeredFlags[i];
+                if (!visibleIdSet.has(questionId(q, i))) return null;
+                const visibleNumber = questions
+                  .slice(0, i + 1)
+                  .filter((item, idx) => visibleIdSet.has(questionId(item, idx))).length;
+                const done = answeredFlags[visibleNumber - 1];
                 const bad = missed.has(q.questionText);
                 const cur = activeIndex === i;
                 const className = [
@@ -458,10 +493,10 @@ export default function StandaloneSurvey() {
                   .join(" ");
                 return (
                   <a
-                    key={i}
+                    key={q._id || i}
                     href={`#sf-q${i + 1}`}
                     className={className || undefined}
-                    aria-label={`Question ${i + 1}${done ? ", answered" : ""}${
+                    aria-label={`Question ${visibleNumber}${done ? ", answered" : ""}${
                       q.isRequired === false ? ", optional" : ""
                     }`}
                     aria-current={cur ? "true" : undefined}
@@ -470,7 +505,7 @@ export default function StandaloneSurvey() {
                       scrollToQuestion(i);
                     }}
                   >
-                    {i + 1}
+                    {visibleNumber}
                   </a>
                 );
               })}
@@ -478,18 +513,41 @@ export default function StandaloneSurvey() {
             {nextUnanswered >= 0 ? (
               <a
                 className="rail-link"
-                href={`#sf-q${nextUnanswered + 1}`}
+                href={`#sf-q${(() => {
+                  let n = 0;
+                  for (let i = 0; i < questions.length; i += 1) {
+                    if (!visibleIdSet.has(questionId(questions[i], i))) continue;
+                    if (n === nextUnanswered) return i + 1;
+                    n += 1;
+                  }
+                  return 1;
+                })()}`}
                 onClick={(event) => {
                   event.preventDefault();
-                  scrollToQuestion(nextUnanswered);
+                  let n = 0;
+                  for (let i = 0; i < questions.length; i += 1) {
+                    if (!visibleIdSet.has(questionId(questions[i], i))) continue;
+                    if (n === nextUnanswered) {
+                      scrollToQuestion(i);
+                      return;
+                    }
+                    n += 1;
+                  }
                 }}
               >
                 Jump to next unanswered
               </a>
             ) : null}
             <p className="rail-note">
-              Your answers aren’t saved if you leave before submitting.
+              {previewMode
+                ? "Preview mode — answers are not saved."
+                : "Your answers aren’t saved if you leave before submitting."}
             </p>
+            {previewMode && logicEnabled ? (
+              <p className="rail-note">
+                Reward if submitted now: <b>{previewReward} Ruchi Credits</b>
+              </p>
+            ) : null}
           </aside>
         </div>
       </main>
@@ -498,8 +556,8 @@ export default function StandaloneSurvey() {
         open={confirmOpen}
         submitting={submitting}
         answeredCount={answeredCount}
-        totalCount={questions.length}
-        credits={survey.credits || 0}
+        totalCount={visibleCount}
+        credits={logicEnabled ? previewReward : (survey.credits || 0)}
         onCancel={() => !submitting && setConfirmOpen(false)}
         onConfirm={handleSubmit}
       />

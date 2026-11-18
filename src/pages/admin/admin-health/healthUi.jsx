@@ -28,6 +28,7 @@ const SECTIONS = [
   ['rewards', 'Rewards'],
   ['retention', 'Retention'],
   ['channel', 'Channel'],
+  ['reactivation', 'Re-activation'],
   ['trust', 'Trust'],
 ];
 

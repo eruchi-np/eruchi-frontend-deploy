@@ -1,4 +1,5 @@
 import { isMatrixComplete } from "../../../components/survey/MatrixQuestion";
+import { optionLabel } from "../../../utils/surveyLogic";
 
 export function matrixTouched(val) {
   return (
@@ -17,6 +18,14 @@ export function toMatrixItem(item, index) {
   }
   const label = String(item ?? "");
   return { id: label, label };
+}
+
+export function choiceLabel(option) {
+  return optionLabel(option);
+}
+
+export function optionLabels(options) {
+  return (options || []).map(optionLabel);
 }
 
 /** Multi-select options that clear every other choice (and are cleared if another is picked). */
@@ -47,7 +56,8 @@ export function isQuestionAnswered(q, val) {
     return Array.isArray(val) && val.length > 0;
   }
   if (q.questionType === "single_checkbox" || q.questionType === "attention_check") {
-    return typeof val === "string" && (q.options || []).includes(val);
+    const labels = optionLabels(q.options);
+    return typeof val === "string" && labels.includes(val);
   }
   if (q.questionType === "likert") {
     const point = Number(val);

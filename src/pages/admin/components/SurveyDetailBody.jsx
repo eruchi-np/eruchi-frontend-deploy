@@ -19,8 +19,16 @@ export default function SurveyDetailBody({ survey, NAVY, refetchSurveys, onDelet
   const handleStatus = async (nextStatus) => {
     setStatusSaving(true);
     try {
-      await sepSurveyAPI.updateStatus(survey._id, nextStatus, { skipErrorToast: true });
-      toast.success(nextStatus === "published" ? "Survey published" : "Survey unpublished");
+      const res = await sepSurveyAPI.updateStatus(survey._id, nextStatus, { skipErrorToast: true });
+      toast.success(res.data?.message || (nextStatus === "published" ? "Survey published" : "Survey unpublished"));
+      const failedSends = (res.data?.sends || []).filter((send) => !send.ok);
+      if (failedSends.length) {
+        toast.error(
+          `Could not schedule ${failedSends.length} cluster${failedSends.length === 1 ? "" : "s"}: ${
+            failedSends.map((send) => send.message).join("; ")
+          }`
+        );
+      }
       setStatus(nextStatus);
       refetchSurveys?.();
     } catch (err) {
@@ -60,6 +68,11 @@ export default function SurveyDetailBody({ survey, NAVY, refetchSurveys, onDelet
           {survey.kind === "daily" && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
               Daily
+            </span>
+          )}
+          {survey.hasLogic && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-green-50 text-green-800 border border-green-200">
+              Logic
             </span>
           )}
           {survey.visibility === "targeted" && survey.alsoPublishToOthers && (

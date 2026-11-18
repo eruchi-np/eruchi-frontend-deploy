@@ -14,6 +14,7 @@ import { trackSurveyCards } from "../../utils/healthEvents";
 import { PROFILE_REFRESH_BLOCKED, PROFILE_REFRESH_BODY, PROFILE_REFRESH_TITLE } from "../../utils/profileRefreshCopy";
 import { AnimationContext } from "../../components/animations/AnimationContext";
 import SurveyRow, { isSurveyOpen } from "../../components/survey/SurveyRow";
+import QuickPoll from "../../components/survey/QuickPoll";
 import SurveysEmptyReminder from "../../components/survey/SurveysEmptyReminder";
 import ProfileSurveySection from "../../components/sec/ProfileSurveySection";
 import skyBg from "../../assets/home/sky.jpg";
@@ -35,7 +36,7 @@ function sortSurveys(items, sortOrder) {
 }
 
 export default function StandaloneSurveys() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { setOverride, clearOverride } = useContext(AnimationContext);
@@ -54,6 +55,15 @@ export default function StandaloneSurveys() {
   const [error, setError] = useState(null);
   const [retryTick, setRetryTick] = useState(0);
   const [showFirstSurveyNudge, setShowFirstSurveyNudge] = useState(false);
+
+  const pollSurveys = useMemo(
+    () => sprintSurveys.filter((survey) => survey.isPoll),
+    [sprintSurveys]
+  );
+  const sprintRows = useMemo(
+    () => sprintSurveys.filter((survey) => !survey.isPoll),
+    [sprintSurveys]
+  );
 
   const setListParams = useCallback(
     (patch) =>
@@ -229,6 +239,7 @@ export default function StandaloneSurveys() {
   };
 
   const openSurvey = (survey) => {
+    if (survey.isPoll) return;
     if (survey.isDailySprint) {
       const wave = Number(survey.wave) >= 1 ? Number(survey.wave) : 1;
       navigate(`/standalone-survey/${survey._id}?sprint=1&wave=${wave}`);
@@ -237,6 +248,26 @@ export default function StandaloneSurveys() {
     if (!isSurveyOpen(survey)) return;
     navigate(`/standalone-survey/${survey._id}`);
   };
+
+  const handlePollVoted = useCallback((survey, data) => {
+    setSprintSurveys((prev) =>
+      prev.map((item) => {
+        if (String(item._id) !== String(survey._id) || item.wave !== survey.wave) {
+          return item;
+        }
+        return {
+          ...item,
+          poll: data?.poll || {
+            ...(item.poll || {}),
+            answered: true,
+          },
+        };
+      })
+    );
+    if (data?.credits != null || data?.surveyCredits) {
+      refreshUser?.();
+    }
+  }, [refreshUser]);
 
   return (
     <div className="home-page shop-page" ref={pageRef}>
@@ -287,8 +318,19 @@ export default function StandaloneSurveys() {
                 </button>
               </div>
             ) : null}
+            {!user?.profileSurveyBlocked && !loading && pollSurveys.length > 0 ? (
+              <div className="mb-10">
+                {pollSurveys.map((survey) => (
+                  <QuickPoll
+                    key={`poll-${survey._id}-${survey.wave}`}
+                    survey={survey}
+                    onVoted={handlePollVoted}
+                  />
+                ))}
+              </div>
+            ) : null}
             {!user?.profileSurveyBlocked ? <ProfileSurveySection /> : null}
-            {!user?.profileSurveyBlocked && !loading && sprintSurveys.length > 0 ? (
+            {!user?.profileSurveyBlocked && !loading && sprintRows.length > 0 ? (
               <div className="mb-12">
                 <div className="shop-head mb-6">
                   <div>
@@ -306,7 +348,7 @@ export default function StandaloneSurveys() {
                   </div>
                 </div>
                 <div className="surveys-list">
-                  {sprintSurveys.map((survey) => (
+                  {sprintRows.map((survey) => (
                     <SurveyRow key={`${survey._id}-${survey.wave}`} survey={survey} onView={openSurvey} />
                   ))}
                 </div>

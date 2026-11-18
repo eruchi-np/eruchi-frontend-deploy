@@ -4,10 +4,12 @@ import {
   canOpenSurveys,
   initOneSignal,
   isOneSignalConfigured,
+  isPushOptedIn,
   loginOneSignalUser,
   logoutOneSignalUser,
   promptSubscribeSlidedown,
 } from '../../utils/oneSignal';
+import { reportPushOptIn } from '../../utils/pushOptIn';
 
 /**
  * Boots OneSignal only for accounts that can open Surveys.
@@ -37,6 +39,8 @@ export default function OneSignalBridge() {
       const ok = await initOneSignal();
       if (!ok || loggedInId.current !== externalId) return;
       await loginOneSignalUser(externalId);
+      if (loggedInId.current !== externalId) return;
+      if (await isPushOptedIn()) reportPushOptIn(true);
       if (loggedInId.current !== externalId) return;
       await promptSubscribeSlidedown();
     })();

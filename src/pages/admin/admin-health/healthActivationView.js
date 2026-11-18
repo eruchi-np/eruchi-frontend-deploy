@@ -1,6 +1,6 @@
 // Shared counts for activation and surveys. Shares, Nepal week keys, and how long activation took.
 
-const BAR_IDS = ['registered', 'step2', 'pc1', 'firstSurvey', 'activated'];
+const BAR_IDS = ['registered', 'step2', 'pc1', 'firstSurvey', 'activated', 'pc2'];
 
 export const shareOf = (numerator, denominator) => ({
   numerator,

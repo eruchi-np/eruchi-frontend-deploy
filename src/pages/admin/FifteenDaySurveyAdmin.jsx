@@ -178,7 +178,10 @@ const FifteenDaySurveyAdmin = () => {
                       ) : survey ? (
                         <>
                           <p className="font-medium text-gray-900 truncate">{survey.title}</p>
-                          <p className="text-xs text-gray-500 capitalize">{survey.status} · {survey.questions?.length || 0} questions</p>
+                          <p className="text-xs text-gray-500 capitalize">
+                            {survey.status}
+                            {survey.isPoll ? ' · Quick poll' : ` · ${survey.questions?.length || 0} questions`}
+                          </p>
                         </>
                       ) : (
                         <p className="text-sm text-gray-400">Empty</p>

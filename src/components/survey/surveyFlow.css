@@ -5,7 +5,14 @@
   --navy:#0c1520; --deep:#16365c; --tert:#2efdd4; --blue:#3399ff; --azure:#2ed6fd;
   --line:#d8dde3; --surf:#f4f6f8; --surf2:#eceff2; --tint:#f5fbff;
   --muted:#5b6168; --ctrl:#7b828a; --err:#c0262d;
+  --mx-stick-top:0px;
 }
+/* html, body, and #root use overflow-x: hidden, which traps a sticky header.
+   clip still cuts a sideways page scroll and lets this header stick. */
+html:has(.sf-page),
+html:has(.sf-page) body,
+html:has(.sf-page) #root{overflow-x:clip}
+
 .sf-page,.sf-page *{box-sizing:border-box}
 .sf-page button,.sf-page input,.sf-page textarea{font-family:inherit}
 .sr{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
@@ -71,6 +78,8 @@
 
 /* ---------- questions ---------- */
 .q{display:grid;grid-template-columns:44px minmax(0,1fr);padding:44px 0;border-top:1px solid var(--line);scroll-margin-top:24px}
+.sf-logic-q{animation:sfLogicIn .22s ease}
+@keyframes sfLogicIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .q:first-child{border-top:0;padding-top:0}
 .q-n{font-size:20px;line-height:28px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
 .q-t{margin:0;font-size:20px;line-height:28px;font-weight:600;letter-spacing:-0.015em;text-wrap:pretty}
@@ -143,14 +152,23 @@ textarea.tx{height:auto;min-height:168px;padding:16px 20px;line-height:1.55;resi
 .tb:hover{background:var(--surf2)}
 .rte .tx{border:0;border-radius:0;box-shadow:none}
 
-/* matrix, desktop */
-.mxw{border:1.5px solid var(--line);border-radius:16px;overflow-x:auto;-webkit-overflow-scrolling:touch}
-.mx{width:100%;border-collapse:collapse;table-layout:fixed;min-width:36rem}
-.mx thead th{height:auto;min-height:52px;padding:10px 8px;background:var(--surf);font-size:13px;line-height:1.3;font-weight:600;color:#454c53;text-align:center;vertical-align:bottom}
-.mx thead th:first-child{width:14%;min-width:7rem}
-.mx tbody th{padding:0 16px 0 20px;border-top:1.5px solid var(--line);font-size:16px;line-height:1.35;font-weight:500;text-align:left}
-.mx tbody td{padding:0;border-top:1.5px solid var(--line);text-align:center}
+/* matrix. Header row sticks to the page; brand column sticks while scrolling sideways. */
+.mx-block{border:1.5px solid var(--line);border-radius:16px;background:#fff;min-width:0;max-width:100%}
+.mx-head-sticky{position:sticky;top:var(--mx-stick-top);z-index:3;background:var(--surf);border-radius:14px 14px 0 0;box-shadow:inset 0 -1.5px 0 var(--line)}
+.mx-head-scroll{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;border-radius:14px 14px 0 0;min-width:0}
+.mx-head-scroll::-webkit-scrollbar{display:none;height:0}
+.mxw{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;position:relative;z-index:1;min-width:0;border-radius:0 0 14px 14px;background:#fff}
+.mx{width:100%;min-width:max(100%,calc(11rem + var(--mx-cols, 1) * 8.25rem));border-collapse:separate;border-spacing:0;table-layout:fixed}
+.mx col.mx-brand{width:11rem}
+.mx thead th{height:auto;min-height:52px;padding:10px 8px;background:var(--surf);font-size:13px;line-height:1.3;font-weight:600;color:#454c53;text-align:center;vertical-align:bottom;overflow-wrap:anywhere}
+.mx thead th:first-child{position:sticky;left:0;z-index:2;width:11rem;min-width:11rem;background:var(--surf);box-shadow:1px 0 0 var(--line)}
+.mx-sr-head{height:0}
+.mx-sr-head th{height:0;max-height:0;padding:0;border:0;font-size:0;line-height:0;color:transparent;overflow:hidden;position:static;box-shadow:none;background:transparent}
+.mx tbody th{position:sticky;left:0;z-index:1;width:11rem;min-width:11rem;padding:0 16px 0 20px;border-top:1.5px solid var(--line);background:#fff;box-shadow:1px 0 0 var(--line);font-size:16px;line-height:1.35;font-weight:500;text-align:left}
+.mx tbody td{padding:0;border-top:1.5px solid var(--line);text-align:center;background:#fff}
+.mx tbody tr:first-child th,.mx tbody tr:first-child td{border-top:0}
 .mx tbody tr:hover th,.mx tbody tr:hover td{background:var(--tint)}
+.mx tbody tr{scroll-margin-top:calc(var(--mx-stick-top) + 96px)}
 .mxc{display:flex;align-items:center;justify-content:center;width:100%;height:64px;cursor:pointer}
 .mxc:has(input:focus-visible) .rb{outline:3px solid var(--blue);outline-offset:3px}
 
@@ -180,12 +198,9 @@ textarea.tx{height:auto;min-height:168px;padding:16px 20px;line-height:1.55;resi
   .sf-page .q.q-matrix .q-b{
     width:100%;
   }
+  .sf-page .q.q-matrix .mx-block,
   .sf-page .q.q-matrix .mxw{
     width:100%;
-    background:#fff;
-  }
-  .sf-page .q.q-matrix .mx{
-    min-width:0;
   }
 }
 
@@ -358,10 +373,13 @@ textarea.tx{height:auto;min-height:168px;padding:16px 20px;line-height:1.55;resi
 .rw-h .hero-h{gap:14px}
 .rw-h .dots{width:20px;height:20px;margin-top:5px;background-size:6.67px 6.67px}
 .rw-h p{margin:8px 0 0 34px;font-size:15px}
+  .sf-page { --mx-stick-top: 64px; }
+  .sf-page .mx{min-width:max(100%,calc(8.25rem + var(--mx-cols, 1) * 7.5rem))}
+  .sf-page .mx col.mx-brand,
+  .sf-page .mx thead th:first-child,
+  .sf-page .mx tbody th{width:8.25rem;min-width:8.25rem}
   .sf-page .rail { display: none !important; }
   .sf-page .sv-wrap { display: block; padding: 0 20px; }
-  .sf-page .mxw { display: none !important; }
-  .sf-page .mxm { display: grid; }
   .sf-page .lk { display: none !important; }
   .sf-page .lk-mobile { display: grid !important; }
   .sf-page .hdr { display: none; }
@@ -372,7 +390,6 @@ textarea.tx{height:auto;min-height:168px;padding:16px 20px;line-height:1.55;resi
 
 @media (min-width: 901px) {
   .sf-page .mstrip { display: none; }
-  .sf-page .mxm { display: none; }
   .sf-page .lk-mobile { display: none !important; }
   .sf-page .rw-scroll { display: none; }
 }

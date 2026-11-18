@@ -16,12 +16,21 @@ import {
 import { emptyMatrixValue } from "../../../components/survey/MatrixQuestion";
 import { plainSurveyText } from "../../../utils/surveyMarkup";
 import {
+  answersByIdFromTextResponses,
+  computeLogicCredits,
+  countAnsweredVisible,
+  evaluateSurveyLogic,
+  filterResponsesToVisible,
+  questionId,
+  surveyHasLogic,
+} from "../../../utils/surveyLogic";
+import {
   isNoneExclusiveOption,
   isQuestionAnswered,
   isQuestionValid,
 } from "./validation";
 
-export default function useStandaloneSurvey() {
+export default function useStandaloneSurvey({ previewMode = false, previewSurvey = null } = {}) {
   const { surveyId } = useParams();
   const [searchParams] = useSearchParams();
   const isSprint = searchParams.get("sprint") === "1";
@@ -29,8 +38,8 @@ export default function useStandaloneSurvey() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  const [survey, setSurvey] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [survey, setSurvey] = useState(previewMode ? previewSurvey : null);
+  const [loading, setLoading] = useState(!previewMode);
   const [submitting, setSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [responses, setResponses] = useState({});
@@ -42,7 +51,8 @@ export default function useStandaloneSurvey() {
   const { startQuestion, getTimingData } = useSurveyTimer();
   const surveyRef = useRef(null);
   surveyRef.current = survey;
-  const markSurveySaved = useSurveyVisit(surveyId, ({ sessionId }) => {
+  const markSurveySaved = useSurveyVisit(previewMode ? null : surveyId, ({ sessionId }) => {
+    if (previewMode) return;
     const current = surveyRef.current;
     let last = null;
     for (const question of getTimingData().questions || []) {
@@ -70,6 +80,23 @@ export default function useStandaloneSurvey() {
   });
 
   useEffect(() => {
+    if (previewMode) {
+      if (previewSurvey) {
+        setSurvey(previewSurvey);
+        const initial = {};
+        (previewSurvey.questions || []).forEach((q) => {
+          if (q.questionType === "multiple_checkbox") initial[q.questionText] = [];
+          else if (q.questionType === "slider") initial[q.questionText] = null;
+          else if (q.questionType === "matrix_radio") {
+            initial[q.questionText] = emptyMatrixValue(q.rows || []);
+          } else initial[q.questionText] = "";
+        });
+        setResponses(initial);
+        setLoading(false);
+      }
+      return undefined;
+    }
+
     let cancelled = false;
     const fetchSurvey = async () => {
       setLoading(true);
@@ -83,7 +110,7 @@ export default function useStandaloneSurvey() {
       }
       try {
         const res = isSprint
-          ? await fifteenDaySurveyAPI.getToTake(surveyId, sprintWave)
+          ? await fifteenDaySurveyAPI.getToTake(surveyId, sprintWave, { skipErrorToast: true })
           : await sepSurveyAPI.getById(surveyId);
         if (cancelled) return;
         setSurvey(res.data.data);
@@ -103,6 +130,10 @@ export default function useStandaloneSurvey() {
         if (!cancelled) setResponses(initial);
       } catch (err) {
         if (!cancelled) {
+          if (err.response?.data?.data?.isPoll) {
+            navigate("/standalone-surveys", { replace: true });
+            return;
+          }
           setError(err.response?.data?.message || "Couldn’t load this survey.");
         }
       } finally {
@@ -114,24 +145,45 @@ export default function useStandaloneSurvey() {
     return () => {
       cancelled = true;
     };
-  }, [surveyId, isSprint, sprintWave, user?.profileSurveyBlocked]);
+  }, [surveyId, isSprint, sprintWave, user?.profileSurveyBlocked, previewMode, previewSurvey]);
 
   const questions = survey?.questions || [];
+  const logicEnabled = Boolean(survey?.hasLogic) || surveyHasLogic(questions);
+
+  const logicState = useMemo(() => {
+    const answersById = answersByIdFromTextResponses(questions, responses);
+    return evaluateSurveyLogic(questions, answersById);
+  }, [questions, responses]);
+
+  const visibleIdSet = useMemo(() => new Set(logicState.visibleIds), [logicState.visibleIds]);
+
+  const visibleQuestions = useMemo(
+    () => questions.filter((q, i) => visibleIdSet.has(questionId(q, i))),
+    [questions, visibleIdSet]
+  );
 
   const answeredFlags = useMemo(
-    () => questions.map((q) => isQuestionAnswered(q, responses[q.questionText])),
-    [questions, responses]
+    () =>
+      visibleQuestions.map((q) => isQuestionAnswered(q, responses[q.questionText])),
+    [visibleQuestions, responses]
   );
   const answeredCount = answeredFlags.filter(Boolean).length;
-  const requiredLeft = questions.filter(
+  const requiredLeft = visibleQuestions.filter(
     (q) => q.isRequired !== false && !isQuestionAnswered(q, responses[q.questionText])
   ).length;
-  const optionalUnanswered = questions.some(
+  const optionalUnanswered = visibleQuestions.some(
     (q) => q.isRequired === false && !isQuestionAnswered(q, responses[q.questionText])
   );
   const progressPct =
-    questions.length === 0 ? 0 : (answeredCount / questions.length) * 100;
+    visibleQuestions.length === 0 ? 0 : (answeredCount / visibleQuestions.length) * 100;
   const nextUnanswered = answeredFlags.findIndex((done) => !done);
+
+  const previewReward = useMemo(() => {
+    if (!logicEnabled) return survey?.credits || 0;
+    const answersById = answersByIdFromTextResponses(questions, responses);
+    const answered = countAnsweredVisible(questions, answersById, logicState.visibleIds);
+    return computeLogicCredits(survey?.credits || 0, answered, questions.length);
+  }, [logicEnabled, survey?.credits, questions, responses, logicState.visibleIds]);
 
   const scrollToQuestion = (index) => {
     const el = document.getElementById(`sf-q${index + 1}`);
@@ -154,9 +206,15 @@ export default function useStandaloneSurvey() {
       if (picked < max) return;
     }
 
+    const answersById = answersByIdFromTextResponses(questions, nextResponses);
+    const nextLogic = evaluateSurveyLogic(questions, answersById);
+    const nextVisible = new Set(nextLogic.visibleIds);
+
     const nextIndex = questions.findIndex(
       (item, i) =>
-        i > index && !isQuestionAnswered(item, nextResponses[item.questionText])
+        i > index
+        && nextVisible.has(questionId(item, i))
+        && !isQuestionAnswered(item, nextResponses[item.questionText])
     );
     if (nextIndex < 0) return;
     window.setTimeout(() => scrollToQuestion(nextIndex), 180);
@@ -188,7 +246,6 @@ export default function useStandaloneSurvey() {
       if (!checked) {
         nextVal = arr.filter((v) => v !== option);
       } else if (pickingNone) {
-        // "None" is exclusive — drop every other selection.
         nextVal = arr.includes(option) ? arr : [option];
       } else {
         const withoutNone = arr.filter((v) => !isNoneExclusiveOption(v));
@@ -222,8 +279,12 @@ export default function useStandaloneSurvey() {
   };
 
   const requestSubmit = () => {
+    if (previewMode) {
+      toast.success(`Preview only — would earn ${previewReward} Ruchi Credits. Nothing was saved.`);
+      return;
+    }
     const nextMissed = new Set();
-    questions.forEach((q) => {
+    visibleQuestions.forEach((q) => {
       if (!isQuestionValid(q, responses[q.questionText])) {
         nextMissed.add(q.questionText);
       }
@@ -240,14 +301,19 @@ export default function useStandaloneSurvey() {
   };
 
   const handleSubmit = async () => {
+    if (previewMode) return;
     setSubmitting(true);
     try {
       const timingData = getTimingData();
       const previousStreak = user?.streakCount ?? 0;
-      const payload = { ...responses };
-      questions.forEach((q) => {
+      const payload = filterResponsesToVisible(
+        questions,
+        responses,
+        logicState.visibleIds
+      );
+      questions.forEach((q, i) => {
+        if (!visibleIdSet.has(questionId(q, i))) return;
         if (q.questionType === "slider" && (payload[q.questionText] == null || payload[q.questionText] === "")) {
-          // Should not reach here for required; optional untouched stays empty string for API.
           payload[q.questionText] = "";
         }
       });
@@ -295,6 +361,12 @@ export default function useStandaloneSurvey() {
     showBanner,
     activeIndex,
     questions,
+    visibleQuestions,
+    visibleIdSet,
+    logicState,
+    logicEnabled,
+    previewMode,
+    previewReward,
     answeredFlags,
     answeredCount,
     requiredLeft,

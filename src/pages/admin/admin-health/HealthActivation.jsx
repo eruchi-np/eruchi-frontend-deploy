@@ -347,7 +347,7 @@ export function Activation({ data }) {
         {data.A1 ? <Mini label="Registrations, last 7 days" value={int(data.A1.last7)} sub={`Previous 7 days: ${int(data.A1.previous7)}`} tone="info" /> : null}
         {activated ? <Mini label="Median time to activate" value={duration(activated.median)} sub={activated.n ? `${int(activated.n)} people` : 'Nobody activated'} tone="info" /> : null}
       </div>
-      <Card metricId="A2" title={`Waterfall · ${weekLabel}`} summary="How far people from the selected signup weeks got, from registration through a first survey." note={data.A2.note}>
+      <Card metricId="A2" title={`Waterfall · ${weekLabel}`} summary="How far people from the selected signup weeks got, from registration through a first survey. Completed PC2 is shown under Activated and is not part of activation." note={data.A2.note}>
         <div className="mb-4">
           <p className="text-xs font-medium text-gray-600 mb-2">Signup weeks</p>
           <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto">

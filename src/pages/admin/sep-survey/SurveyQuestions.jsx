@@ -4,6 +4,8 @@ import { AlertCircle, ChevronDown, ChevronUp, Eye, Plus, Trash2 } from 'lucide-r
 import MatrixQuestion from '../../../components/survey/MatrixQuestion';
 import SurveyTextField, { SurveyRichText } from '../../../components/survey/SurveyTextField';
 import { plainSurveyText } from '../../../utils/surveyMarkup';
+import QuestionLogicPanel, { logicBadge } from './QuestionLogicPanel.jsx';
+import { optionLabel } from './optionHelpers.js';
 
 export default function SurveyQuestions({
   addOption,
@@ -22,24 +24,55 @@ export default function SurveyQuestions({
   removeOption,
   removeQuestion,
   removeRow,
+  logicTextOnlyLocked = false,
+  logicRewardSummary = null,
+  onPreview = null,
 }) {
   return (
     <>
           {/* Questions Builder */}
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-            <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-green-50 border-b border-gray-200 flex items-center justify-between">
+            <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-green-50 border-b border-gray-200 flex items-center justify-between gap-3 flex-wrap">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">Survey Questions</h2>
                 <p className="text-sm text-gray-600">{formData.questions.length} question{formData.questions.length !== 1 ? 's' : ''}</p>
+                {formData.isPoll ? (
+                  <p className="text-xs text-indigo-700 mt-1">
+                    Quick poll: one single-choice question only.
+                  </p>
+                ) : null}
+                {logicRewardSummary ? (
+                  <p className="text-xs text-gray-600 mt-1">
+                    Ended after 1 question: {logicRewardSummary.early} credits · 2 or more questions: {logicRewardSummary.full} credits
+                  </p>
+                ) : null}
+                {logicTextOnlyLocked ? (
+                  <p className="text-xs text-amber-700 mt-1">
+                    This published logic survey is text-only. Structure and rules are locked.
+                  </p>
+                ) : null}
               </div>
-              <button
-                type="button"
-                onClick={addQuestion}
-                className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                Add Question
-              </button>
+              <div className="flex items-center gap-2">
+                {onPreview ? (
+                  <button
+                    type="button"
+                    onClick={onPreview}
+                    className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 bg-white text-gray-800 rounded-xl hover:bg-gray-50 transition-colors"
+                  >
+                    <Eye className="h-4 w-4" />
+                    Test this survey
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={addQuestion}
+                  disabled={logicTextOnlyLocked || formData.isPoll}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Question
+                </button>
+              </div>
             </div>
 
             <div className="p-6 space-y-6">
@@ -72,12 +105,18 @@ export default function SurveyQuestions({
                               {q.metricTag.toUpperCase()}
                             </span>
                           )}
+                          {logicBadge(q) ? (
+                            <span className="px-3 py-1 rounded-lg text-xs font-bold border bg-green-50 border-green-200 text-green-800">
+                              Logic
+                            </span>
+                          ) : null}
                         </div>
 
                         <button
                           type="button"
+                          disabled={logicTextOnlyLocked}
                           onClick={() => handleQuestionChange(idx, 'isRequired', q.isRequired === false)}
-                          className={`inline-flex items-center px-3 py-1 rounded-lg border text-xs font-semibold mb-4 transition-colors ${
+                          className={`inline-flex items-center px-3 py-1 rounded-lg border text-xs font-semibold mb-4 transition-colors disabled:opacity-60 ${
                             q.isRequired === false
                               ? 'bg-gray-50 border-gray-200 text-gray-500'
                               : 'bg-red-50 border-red-200 text-red-700'
@@ -92,7 +131,7 @@ export default function SurveyQuestions({
                         />
                       </div>
 
-                      {formData.questions.length > 1 && (
+                      {formData.questions.length > 1 && !logicTextOnlyLocked && (
                         <button
                           type="button"
                           onClick={() => removeQuestion(idx)}
@@ -104,21 +143,35 @@ export default function SurveyQuestions({
                     </div>
 
                     <div className="p-6 space-y-6">
+                      {!formData.isPoll ? (
+                        <QuestionLogicPanel
+                          question={q}
+                          index={idx}
+                          questions={formData.questions}
+                          locked={logicTextOnlyLocked}
+                          onChange={(field, value) => handleQuestionChange(idx, field, value)}
+                        />
+                      ) : null}
+
                       {/* Question Type Selector */}
                       <div>
                         <label className="block text-sm font-semibold text-gray-900 mb-3">
                           Question Type
                         </label>
                         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                          {questionTypes.map(t => {
+                          {(formData.isPoll
+                            ? questionTypes.filter((t) => t.value === 'single_checkbox')
+                            : questionTypes
+                          ).map(t => {
                             const Icon = t.icon;
                             const isActive = q.questionType === t.value;
                             return (
                               <button
                                 key={t.value}
                                 type="button"
+                                disabled={logicTextOnlyLocked || formData.isPoll}
                                 onClick={() => handleQuestionChange(idx, 'questionType', t.value)}
-                                className={`p-4 rounded-xl border-2 transition-all text-center ${
+                                className={`p-4 rounded-xl border-2 transition-all text-center disabled:opacity-60 ${
                                   isActive
                                     ? 'border-green-500 bg-green-50'
                                     : 'border-gray-200 hover:border-gray-300 bg-white'
@@ -135,6 +188,7 @@ export default function SurveyQuestions({
                       </div>
 
                       {/* Metric tag: None / CEP / NPS */}
+                      {!formData.isPoll ? (
                       <div>
                         <label className="block text-sm font-semibold text-gray-900 mb-3">
                           Metric tag
@@ -177,6 +231,7 @@ export default function SurveyQuestions({
                           })}
                         </div>
                       </div>
+                      ) : null}
 
                       {/* Options for checkbox, Likert, and attention-check questions */}
                       {(q.questionType === 'single_checkbox' || q.questionType === 'multiple_checkbox' || q.questionType === 'likert' || q.questionType === 'attention_check') && (
@@ -185,30 +240,34 @@ export default function SurveyQuestions({
                             <label className="text-sm font-semibold text-gray-900">
                               Answer Options
                             </label>
-                            <button
-                              type="button"
-                              onClick={() => addOption(idx)}
-                              className="text-sm font-medium text-green-700 hover:text-green-800"
-                            >
-                              + Add Option
-                            </button>
+                            {!logicTextOnlyLocked ? (
+                              <button
+                                type="button"
+                                onClick={() => addOption(idx)}
+                                className="text-sm font-medium text-green-700 hover:text-green-800"
+                              >
+                                + Add Option
+                              </button>
+                            ) : null}
                           </div>
 
                           <div className="space-y-3">
-                            {q.options.map((opt, optIdx) => (
-                              <div key={optIdx} className="flex items-center gap-3">
+                            {q.options.map((opt, optIdx) => {
+                              const label = optionLabel(opt);
+                              return (
+                              <div key={opt?.id || optIdx} className="flex items-center gap-3">
                                 <span className="text-sm font-medium text-gray-500 w-8">{optIdx + 1}.</span>
                                 <input
                                   type="text"
-                                  value={opt}
+                                  value={label}
                                   onChange={e => handleOptionChange(idx, optIdx, e.target.value)}
                                   className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                                   placeholder={`Option ${optIdx + 1}`}
                                 />
-                                {q.questionType === 'attention_check' && q.attentionAnswer === opt && (
+                                {q.questionType === 'attention_check' && q.attentionAnswer === label && (
                                   <span className="text-xs font-semibold text-green-700">Correct</span>
                                 )}
-                                {q.options.length > 1 && (
+                                {q.options.length > 1 && !logicTextOnlyLocked && (
                                   <button
                                     type="button"
                                     onClick={() => removeOption(idx, optIdx)}
@@ -218,7 +277,7 @@ export default function SurveyQuestions({
                                   </button>
                                 )}
                               </div>
-                            ))}
+                            );})}
                           </div>
 
                           {q.questionType === 'attention_check' && (
@@ -236,18 +295,21 @@ export default function SurveyQuestions({
                               >
                                 <option value="">Correct answer</option>
                                 {q.options.map((opt, optIdx) => (
-                                  <option key={optIdx} value={opt}>{opt || `Option ${optIdx + 1}`}</option>
+                                  <option key={opt?.id || optIdx} value={optionLabel(opt)}>
+                                    {optionLabel(opt) || `Option ${optIdx + 1}`}
+                                  </option>
                                 ))}
                               </select>
                             </div>
                           )}
 
-                          {q.questionType === 'single_checkbox' && (
+                          {q.questionType === 'single_checkbox' && !formData.isPoll && (
                             <div className="mt-4 pt-4 border-t border-green-100 space-y-3">
                               <label className="flex items-center gap-2 text-sm font-semibold text-gray-900">
                                 <input
                                   type="checkbox"
                                   checked={!!q.attentionCheck}
+                                  disabled={logicTextOnlyLocked}
                                   onChange={(e) => handleQuestionChange(idx, 'attentionCheck', e.target.checked)}
                                 />
                                 Attention check
@@ -258,12 +320,15 @@ export default function SurveyQuestions({
                               {q.attentionCheck && (
                                 <select
                                   value={q.attentionAnswer || ''}
+                                  disabled={logicTextOnlyLocked}
                                   onChange={(e) => handleQuestionChange(idx, 'attentionAnswer', e.target.value)}
                                   className="w-full px-4 py-2.5 border border-gray-200 rounded-lg bg-white"
                                 >
                                   <option value="">Correct answer</option>
                                   {q.options.map((opt, optIdx) => (
-                                    <option key={optIdx} value={opt}>{opt || `Option ${optIdx + 1}`}</option>
+                                    <option key={opt?.id || optIdx} value={optionLabel(opt)}>
+                                      {optionLabel(opt) || `Option ${optIdx + 1}`}
+                                    </option>
                                   ))}
                                 </select>
                               )}
@@ -407,11 +472,11 @@ export default function SurveyQuestions({
                             </p>
                             <div className="space-y-3">
                               {(q.options || []).map((opt, optIdx) => (
-                                <div key={optIdx} className="flex items-center gap-2">
+                                <div key={opt?.id || optIdx} className="flex items-center gap-2">
                                   <span className="text-sm font-medium text-gray-500 w-8 shrink-0">{optIdx + 1}.</span>
                                   <input
                                     type="text"
-                                    value={opt}
+                                    value={optionLabel(opt)}
                                     onChange={e => handleOptionChange(idx, optIdx, e.target.value)}
                                     className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                                     placeholder={`Column ${optIdx + 1}`}
@@ -419,7 +484,7 @@ export default function SurveyQuestions({
                                   <button
                                     type="button"
                                     onClick={() => moveOption(idx, optIdx, optIdx - 1)}
-                                    disabled={optIdx === 0}
+                                    disabled={logicTextOnlyLocked || optIdx === 0}
                                     className="p-2 text-gray-500 hover:bg-white rounded-lg disabled:opacity-30"
                                     aria-label="Move column left"
                                   >
@@ -428,13 +493,13 @@ export default function SurveyQuestions({
                                   <button
                                     type="button"
                                     onClick={() => moveOption(idx, optIdx, optIdx + 1)}
-                                    disabled={optIdx === (q.options || []).length - 1}
+                                    disabled={logicTextOnlyLocked || optIdx === (q.options || []).length - 1}
                                     className="p-2 text-gray-500 hover:bg-white rounded-lg disabled:opacity-30"
                                     aria-label="Move column right"
                                   >
                                     <ChevronDown className="h-4 w-4" />
                                   </button>
-                                  {(q.options || []).length > 1 && (
+                                  {(q.options || []).length > 1 && !logicTextOnlyLocked && (
                                     <button
                                       type="button"
                                       onClick={() => removeOption(idx, optIdx)}
@@ -509,14 +574,14 @@ export default function SurveyQuestions({
                         {(q.questionType === 'single_checkbox' || q.questionType === 'multiple_checkbox' || q.questionType === 'likert' || q.questionType === 'attention_check') && (
                           <div className="space-y-3">
                             {q.options.map((opt, i) => (
-                              <label key={i} className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg">
+                              <label key={opt?.id || i} className="flex items-center gap-3 p-3 bg-white border border-gray-200 rounded-lg">
                                 <input
                                   type={q.questionType === 'multiple_checkbox' ? 'checkbox' : 'radio'}
                                   disabled
                                   className="h-5 w-5"
                                 />
-                                <span className="text-sm">{opt}</span>
-                                {q.questionType === 'attention_check' && q.attentionAnswer === opt && (
+                                <span className="text-sm">{optionLabel(opt)}</span>
+                                {q.questionType === 'attention_check' && q.attentionAnswer === optionLabel(opt) && (
                                   <span className="text-xs font-semibold text-green-700">Correct</span>
                                 )}
                               </label>

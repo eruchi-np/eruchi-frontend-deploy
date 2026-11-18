@@ -196,6 +196,21 @@ export async function isWebPushSupported() {
   }
 }
 
+/**
+ * iOS shows the browser prompt only from an installed home-screen app,
+ * when push is supported and permission is not already blocked.
+ * A Safari tab, an unsupported browser, or a denied permission returns false
+ * so Remind me can send the email instead.
+ */
+export async function iosPushPromptAvailable() {
+  if (!isIosDevice() || !isOneSignalConfigured()) return false;
+  if (needsIosHomeScreenInstall()) return false;
+  const supported = await isWebPushSupported();
+  if (!supported) return false;
+  const permission = await getPushPermission();
+  return permission !== 'denied';
+}
+
 /** Soft then native prompt. On iOS Safari tab, callers should show A2HS first. */
 export async function requestPushSubscription() {
   const ok = await initOneSignal();

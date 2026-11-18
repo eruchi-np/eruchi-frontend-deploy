@@ -13,7 +13,14 @@ function isSurveyOpen(survey) {
 function minutesLabel(survey) {
   const mins = Number(survey.estimatedMinutes);
   if (!Number.isFinite(mins) || mins <= 0) return "—";
+  if (survey.hasLogic) return `Up to ${mins}Min`;
   return `${mins}Min`;
+}
+
+function creditsLabel(survey) {
+  const credits = survey.credits || 0;
+  if (survey.hasLogic) return `Up to ${credits} Ruchi Credits`;
+  return `${credits} Ruchi Credits`;
 }
 
 export { isSurveyOpen, minutesLabel };
@@ -59,7 +66,7 @@ export default function SurveyRow({ survey, onView, actionLabel }) {
       <div className="surveys-row-meta">
         <span className="surveys-row-time">{minutesLabel(survey)}</span>
         <span className="surveys-row-credits">
-          {survey.credits || 0} Ruchi Credits
+          {creditsLabel(survey)}
         </span>
       </div>
       <button

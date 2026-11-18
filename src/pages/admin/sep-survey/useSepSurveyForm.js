@@ -6,6 +6,7 @@ import {
   SATISFACTION_SCALE,
   DEFAULT_MATRIX_ROWS,
   createEmptyFormData,
+  EMPTY_POLL_QUESTION,
   questionTypes,
   metricTagOptions,
   statusOptions,
@@ -23,8 +24,11 @@ import {
   snapshotForm,
   validateSurveyForm,
   buildSurveyQuestions,
+  formHasLogic,
 } from './surveyFormPersist.js';
 import { surveyToFormData } from './surveyToFormData.js';
+import { asOptionObject, normalizeOptions, optionLabel } from './optionHelpers.js';
+import { computeLogicCredits } from '../../../utils/surveyLogic';
 
 const AUTOSAVE_MS = 15000;
 
@@ -55,7 +59,9 @@ export default function useSepSurveyForm() {
   const isSprint = searchParams.get('sprint') === '1';
   const sprintDay = Number(searchParams.get('day'));
   const [activeSurveyId, setActiveSurveyId] = useState(routeSurveyId || null);
-  const isEditMode = Boolean(activeSurveyId);
+  // Autosave stores an id during create. Edit mode follows the URL only,
+  // so a loaded template still shows Create Survey.
+  const isEditMode = Boolean(routeSurveyId);
   const [initialLoading, setInitialLoading] = useState(Boolean(routeSurveyId));
   const backTo = isSprint ? '/admin/15-day-survey' : '/admin';
 
@@ -206,9 +212,8 @@ export default function useSepSurveyForm() {
 
       const next = {
         ...surveyToFormData(survey),
-        status: 'draft',
-        clusterIds: [],
-        clusterSendAt: new Date().toISOString().slice(0, 16),
+        // Template stays a draft. This copy is ready to publish and schedule.
+        status: 'published',
       };
 
       // New copy — next Save/Create posts a new survey
@@ -274,27 +279,27 @@ export default function useSepSurveyForm() {
 
     try {
       const availableDays = Number(current.availableDays) || 7;
-      const publishedAt = current.publishedAt
-        ? new Date(current.publishedAt)
-        : new Date();
-      const derivedEndDate = new Date(publishedAt);
-      derivedEndDate.setDate(derivedEndDate.getDate() + availableDays);
       const questions = buildSurveyQuestions(current.questions);
 
       if (isSprint) {
         const sprintPayload = {
           daySlot: sprintDay,
           title: trimmedTitle,
+          hiddenName: String(current.hiddenName || '').trim(),
           description: trimmedDesc,
           status,
           credits: Number(current.credits),
           estimatedMinutes: minutes,
           questions,
+          hasLogic: current.isPoll ? false : formHasLogic(current),
+          isPoll: Boolean(current.isPoll),
         };
         let savedId = surveyId;
         if (surveyId) {
           await fifteenDaySurveyAPI.update(surveyId, sprintPayload, { skipErrorToast: silent });
-          if (!silent) toast.success(asDraft ? '15-day survey saved' : '15-day survey updated');
+          if (!silent) {
+            toast.success(asDraft ? '15-day survey saved' : (routeSurveyId ? '15-day survey updated' : '15-day survey created'));
+          }
         } else {
           const res = await fifteenDaySurveyAPI.create(sprintPayload, { skipErrorToast: silent });
           savedId = res.data?.data?._id || null;
@@ -315,47 +320,114 @@ export default function useSepSurveyForm() {
         return { ok: true, id: savedId };
       }
 
-      const payload = {
-        title: trimmedTitle,
-        description: trimmedDesc,
-        status,
-        credits: Number(current.credits),
-        estimatedMinutes: minutes,
-        kind: current.kind === 'daily' ? 'daily' : 'normal',
-        startDate: publishedAt.toISOString(),
-        endDate: needsWindow ? derivedEndDate.toISOString() : null,
-        visibility: current.visibility,
-        alsoPublishToOthers:
-          current.visibility === 'targeted' ? Boolean(current.alsoPublishToOthers) : false,
-        validityDays: Number(current.validityDays) || 7,
-        clusterIds:
-          current.visibility === 'targeted' && status === 'published'
-            ? current.clusterIds
-            : [],
-        clusterSendAt:
-          current.visibility === 'targeted'
-          && status === 'published'
-          && current.clusterIds.length > 0
-            ? new Date(current.clusterSendAt).toISOString()
-            : undefined,
-        questions,
+      const collectPublishDates = () => {
+        const raw = needsWindow
+          ? [
+            current.publishedAt,
+            ...((!routeSurveyId && !silent && Array.isArray(current.extraPublishedAts))
+              ? current.extraPublishedAts
+              : []),
+          ]
+          : [current.publishedAt || new Date().toISOString().slice(0, 16)];
+
+        const seen = new Set();
+        const dates = [];
+        for (const value of raw) {
+          if (value == null || value === '') continue;
+          const when = new Date(value);
+          if (Number.isNaN(when.getTime())) continue;
+          const key = when.getTime();
+          if (seen.has(key)) continue;
+          seen.add(key);
+          dates.push(when);
+        }
+        return dates.length ? dates : [new Date()];
+      };
+
+      const publishDates = collectPublishDates();
+      const clusterSendAt = (() => {
+        if (current.visibility !== 'targeted' || !current.clusterIds.length || !current.clusterSendAt) {
+          return null;
+        }
+        const when = new Date(current.clusterSendAt);
+        return Number.isNaN(when.getTime()) ? null : when.toISOString();
+      })();
+
+      const buildPayload = (publishedAt) => {
+        const derivedEndDate = new Date(publishedAt);
+        derivedEndDate.setDate(derivedEndDate.getDate() + availableDays);
+        return {
+          title: trimmedTitle,
+          hiddenName: String(current.hiddenName || '').trim(),
+          description: trimmedDesc,
+          status,
+          credits: Number(current.credits),
+          estimatedMinutes: minutes,
+          kind: current.kind === 'daily' ? 'daily' : 'normal',
+          startDate: publishedAt.toISOString(),
+          endDate: needsWindow ? derivedEndDate.toISOString() : null,
+          visibility: current.visibility,
+          alsoPublishToOthers:
+            current.visibility === 'targeted' ? Boolean(current.alsoPublishToOthers) : false,
+          validityDays: Number(current.validityDays) || 7,
+          clusterIds: current.visibility === 'targeted' ? current.clusterIds : [],
+          clusterSendAt,
+          questions,
+          hasLogic: formHasLogic(current),
+        };
       };
 
       let sends = [];
       let savedId = surveyId;
-      if (surveyId) {
-        const res = await sepSurveyAPI.update(surveyId, payload, { skipErrorToast: silent });
-        sends = res.data?.sends || [];
-        if (!silent) toast.success(asDraft ? 'Survey saved' : 'Survey updated successfully!');
-      } else {
-        const res = await sepSurveyAPI.create(payload, { skipErrorToast: silent });
-        sends = res.data?.sends || [];
-        savedId = res.data?.data?._id || null;
-        if (savedId) setActiveSurveyId(String(savedId));
-        if (!silent) toast.success(asDraft ? 'Survey saved' : 'Standalone survey created successfully!');
+      let createdCount = 0;
+      const failedDates = [];
+
+      for (let i = 0; i < publishDates.length; i += 1) {
+        const payload = buildPayload(publishDates[i]);
+        const reuseExisting = i === 0 && surveyId;
+        try {
+          if (reuseExisting) {
+            const res = await sepSurveyAPI.update(surveyId, payload, { skipErrorToast: silent });
+            sends = sends.concat(res.data?.sends || []);
+            savedId = surveyId;
+            createdCount += 1;
+          } else {
+            const res = await sepSurveyAPI.create(payload, { skipErrorToast: silent });
+            sends = sends.concat(res.data?.sends || []);
+            const newId = res.data?.data?._id || null;
+            if (i === 0 && newId) {
+              savedId = newId;
+              setActiveSurveyId(String(newId));
+            }
+            if (newId) createdCount += 1;
+          }
+        } catch (dateErr) {
+          if (i === 0 && publishDates.length === 1) throw dateErr;
+          failedDates.push(publishDates[i].toLocaleString());
+          if (i === 0) throw dateErr;
+        }
       }
 
       if (!silent) {
+        if (createdCount > 1) {
+          toast.success(
+            asDraft
+              ? `Saved ${createdCount} surveys`
+              : `Created ${createdCount} surveys for the selected dates`
+          );
+        } else {
+          toast.success(
+            asDraft
+              ? 'Survey saved'
+              : (routeSurveyId ? 'Survey updated successfully!' : 'Standalone survey created successfully!')
+          );
+        }
+        if (failedDates.length) {
+          toast.error(
+            `Could not create survey for ${failedDates.length} date${failedDates.length === 1 ? '' : 's'}: ${failedDates.join('; ')}`
+          );
+        }
+
         const failedSends = sends.filter((s) => !s.ok);
         const okSends = sends.filter((s) => s.ok);
         if (okSends.length) {
@@ -410,7 +482,7 @@ export default function useSepSurveyForm() {
     } finally {
       if (!silent) setPendingAction(null);
     }
-  }, [isSprint, sprintDay, navigate, markClean, cacheScope]);
+  }, [isSprint, sprintDay, navigate, markClean, cacheScope, routeSurveyId]);
 
   useEffect(() => {
     if (initialLoading) return undefined;
@@ -440,7 +512,37 @@ export default function useSepSurveyForm() {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   }, []);
 
+  const ensurePollQuestion = (question) => ({
+    ...question,
+    questionType: 'single_checkbox',
+    options: normalizeOptions(
+      (question.options || []).length
+        ? question.options
+        : EMPTY_POLL_QUESTION.options
+    ),
+    rows: [],
+    maxSelections: 1,
+    attentionCheck: false,
+    attentionAnswer: '',
+    show_if: null,
+    end_after_if: null,
+    metricTag: 'none',
+  });
+
   const handleInputChange = (field, value) => {
+    if (field === 'isPoll') {
+      const enabled = Boolean(value);
+      setFormData((prev) => {
+        if (!enabled) return { ...prev, isPoll: false };
+        const first = prev.questions[0] || { ...EMPTY_POLL_QUESTION };
+        return {
+          ...prev,
+          isPoll: true,
+          questions: [ensurePollQuestion(first)],
+        };
+      });
+      return;
+    }
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -458,25 +560,31 @@ export default function useSepSurveyForm() {
   };
 
   const handleQuestionChange = (index, field, value) => {
+    if (formData.isPoll && field === 'questionType' && value !== 'single_checkbox') {
+      toast.error('Poll questions must be single choice');
+      return;
+    }
     const updated = [...formData.questions];
     const previousType = updated[index].questionType;
     updated[index][field] = value;
 
     if (field === 'questionType') {
       if (value === 'single_checkbox' || value === 'multiple_checkbox' || value === 'attention_check') {
-        updated[index].options = updated[index].options.length ? updated[index].options : ['Option 1', 'Option 2'];
+        updated[index].options = updated[index].options.length
+          ? normalizeOptions(updated[index].options)
+          : normalizeOptions(['Option 1', 'Option 2']);
         updated[index].rows = [];
         updated[index].maxSelections = value === 'multiple_checkbox' ? 2 : 1;
       } else if (value === 'likert') {
         if (previousType !== 'likert') {
-          updated[index].options = ['1', '2', '3', '4', '5'];
+          updated[index].options = normalizeOptions(['1', '2', '3', '4', '5']);
           updated[index].rows = [];
           updated[index].maxSelections = 1;
         }
       } else if (value === 'matrix_radio') {
         updated[index].options = updated[index].options?.length
-          ? updated[index].options
-          : [...SATISFACTION_SCALE];
+          ? normalizeOptions(updated[index].options)
+          : normalizeOptions([...SATISFACTION_SCALE]);
         updated[index].rows = updated[index].rows?.length
           ? updated[index].rows
           : [...DEFAULT_MATRIX_ROWS];
@@ -502,6 +610,8 @@ export default function useSepSurveyForm() {
         updated[index].attentionCheck = false;
         updated[index].attentionAnswer = '';
       }
+      // Drop show rules that become invalid for attention / first question handled at validate time
+      if (value === 'attention_check') updated[index].show_if = null;
     }
 
     setFormData((prev) => ({ ...prev, questions: updated }));
@@ -510,9 +620,10 @@ export default function useSepSurveyForm() {
   const handleOptionChange = (qIndex, optIndex, value) => {
     const updated = [...formData.questions];
     const previous = updated[qIndex].options[optIndex];
-    updated[qIndex].options[optIndex] = value;
-    if (updated[qIndex].attentionAnswer === previous) {
-      updated[qIndex].attentionAnswer = value;
+    const previousLabel = optionLabel(previous);
+    updated[qIndex].options[optIndex] = asOptionObject(value, previous);
+    if (updated[qIndex].attentionAnswer === previousLabel) {
+      updated[qIndex].attentionAnswer = optionLabel(updated[qIndex].options[optIndex]);
     }
     setFormData((prev) => ({ ...prev, questions: updated }));
   };
@@ -521,7 +632,7 @@ export default function useSepSurveyForm() {
     const updated = [...formData.questions];
     const next = updated[qIndex].options.length + 1;
     const label = updated[qIndex].questionType === 'likert' ? String(next) : `Option ${next}`;
-    updated[qIndex].options.push(label);
+    updated[qIndex].options.push(asOptionObject(label));
     setFormData((prev) => ({ ...prev, questions: updated }));
   };
 
@@ -530,7 +641,7 @@ export default function useSepSurveyForm() {
     if (updated[qIndex].options.length > 1) {
       const removed = updated[qIndex].options[optIndex];
       updated[qIndex].options.splice(optIndex, 1);
-      if (updated[qIndex].attentionAnswer === removed) {
+      if (updated[qIndex].attentionAnswer === optionLabel(removed)) {
         updated[qIndex].attentionAnswer = '';
       }
       setFormData((prev) => ({ ...prev, questions: updated }));
@@ -573,11 +684,15 @@ export default function useSepSurveyForm() {
 
   const applySatisfactionScale = (qIndex) => {
     const updated = [...formData.questions];
-    updated[qIndex].options = [...SATISFACTION_SCALE];
+    updated[qIndex].options = normalizeOptions([...SATISFACTION_SCALE]);
     setFormData((prev) => ({ ...prev, questions: updated }));
   };
 
   const addQuestion = () => {
+    if (formData.isPoll) {
+      toast.error('A poll can only have one question');
+      return;
+    }
     setFormData((prev) => ({
       ...prev,
       questions: [
@@ -594,12 +709,18 @@ export default function useSepSurveyForm() {
           attentionCheck: false,
           attentionAnswer: '',
           metricTag: 'none',
+          show_if: null,
+          end_after_if: null,
         },
       ],
     }));
   };
 
   const removeQuestion = (index) => {
+    if (formData.isPoll) {
+      toast.error('A poll can only have one question');
+      return;
+    }
     if (formData.questions.length > 1) {
       const updated = formData.questions.filter((_, i) => i !== index);
       setFormData((prev) => ({ ...prev, questions: updated }));
@@ -622,6 +743,19 @@ export default function useSepSurveyForm() {
   const getMinPublishedDate = () => new Date().toISOString().slice(0, 16);
 
   const getQuestionTypeData = (type) => questionTypes.find((qt) => qt.value === type);
+
+  const hasLogic = formHasLogic(formData);
+  const logicTextOnlyLocked = Boolean(
+    isEditMode
+    && formData.status === 'published'
+    && hasLogic
+  );
+  const logicRewardSummary = hasLogic
+    ? {
+      early: computeLogicCredits(formData.credits, 1, formData.questions.length),
+      full: Number(formData.credits) || 0,
+    }
+    : null;
 
   return {
     loading,
@@ -647,6 +781,9 @@ export default function useSepSurveyForm() {
     statusOptions,
     visibilityOptions,
     kindOptions,
+    hasLogic,
+    logicTextOnlyLocked,
+    logicRewardSummary,
     handleInputChange,
     toggleCluster,
     needsPublicWindow,

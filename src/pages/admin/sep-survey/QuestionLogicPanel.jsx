@@ -1,0 +1,335 @@
+import { useState } from 'react';
+import { GitBranch, Plus, Trash2 } from 'lucide-react';
+import {
+  allowedOperatorsFor,
+  hasLogicRules,
+  normalizeOptions,
+  optionLabel,
+  questionId,
+} from '../../../utils/surveyLogic';
+import { plainSurveyText } from '../../../utils/surveyMarkup';
+
+const OP_LABELS = {
+  is: 'is',
+  is_not: 'is not',
+  is_any_of: 'is any of',
+  is_none_of: 'is none of',
+  includes: 'includes',
+  does_not_include: 'does not include',
+  includes_any_of: 'includes any of',
+  includes_all_of: 'includes all of',
+  equals: 'equals',
+  not_equals: 'not equals',
+  greater_than: 'greater than',
+  at_least: 'at least',
+  less_than: 'less than',
+  at_most: 'at most',
+  between: 'between',
+  was_answered: 'was answered',
+  was_not_answered: 'was not answered',
+  was_skipped: 'was skipped',
+};
+
+const emptyCondition = (questionIdValue) => ({
+  question: questionIdValue || '',
+  op: 'is',
+  value: '',
+});
+
+const emptyRule = (questionIdValue) => ({
+  match: 'all',
+  conditions: [emptyCondition(questionIdValue)],
+});
+
+function ConditionRow({
+  condition,
+  sources,
+  onChange,
+  onRemove,
+  canRemove,
+  locked,
+}) {
+  const source = sources.find((s) => s.id === condition.question) || sources[0];
+  const ops = allowedOperatorsFor(source?.question || { questionType: 'text_short' });
+  const needsValue = !['was_answered', 'was_not_answered', 'was_skipped'].includes(condition.op);
+  const multi = ['is_any_of', 'is_none_of', 'includes_any_of', 'includes_all_of'].includes(condition.op);
+  const isBetween = condition.op === 'between';
+  const choiceOps = ['is', 'is_not', 'is_any_of', 'is_none_of', 'includes', 'does_not_include', 'includes_any_of', 'includes_all_of'];
+  const useOptions = choiceOps.includes(condition.op);
+  const options = normalizeOptions(source?.question?.options || []);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <select
+        className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+        value={condition.question}
+        disabled={locked}
+        onChange={(e) => {
+          const nextSource = sources.find((s) => s.id === e.target.value);
+          const nextOps = allowedOperatorsFor(nextSource?.question || {});
+          onChange({
+            ...condition,
+            question: e.target.value,
+            op: nextOps[0] || 'was_answered',
+            value: '',
+          });
+        }}
+      >
+        {sources.map((s) => (
+          <option key={s.id} value={s.id}>{s.label}</option>
+        ))}
+      </select>
+      <select
+        className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+        value={condition.op}
+        disabled={locked}
+        onChange={(e) => onChange({ ...condition, op: e.target.value, value: e.target.value === 'between' ? ['', ''] : '' })}
+      >
+        {ops.map((op) => (
+          <option key={op} value={op}>{OP_LABELS[op] || op}</option>
+        ))}
+      </select>
+      {needsValue && useOptions && !multi && (
+        <select
+          className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white min-w-[8rem]"
+          value={String(condition.value || '')}
+          disabled={locked}
+          onChange={(e) => onChange({ ...condition, value: e.target.value })}
+        >
+          <option value="">Pick option</option>
+          {options.map((o) => (
+            <option key={o.id} value={o.id}>{o.label}</option>
+          ))}
+        </select>
+      )}
+      {needsValue && useOptions && multi && (
+        <select
+          multiple
+          className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white min-w-[8rem] min-h-[4.5rem]"
+          value={Array.isArray(condition.value) ? condition.value.map(String) : (condition.value ? [String(condition.value)] : [])}
+          disabled={locked}
+          onChange={(e) => {
+            const vals = Array.from(e.target.selectedOptions).map((o) => o.value);
+            onChange({ ...condition, value: vals });
+          }}
+        >
+          {options.map((o) => (
+            <option key={o.id} value={o.id}>{o.label}</option>
+          ))}
+        </select>
+      )}
+      {needsValue && !useOptions && isBetween && (
+        <>
+          <input
+            type="number"
+            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-20"
+            value={Array.isArray(condition.value) ? condition.value[0] ?? '' : ''}
+            disabled={locked}
+            onChange={(e) => {
+              const cur = Array.isArray(condition.value) ? [...condition.value] : ['', ''];
+              cur[0] = e.target.value;
+              onChange({ ...condition, value: cur });
+            }}
+          />
+          <span className="text-xs text-gray-500">and</span>
+          <input
+            type="number"
+            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-20"
+            value={Array.isArray(condition.value) ? condition.value[1] ?? '' : ''}
+            disabled={locked}
+            onChange={(e) => {
+              const cur = Array.isArray(condition.value) ? [...condition.value] : ['', ''];
+              cur[1] = e.target.value;
+              onChange({ ...condition, value: cur });
+            }}
+          />
+        </>
+      )}
+      {needsValue && !useOptions && !isBetween && (
+        <input
+          type="number"
+          className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-24"
+          value={condition.value ?? ''}
+          disabled={locked}
+          onChange={(e) => onChange({ ...condition, value: e.target.value })}
+        />
+      )}
+      {canRemove && !locked ? (
+        <button type="button" className="p-1.5 text-red-600 hover:bg-red-50 rounded" onClick={onRemove}>
+          <Trash2 className="h-4 w-4" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function RuleEditor({ title, rule, onChange, onClear, sources, locked }) {
+  if (!rule) {
+    return (
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-gray-600">{title}: none</p>
+        {!locked ? (
+          <button
+            type="button"
+            className="text-sm font-semibold text-green-700 hover:underline"
+            onClick={() => onChange(emptyRule(sources[0]?.id))}
+          >
+            Add rule
+          </button>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-gray-900">{title}</p>
+        {!locked ? (
+          <button type="button" className="text-xs font-semibold text-red-600 hover:underline" onClick={onClear}>
+            Remove
+          </button>
+        ) : null}
+      </div>
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-gray-600">Match</span>
+        <select
+          className="border border-gray-300 rounded-lg px-2 py-1.5 bg-white"
+          value={rule.match || 'all'}
+          disabled={locked}
+          onChange={(e) => onChange({ ...rule, match: e.target.value })}
+        >
+          <option value="all">ALL conditions</option>
+          <option value="any">ANY condition</option>
+        </select>
+      </div>
+      <div className="space-y-2">
+        {(rule.conditions || []).map((condition, index) => (
+          <ConditionRow
+            key={index}
+            condition={condition}
+            sources={sources}
+            locked={locked}
+            canRemove={(rule.conditions || []).length > 1}
+            onRemove={() => {
+              const next = rule.conditions.filter((_, i) => i !== index);
+              onChange({ ...rule, conditions: next });
+            }}
+            onChange={(nextCondition) => {
+              const next = [...rule.conditions];
+              next[index] = nextCondition;
+              onChange({ ...rule, conditions: next });
+            }}
+          />
+        ))}
+      </div>
+      {!locked ? (
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 text-sm font-semibold text-green-700"
+          onClick={() => onChange({
+            ...rule,
+            conditions: [...(rule.conditions || []), emptyCondition(sources[0]?.id)],
+          })}
+        >
+          <Plus className="h-4 w-4" />
+          Add condition
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+export default function QuestionLogicPanel({
+  question,
+  index,
+  questions,
+  onChange,
+  locked = false,
+}) {
+  const [open, setOpen] = useState(Boolean(hasLogicRules(question)));
+  const qid = questionId(question, index);
+  const earlier = questions.slice(0, index).map((q, i) => ({
+    id: questionId(q, i),
+    label: `Q${i + 1}: ${plainSurveyText(q.questionText) || 'Untitled'}`,
+    question: q,
+  })).filter((s) => allowedOperatorsFor(s.question).length > 0);
+
+  const endSources = [
+    ...earlier,
+    {
+      id: qid,
+      label: `Q${index + 1}: this question`,
+      question,
+    },
+  ].filter((s) => allowedOperatorsFor(s.question).length > 0);
+
+  const canShow = index > 0 && question.questionType !== 'attention_check' && earlier.length > 0;
+  const canEnd = endSources.length > 0 && allowedOperatorsFor(question).length > 0;
+
+  return (
+    <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 space-y-3">
+      <button
+        type="button"
+        className="flex w-full items-center justify-between gap-3 text-left"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <span className="inline-flex items-center gap-2 text-sm font-semibold text-gray-900">
+          <GitBranch className="h-4 w-4 text-green-700" />
+          Logic
+          {hasLogicRules(question) ? (
+            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-bold text-green-800">On</span>
+          ) : null}
+        </span>
+        <span className="text-xs text-gray-500">{open ? 'Hide' : 'Show'}</span>
+      </button>
+      {open ? (
+        <div className="space-y-4">
+          {locked ? (
+            <p className="text-xs text-amber-700">
+              Published logic surveys are text-only. Rules stay locked — create a new survey to change them.
+            </p>
+          ) : null}
+          {canShow ? (
+            <RuleEditor
+              title="Show this question only if"
+              rule={question.show_if || null}
+              sources={earlier}
+              locked={locked}
+              onClear={() => onChange('show_if', null)}
+              onChange={(rule) => onChange('show_if', rule)}
+            />
+          ) : (
+            <p className="text-xs text-gray-500">
+              {index === 0
+                ? 'The first question cannot have a Show rule.'
+                : question.questionType === 'attention_check'
+                  ? 'Attention checks are always shown.'
+                  : 'Add an earlier choice/scale/text question to use a Show rule.'}
+            </p>
+          )}
+          {canEnd ? (
+            <RuleEditor
+              title="End the survey after this question if"
+              rule={question.end_after_if || null}
+              sources={endSources}
+              locked={locked}
+              onClear={() => onChange('end_after_if', null)}
+              onChange={(rule) => onChange('end_after_if', rule)}
+            />
+          ) : (
+            <p className="text-xs text-gray-500">This question type cannot carry an End rule.</p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+export function logicBadge(question) {
+  return hasLogicRules(question);
+}
+
+export function optionDisplay(option) {
+  return optionLabel(option);
+}

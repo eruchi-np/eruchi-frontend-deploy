@@ -15,6 +15,7 @@ import {
   wasPushPromptDismissed,
 } from '../../utils/oneSignal';
 import { healthSessionId, trackHealthEvent } from '../../utils/healthEvents';
+import { reportPushOptIn } from '../../utils/pushOptIn';
 import './pushPrompt.css';
 
 const SURVEY_COMPLETE_PATH = '/survey-complete';
@@ -92,6 +93,7 @@ export default function PushPrompt() {
       const result = await requestPushSubscription();
       if (result.ok) {
         trackPush('push_prompt_accepted');
+        reportPushOptIn(true);
         toast.success('Notifications enabled');
         setVisible(false);
         return;

@@ -26,6 +26,7 @@ import { useAuth } from './context/AuthContext';
 import { isProfileOnboardingLocked } from './utils/onboardingGate';
 import OneSignalBridge from './components/notifications/OneSignalBridge';
 import PushPrompt from './components/notifications/PushPrompt';
+import PwaPrompt from './components/notifications/PwaPrompt';
 
 const Homepage = lazy(() => import('./pages/public/Homepage'));
 const ForBusiness = lazy(() => import('./pages/public/ForBusiness.jsx'));
@@ -141,7 +142,7 @@ function AppChrome({ children }) {
     <>
       {!isBusiness && !isBrand && !hideNav && <HomeNav variant={navVariant} sidebarOffset={isAdminBrands} />}
       <BusinessAccessGuard />
-      <div className={`min-w-0 max-w-full ${overlayNav ? 'overflow-x-clip' : 'overflow-x-hidden'}`}>
+      <div className={`min-w-0 max-w-full ${overlayNav || isSurveyTake ? 'overflow-x-clip' : 'overflow-x-hidden'}`}>
         {children}
         {!isHome && !isProfile && !isShop && !isSurveys && !isSurveyTake && !isSurveyComplete && !isBusiness && !isBrand && !isOnboarding && <Footer />}
       </div>
@@ -207,6 +208,7 @@ function App() {
         <ScrollToTop />
         <OneSignalBridge />
         <PushPrompt />
+        <PwaPrompt />
         <AppChrome>
         <OnboardingGate />
         <RouteErrorBoundary>

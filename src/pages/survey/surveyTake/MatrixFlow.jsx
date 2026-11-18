@@ -1,22 +1,72 @@
+import { useRef } from "react";
 import { toMatrixItem } from "./validation";
+
+function MatrixCols({ columns }) {
+  return (
+    <colgroup>
+      <col className="mx-brand" />
+      {columns.map((col) => (
+        <col key={col.id} />
+      ))}
+    </colgroup>
+  );
+}
 
 export default function MatrixFlow({ rows, columns, value, onChange, namePrefix }) {
   const rowItems = rows.map(toMatrixItem);
   const colItems = columns.map(toMatrixItem);
+  const headRef = useRef(null);
+  const bodyRef = useRef(null);
+  const syncing = useRef(false);
 
   const select = (rowId, colId) => {
     onChange({ ...value, [rowId]: colId });
   };
 
+  const syncScroll = (from) => {
+    const head = headRef.current;
+    const body = bodyRef.current;
+    if (!head || !body || syncing.current) return;
+    const to = from === head ? body : head;
+    if (to.scrollLeft === from.scrollLeft) return;
+    syncing.current = true;
+    to.scrollLeft = from.scrollLeft;
+    syncing.current = false;
+  };
+
   return (
-    <>
-      <div className="mxw">
+    <div className="mx-block" style={{ "--mx-cols": colItems.length }}>
+      <div className="mx-head-sticky">
+        <div
+          className="mx-head-scroll"
+          ref={headRef}
+          onScroll={(event) => syncScroll(event.currentTarget)}
+          aria-hidden="true"
+        >
+          <table className="mx">
+            <MatrixCols columns={colItems} />
+            <thead>
+              <tr>
+                <th scope="col">
+                  <span className="sr">Row</span>
+                </th>
+                {colItems.map((col) => (
+                  <th key={col.id} scope="col">
+                    {col.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+          </table>
+        </div>
+      </div>
+
+      <div className="mxw" ref={bodyRef} onScroll={(event) => syncScroll(event.currentTarget)}>
         <table className="mx">
-          <thead>
+          <MatrixCols columns={colItems} />
+          <thead className="mx-sr-head">
             <tr>
-              <th scope="col">
-                <span className="sr">Row</span>
-              </th>
+              <th scope="col">Row</th>
               {colItems.map((col) => (
                 <th key={col.id} scope="col">
                   {col.label}
@@ -51,31 +101,6 @@ export default function MatrixFlow({ rows, columns, value, onChange, namePrefix 
           </tbody>
         </table>
       </div>
-
-      <div className="mxm">
-        {rowItems.map((row) => (
-          <fieldset key={row.id}>
-            <legend>{row.label}</legend>
-            <div className="chs">
-              {colItems.map((col) => {
-                const on = value[row.id] === col.id;
-                return (
-                  <label key={col.id} className={`ch${on ? " on" : ""}`}>
-                    <input
-                      className="sr"
-                      type="radio"
-                      name={`${namePrefix}-${row.id}-m`}
-                      checked={on}
-                      onChange={() => select(row.id, col.id)}
-                    />
-                    <span>{col.label}</span>
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-        ))}
-      </div>
-    </>
+    </div>
   );
 }

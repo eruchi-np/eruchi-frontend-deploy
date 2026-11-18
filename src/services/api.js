@@ -113,6 +113,8 @@ export const userAPI = {
   purchaseStreakGuard: (days, config = {}) => api.post('/users/me/streak-guard', { days }, config),
   getActivity: (options = {}) => getRequest('/users/me/activity', options),
   getNotifications: (options = {}) => getRequest('/users/me/notifications', options),
+  setPushOptIn: (optedIn, config = {}) =>
+    api.put('/users/me/push-opt-in', { optedIn: Boolean(optedIn) }, config),
 };
 
 /** PC2 SEC household survey + shared profile-survey list. */
@@ -305,13 +307,13 @@ export const fifteenDaySurveyAPI = {
         ...(Number.isInteger(Number(wave)) && Number(wave) >= 1 ? { wave: Number(wave) } : {}),
       },
     }),
-  submit: (surveyId, responses, timingData, wave, sessionId) =>
+  submit: (surveyId, responses, timingData, wave, sessionId, config = {}) =>
     api.post(`/fifteen-day/take/${surveyId}/submit`, {
       responses,
       timingData,
       ...(Number.isInteger(Number(wave)) && Number(wave) >= 1 ? { wave: Number(wave) } : {}),
       ...(sessionId ? { sessionId } : {}),
-    }),
+    }, config),
 };
 
 export const voucherAPI = {

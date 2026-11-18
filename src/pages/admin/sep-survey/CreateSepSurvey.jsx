@@ -1,10 +1,12 @@
 // Create or edit a standalone survey. Settings, questions, and publish.
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ArrowLeft, Save, Loader2 } from 'lucide-react';
 import SurveySettings from './SurveySettings.jsx';
 import SurveyQuestions from './SurveyQuestions.jsx';
 import useSepSurveyForm from './useSepSurveyForm.js';
+import StandaloneSurvey from '../../survey/StandaloneSurvey.jsx';
+import { buildSurveyQuestions } from './surveyFormPersist.js';
 
 export { SATISFACTION_SCALE } from './sepSurveyDefaults.js';
 
@@ -26,6 +28,9 @@ const CreateSepSurvey = () => {
     statusOptions,
     visibilityOptions,
     kindOptions,
+    hasLogic,
+    logicTextOnlyLocked,
+    logicRewardSummary,
     handleInputChange,
     toggleCluster,
     needsPublicWindow,
@@ -54,6 +59,21 @@ const CreateSepSurvey = () => {
 
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [selectedSavedId, setSelectedSavedId] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  const previewSurvey = useMemo(() => ({
+    _id: 'preview',
+    title: formData.title || 'Untitled survey',
+    description: formData.description || '',
+    credits: Number(formData.credits) || 0,
+    estimatedMinutes: Number(formData.estimatedMinutes) || null,
+    kind: formData.kind || 'normal',
+    hasLogic,
+    questions: buildSurveyQuestions(formData.questions).map((q, i) => ({
+      ...q,
+      _id: q._id || `preview_q_${i + 1}`,
+    })),
+  }), [formData, hasLogic]);
 
   const requestLeave = () => {
     if (!isDirty) {
@@ -82,6 +102,7 @@ const CreateSepSurvey = () => {
     { label: 'Title', value: formData.title?.trim() || '—' },
     { label: 'Description', value: descriptionPreview },
     ...(!isSprint ? [{ label: 'Survey type', value: kindLabel }] : []),
+    ...(isSprint ? [{ label: 'Format', value: formData.isPoll ? 'Quick poll' : 'Survey' }] : []),
     ...(!isSprint ? [{ label: 'Visibility', value: visibilityLabel }] : []),
     { label: 'Status', value: statusLabel },
     { label: 'Credits', value: String(formData.credits ?? 0) },
@@ -108,7 +129,16 @@ const CreateSepSurvey = () => {
       ? [
           {
             label: formData.visibility === 'targeted' ? 'Publish to others on' : 'Published date',
-            value: formatDateTime(formData.publishedAt),
+            value: (() => {
+              const dates = [
+                formData.publishedAt,
+                ...((!isEditMode && Array.isArray(formData.extraPublishedAts))
+                  ? formData.extraPublishedAts
+                  : []),
+              ].filter(Boolean);
+              if (!dates.length) return '—';
+              return dates.map((value) => formatDateTime(value)).join(' · ');
+            })(),
           },
           {
             label: 'Available for',
@@ -166,7 +196,7 @@ const CreateSepSurvey = () => {
                 Load saved survey
               </label>
               <p className="text-sm text-gray-500 mt-1">
-                Pick a draft to fill this form. Saving still creates a new survey.
+                Pick a draft to fill this form. Create Survey publishes a new copy and uses its saved clusters and send time.
               </p>
               <div className="mt-3 flex flex-col sm:flex-row gap-3 sm:items-center">
                 <select
@@ -209,12 +239,14 @@ const CreateSepSurvey = () => {
             formData={formData}
             getMinPublishedDate={getMinPublishedDate}
             handleInputChange={handleInputChange}
+            isEditMode={isEditMode}
             isSprint={isSprint}
             kindOptions={kindOptions}
             needsPublicWindow={needsPublicWindow}
             statusOptions={statusOptions}
             toggleCluster={toggleCluster}
             visibilityOptions={visibilityOptions}
+            structureLocked={logicTextOnlyLocked}
           />
 
           <SurveyQuestions
@@ -234,6 +266,9 @@ const CreateSepSurvey = () => {
             removeOption={removeOption}
             removeQuestion={removeQuestion}
             removeRow={removeRow}
+            logicTextOnlyLocked={logicTextOnlyLocked}
+            logicRewardSummary={logicRewardSummary}
+            onPreview={() => setPreviewOpen(true)}
           />
 
           {/* Submit Bar */}
@@ -248,7 +283,7 @@ const CreateSepSurvey = () => {
                     Survey with {formData.questions.length} question{formData.questions.length !== 1 ? 's' : ''}
                   </p>
                   <p className="text-sm text-gray-500 mt-1">
-                    Save keeps a private draft. Only you can open it until it is published. Drafts also autosave every 15 seconds when ready.
+                    Save keeps a private draft, including the clusters and send time. The send is queued when you create or publish it. Drafts also autosave every 15 seconds when ready.
                   </p>
                 </div>
 
@@ -351,6 +386,16 @@ const CreateSepSurvey = () => {
               </button>
             </div>
           </div>
+        </div>
+      ) : null}
+
+      {previewOpen ? (
+        <div className="fixed inset-0 z-[90] bg-white overflow-auto">
+          <StandaloneSurvey
+            previewMode
+            previewSurvey={previewSurvey}
+            onExitPreview={() => setPreviewOpen(false)}
+          />
         </div>
       ) : null}
     </div>

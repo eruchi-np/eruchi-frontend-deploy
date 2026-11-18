@@ -1,6 +1,6 @@
 // Survey title, credits, visibility, clusters, and when it goes live.
 
-import { AlertCircle, Clock, Loader2 } from 'lucide-react';
+import { AlertCircle, Clock, Loader2, Plus, Trash2 } from 'lucide-react';
 
 export default function SurveySettings({
   clusters,
@@ -8,13 +8,36 @@ export default function SurveySettings({
   formData,
   getMinPublishedDate,
   handleInputChange,
+  isEditMode,
   isSprint,
   kindOptions,
   needsPublicWindow,
   statusOptions,
   toggleCluster,
   visibilityOptions,
+  structureLocked = false,
 }) {
+  const extraPublishedAts = Array.isArray(formData.extraPublishedAts)
+    ? formData.extraPublishedAts
+    : [];
+  const canScheduleMultiple = needsPublicWindow && !isEditMode;
+
+  const setExtraPublishedAt = (index, value) => {
+    const next = [...extraPublishedAts];
+    next[index] = value;
+    handleInputChange('extraPublishedAts', next);
+  };
+
+  const addExtraPublishedAt = () => {
+    handleInputChange('extraPublishedAts', [...extraPublishedAts, '']);
+  };
+
+  const removeExtraPublishedAt = (index) => {
+    handleInputChange(
+      'extraPublishedAts',
+      extraPublishedAts.filter((_, i) => i !== index)
+    );
+  };
   return (
     <>
           {/* Basic Info */}
@@ -22,6 +45,11 @@ export default function SurveySettings({
             <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-indigo-50 border-b border-gray-200">
               <h2 className="text-lg font-bold text-gray-900">Survey Information</h2>
               <p className="text-sm text-gray-600 mt-0.5">Title, description and visibility</p>
+              {structureLocked ? (
+                <p className="text-xs text-amber-700 mt-1">
+                  Published logic survey: only title, description, wording, and estimated time can change.
+                </p>
+              ) : null}
             </div>
 
             <div className="p-6 space-y-6">
@@ -41,6 +69,22 @@ export default function SurveySettings({
 
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
+                  Hidden name
+                </label>
+                <input
+                  type="text"
+                  value={formData.hiddenName || ''}
+                  onChange={e => handleInputChange('hiddenName', e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  placeholder="Internal label — not shown to respondents"
+                />
+                <p className="mt-1.5 text-xs text-gray-500">
+                  Saved for admin use only. Respondents never see this.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-900 mb-2">
                   Description <span className="text-red-500">*</span>
                 </label>
                 <textarea
@@ -52,6 +96,28 @@ export default function SurveySettings({
                   required
                 />
               </div>
+
+              {isSprint ? (
+                <div className="rounded-xl border border-gray-200 p-4">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(formData.isPoll)}
+                      disabled={structureLocked}
+                      onChange={(e) => handleInputChange('isPoll', e.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span>
+                      <span className="block text-sm font-semibold text-gray-900">
+                        Quick poll
+                      </span>
+                      <span className="block text-xs text-gray-500 mt-0.5">
+                        One single-choice question on the survey list. Does not count toward streaks.
+                      </span>
+                    </span>
+                  </label>
+                </div>
+              ) : null}
 
               {!isSprint && (
               <>
@@ -66,8 +132,9 @@ export default function SurveySettings({
                       <button
                         key={opt.value}
                         type="button"
+                        disabled={structureLocked}
                         onClick={() => handleInputChange('kind', opt.value)}
-                        className={`text-left p-4 rounded-xl border-2 transition-all ${
+                        className={`text-left p-4 rounded-xl border-2 transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
                           selected
                             ? 'border-indigo-500 bg-indigo-50'
                             : 'border-gray-200 bg-gray-50 hover:border-gray-300'
@@ -96,8 +163,9 @@ export default function SurveySettings({
                       <button
                         key={opt.value}
                         type="button"
+                        disabled={structureLocked}
                         onClick={() => handleInputChange('visibility', opt.value)}
-                        className={`p-4 rounded-xl border-2 text-left transition-all ${
+                        className={`p-4 rounded-xl border-2 text-left transition-all disabled:opacity-60 disabled:cursor-not-allowed ${
                           isActive
                             ? 'border-indigo-500 bg-indigo-50'
                             : 'border-gray-200 hover:border-gray-300 bg-white'
@@ -133,6 +201,7 @@ export default function SurveySettings({
                       type="number"
                       min="1"
                       value={formData.validityDays}
+                      disabled={structureLocked}
                       onChange={e => handleInputChange('validityDays', Number(e.target.value))}
                       className="w-full max-w-[200px] px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       required
@@ -172,6 +241,7 @@ export default function SurveySettings({
                               <input
                                 type="checkbox"
                                 checked={checked}
+                                disabled={structureLocked}
                                 onChange={() => toggleCluster(id)}
                                 className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                               />
@@ -194,9 +264,10 @@ export default function SurveySettings({
                         <input
                           type="datetime-local"
                           value={formData.clusterSendAt}
+                          disabled={structureLocked}
                           onChange={(e) => handleInputChange('clusterSendAt', e.target.value)}
                           min={getMinPublishedDate()}
-                          className="w-full max-w-md px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          className="w-full max-w-md px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
                           required
                         />
                         <p className="text-xs text-gray-500 mt-1.5">
@@ -211,6 +282,7 @@ export default function SurveySettings({
                       <input
                         type="checkbox"
                         checked={formData.alsoPublishToOthers}
+                        disabled={structureLocked}
                         onChange={(e) => handleInputChange('alsoPublishToOthers', e.target.checked)}
                         className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                       />
@@ -236,8 +308,9 @@ export default function SurveySettings({
                   </label>
                   <select
                     value={formData.status}
+                    disabled={structureLocked}
                     onChange={e => handleInputChange('status', e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
                   >
                     {statusOptions.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -253,6 +326,7 @@ export default function SurveySettings({
                     type="number"
                     min="0"
                     value={formData.credits}
+                    disabled={structureLocked}
                     onChange={e => handleInputChange('credits', Number(e.target.value))}
                     className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     required
@@ -261,43 +335,89 @@ export default function SurveySettings({
               </div>
 
               {needsPublicWindow && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">
-                      {formData.visibility === 'targeted'
-                        ? 'Publish to other users on'
-                        : 'Published Date'}{' '}
-                      <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="datetime-local"
-                      value={formData.publishedAt}
-                      onChange={e => handleInputChange('publishedAt', e.target.value)}
-                      min={getMinPublishedDate()}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      required
-                    />
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-900 mb-2">
+                        {formData.visibility === 'targeted'
+                          ? 'Publish to other users on'
+                          : 'Published Date'}{' '}
+                        <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="datetime-local"
+                        value={formData.publishedAt}
+                        disabled={structureLocked}
+                        onChange={e => handleInputChange('publishedAt', e.target.value)}
+                        min={getMinPublishedDate()}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                        required
+                      />
+                      {canScheduleMultiple && (
+                        <p className="text-xs text-gray-500 mt-1.5">
+                          Optional: add more dates below to create a separate survey for each one.
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-900 mb-2">
+                        Available for (in days) <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.availableDays}
+                        disabled={structureLocked}
+                        onChange={e => handleInputChange('availableDays', Number(e.target.value))}
+                        className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-60"
+                        placeholder="e.g., 7, 14, 30"
+                        required
+                      />
+                      {formData.visibility === 'targeted' && (
+                        <p className="text-xs text-gray-500 mt-1.5">
+                          Only applies to non-targeted users. Cluster members still use validity days from send time.
+                        </p>
+                      )}
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-900 mb-2">
-                      Available for (in days) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      value={formData.availableDays}
-                      onChange={e => handleInputChange('availableDays', Number(e.target.value))}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      placeholder="e.g., 7, 14, 30"
-                      required
-                    />
-                    {formData.visibility === 'targeted' && (
-                      <p className="text-xs text-gray-500 mt-1.5">
-                        Only applies to non-targeted users. Cluster members still use validity days from send time.
-                      </p>
-                    )}
-                  </div>
+                  {canScheduleMultiple && (
+                    <div className="space-y-3">
+                      {extraPublishedAts.map((value, index) => (
+                        <div key={`extra-publish-${index}`} className="flex flex-col sm:flex-row sm:items-end gap-3">
+                          <div className="flex-1 min-w-0">
+                            <label className="block text-sm font-semibold text-gray-900 mb-2">
+                              Additional publish date {index + 2}
+                            </label>
+                            <input
+                              type="datetime-local"
+                              value={value}
+                              onChange={(e) => setExtraPublishedAt(index, e.target.value)}
+                              min={getMinPublishedDate()}
+                              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeExtraPublishedAt(index)}
+                            className="inline-flex items-center justify-center gap-1.5 px-4 py-3 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={addExtraPublishedAt}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add another date
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

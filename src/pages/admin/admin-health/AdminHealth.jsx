@@ -1,4 +1,4 @@
-// Platform health page. Loads the counts, switches the six tabs, and opens a user when an id is clicked.
+// Platform health page. Loads the counts, switches tabs, and opens a user when an id is clicked.
 
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +11,7 @@ import { Surveys } from './HealthSurveys.jsx';
 import { Rewards } from './HealthRewards.jsx';
 import { Retention } from './HealthRetention.jsx';
 import { Channel } from './HealthChannel.jsx';
+import { Reactivation } from './HealthReactivation.jsx';
 import { Trust } from './HealthTrust.jsx';
 import {
   Legend,
@@ -116,6 +117,7 @@ export default function AdminHealth() {
         {data && section === 'rewards' ? <Rewards data={data} /> : null}
         {data && section === 'retention' ? <Retention data={data} /> : null}
         {data && section === 'channel' ? <Channel data={data} /> : null}
+        {data && section === 'reactivation' ? <Reactivation data={data} /> : null}
         {data && section === 'trust' ? <Trust data={data} /> : null}
       </div>
       {selectedUserId ? (

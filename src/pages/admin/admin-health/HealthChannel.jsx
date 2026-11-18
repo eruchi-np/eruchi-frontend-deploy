@@ -180,6 +180,30 @@ function EmailLoad({ metric }) {
   );
 }
 
+function PromptAcceptance({ metric }) {
+  if (!metric || metric.available === false) return <Missing metric={metric} />;
+  const tile = (label, row) => (
+    <Mini
+      label={label}
+      value={shareText(row?.accepted)}
+      sub={row?.prompted ? null : 'No one prompted yet'}
+    />
+  );
+  return (
+    <Card
+      metricId={metric.id}
+      title={metric.title}
+      summary="Of the people shown a prompt, how many accepted it."
+      note={metric.note}
+    >
+      <div className="grid sm:grid-cols-2 gap-3">
+        {tile('App install', metric.pwa)}
+        {tile('Notifications', metric.notifications)}
+      </div>
+    </Card>
+  );
+}
+
 function Deliverability({ metric }) {
   if (!metric || metric.available === false) return <Missing metric={metric} />;
   if (!metric.sends) {
@@ -226,6 +250,7 @@ export function Channel({ data }) {
           <Mini label="Reachable by email" value={shareText(data.C4.reachable)} />
         </div>
       </Card>
+      <PromptAcceptance metric={data.C9} />
       <EmailPerformance metric={data.C1} />
       <ReturnTriggers metric={data.C2} />
       <EmailLoad metric={data.C7} />

@@ -1,5 +1,9 @@
+import path from 'path'
+import { fileURLToPath } from 'url'
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const PRODUCTION_ORIGIN = 'https://eruchi.com.np'
 const PRODUCTION_GTM_ID = 'GTM-5NT24MPD'
@@ -109,6 +113,11 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
+    resolve: {
+      alias: {
+        '@shared': path.resolve(__dirname, 'shared'),
+      },
+    },
     server: {
       host: '127.0.0.1',
       allowedHosts: ['localhost', '127.0.0.1', '.trycloudflare.com'],
