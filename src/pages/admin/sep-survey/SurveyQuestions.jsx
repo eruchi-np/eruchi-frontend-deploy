@@ -5,7 +5,7 @@ import MatrixQuestion from '../../../components/survey/MatrixQuestion';
 import SurveyTextField, { SurveyRichText } from '../../../components/survey/SurveyTextField';
 import { plainSurveyText } from '../../../utils/surveyMarkup';
 import QuestionLogicPanel, { logicBadge } from './QuestionLogicPanel.jsx';
-import { optionLabel } from './optionHelpers.js';
+import { optionDraftLabel, optionLabel } from './optionHelpers.js';
 
 export default function SurveyQuestions({
   addOption,
@@ -144,13 +144,13 @@ export default function SurveyQuestions({
 
                     <div className="p-6 space-y-6">
                       {!formData.isPoll ? (
-                        <QuestionLogicPanel
-                          question={q}
-                          index={idx}
-                          questions={formData.questions}
-                          locked={logicTextOnlyLocked}
-                          onChange={(field, value) => handleQuestionChange(idx, field, value)}
-                        />
+                      <QuestionLogicPanel
+                        question={q}
+                        index={idx}
+                        questions={formData.questions}
+                        structureLocked={logicTextOnlyLocked}
+                        onChange={(field, value) => handleQuestionChange(idx, field, value)}
+                      />
                       ) : null}
 
                       {/* Question Type Selector */}
@@ -259,7 +259,7 @@ export default function SurveyQuestions({
                                 <span className="text-sm font-medium text-gray-500 w-8">{optIdx + 1}.</span>
                                 <input
                                   type="text"
-                                  value={label}
+                                  value={optionDraftLabel(opt)}
                                   onChange={e => handleOptionChange(idx, optIdx, e.target.value)}
                                   className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                                   placeholder={`Option ${optIdx + 1}`}
@@ -476,7 +476,7 @@ export default function SurveyQuestions({
                                   <span className="text-sm font-medium text-gray-500 w-8 shrink-0">{optIdx + 1}.</span>
                                   <input
                                     type="text"
-                                    value={optionLabel(opt)}
+                                    value={optionDraftLabel(opt)}
                                     onChange={e => handleOptionChange(idx, optIdx, e.target.value)}
                                     className="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
                                     placeholder={`Column ${optIdx + 1}`}

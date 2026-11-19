@@ -81,7 +81,7 @@ export default function MerchantPublicProfile() {
   }, [posters.length]);
 
   const handleRedeem = (offer) => {
-    if (!user) {
+    if (!user || user.limitedSession) {
       toast.error('Please log in to redeem vouchers.');
       rememberReturnPath(
         `${window.location.pathname}${window.location.search}${window.location.hash}`

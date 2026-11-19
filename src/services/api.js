@@ -94,6 +94,11 @@ export const healthAPI = {
     skipAuthRedirect: true,
     ...config,
   }),
+  pushEvent: (data, config = {}) => api.post('/signals/push', data, {
+    skipErrorToast: true,
+    skipAuthRedirect: true,
+    ...config,
+  }),
 };
 
 export const authAPI = {

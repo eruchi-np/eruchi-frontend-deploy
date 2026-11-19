@@ -10,6 +10,7 @@ import {
 } from "../../../utils/pickSurveyOffers";
 import { canAffordOffer } from "../../../utils/surveysAway";
 import { trackHealthEvent } from "../../../utils/healthEvents";
+import { rememberReturnPath } from "../../../utils/auth";
 
 const SEARCH_LIMIT = 8;
 
@@ -182,6 +183,12 @@ export default function useSurveyCompleteOffers(completion) {
   };
 
   const handleSelectOffer = (offer) => {
+    if (user?.limitedSession) {
+      trackAction("voucher", offer?._id);
+      rememberReturnPath("/shop");
+      navigate("/login", { state: { from: { pathname: "/shop" } } });
+      return;
+    }
     trackAction("voucher", offer?._id);
     setSelectedOffer(offer);
   };

@@ -1,4 +1,4 @@
-import React, { useLayoutEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getOfferStock } from "../../utils/pickSurveyOffers";
 import {
   canAffordOffer,
@@ -49,7 +49,7 @@ function offerBlurb(offer) {
   return bits.join(" · ");
 }
 
-function FitTitle({ text }) {
+function FitTitle({ text, onActivate }) {
   const ref = useRef(null);
 
   useLayoutEffect(() => {
@@ -97,7 +97,21 @@ function FitTitle({ text }) {
       cancelled = true;
       observer.disconnect();
     };
-  }, [text]);
+  }, [text, Boolean(onActivate)]);
+
+  if (onActivate) {
+    return (
+      <button
+        ref={ref}
+        type="button"
+        className="shop-card-title"
+        data-card-action="redeem"
+        onClick={onActivate}
+      >
+        {text}
+      </button>
+    );
+  }
 
   return (
     <span ref={ref} className="shop-card-title">
@@ -106,11 +120,27 @@ function FitTitle({ text }) {
   );
 }
 
+const FINE_HOVER_QUERY = "(hover: hover) and (pointer: fine)";
+
 function canHoverReveal() {
   return (
     typeof window !== "undefined" &&
-    window.matchMedia("(hover: hover) and (pointer: fine)").matches
+    window.matchMedia(FINE_HOVER_QUERY).matches
   );
+}
+
+function useTitleBuysOnTap() {
+  const [buysOnTap, setBuysOnTap] = useState(() => !canHoverReveal());
+
+  useEffect(() => {
+    const media = window.matchMedia(FINE_HOVER_QUERY);
+    const sync = () => setBuysOnTap(!media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  return buysOnTap;
 }
 
 export default function RewardCard({
@@ -122,6 +152,7 @@ export default function RewardCard({
   avgSurveyCredits,
 }) {
   const [flipped, setFlipped] = useState(false);
+  const titleBuysOnTap = useTitleBuysOnTap();
   const touchRef = useRef({ x: 0, y: 0, moved: false });
   const stockInfo = useMemo(() => getOfferStock(offer), [offer]);
   const isOut = stockInfo !== null && stockInfo.remaining === 0;
@@ -197,13 +228,27 @@ export default function RewardCard({
 
         <div className="shop-card-body">
           <div className="shop-card-panel shop-card-front">
-            <FitTitle text={offer.title} />
+            <FitTitle
+              text={offer.title}
+              onActivate={titleBuysOnTap ? redeem : undefined}
+            />
             <span className="shop-card-credits">{offer.creditsRequired || 0} CREDITS</span>
             {meta ? <span className="shop-card-meta">{meta}</span> : null}
           </div>
 
           <div className="shop-card-panel shop-card-back">
-            <p className="shop-card-back-title">{offer.title}</p>
+            {titleBuysOnTap ? (
+              <button
+                type="button"
+                className="shop-card-back-title"
+                data-card-action="redeem"
+                onClick={redeem}
+              >
+                {offer.title}
+              </button>
+            ) : (
+              <p className="shop-card-back-title">{offer.title}</p>
+            )}
             <p className="shop-card-back-desc">{blurb}</p>
             {deal ? <p className="shop-card-back-deal">{deal}</p> : null}
             <div className="shop-card-back-actions">

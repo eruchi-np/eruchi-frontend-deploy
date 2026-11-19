@@ -7,6 +7,7 @@ import toast, { Toaster } from "react-hot-toast";
 import HomeNav from './components/homepage/HomeNav';
 import BottomNavigation from './components/layout/BottomNavigation';
 import Footer from './components/layout/Footer';
+import LimitedSessionBanner from './components/layout/LimitedSessionBanner';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import OnboardingGate from './components/layout/OnboardingGate';
 import AdminRoute from './components/layout/AdminRoute';
@@ -34,6 +35,7 @@ const FAQs = lazy(() => import('./pages/public/FAQs.jsx'));
 const Signup = lazy(() => import('./pages/auth/Signup'));
 const Login = lazy(() => import('./pages/auth/Login'));
 const LoginSuccess = lazy(() => import('./pages/auth/LoginSuccess'));
+const SurveyTap = lazy(() => import('./pages/auth/SurveyTap'));
 const Profile = lazy(() => import('./pages/user/Profile'));
 const CompleteProfile = lazy(() => import('./pages/user/CompleteProfile'));
 const CompleteBasicInfo = lazy(() => import('./pages/user/CompleteBasicInfo'));
@@ -140,6 +142,7 @@ function AppChrome({ children }) {
 
   return (
     <>
+      {!isBusiness && !isBrand && <LimitedSessionBanner />}
       {!isBusiness && !isBrand && !hideNav && <HomeNav variant={navVariant} sidebarOffset={isAdminBrands} />}
       <BusinessAccessGuard />
       <div className={`min-w-0 max-w-full ${overlayNav || isSurveyTake ? 'overflow-x-clip' : 'overflow-x-hidden'}`}>
@@ -219,6 +222,7 @@ function App() {
             <Route path="/signup" element={<Signup />} />
            <Route path="/login" element={<Login />} />
             <Route path="/login/success" element={<LoginSuccess />} />
+            <Route path="/s/:code" element={<SurveyTap />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/reset-password/:token" element={<ResetPasswordToken />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />

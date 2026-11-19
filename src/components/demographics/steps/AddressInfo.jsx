@@ -3,7 +3,7 @@ import { Search, MapPin, AlertCircle } from 'lucide-react';
 import { groupedMunicipalities, getMaxWards, municipalityData } from '../../../utils/municipalityData';
 import ConfirmSame from '../ConfirmSame';
 
-const AddressInfo = ({ formData, updateFormData, errors = {}, title = 'Address', copy = 'Tell us where you live in Nepal', showProgress = true, saved = null, confirmed = {}, onConfirm }) => {
+const AddressInfo = ({ formData, updateFormData, errors = {}, title = 'Address', copy = 'Tell us where you are living currently. You can update this every 6 months or if you change your address.', showProgress = true, saved = null, confirmed = {}, onConfirm }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showMunicipalityDropdown, setShowMunicipalityDropdown] = useState(false);
   const [wardError, setWardError] = useState('');

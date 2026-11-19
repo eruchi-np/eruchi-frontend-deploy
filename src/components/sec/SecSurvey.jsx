@@ -45,6 +45,18 @@ function OptionPill({ label, help, selected, onClick }) {
 const NO_ADULT_MSG =
   'Please check this. Someone aged 16 or older should be counted in the household. If you live there, include yourself.';
 
+function questionHeading(id, text) {
+  if (id !== 'EDU_F' || typeof text !== 'string') return text;
+  const parts = text.split(/(women)/i);
+  return parts.map((part, i) => (
+    /^women$/i.test(part) ? (
+      <strong key={i} style={{ fontWeight: 900, letterSpacing: '0.04em' }}>WOMEN</strong>
+    ) : (
+      part
+    )
+  ));
+}
+
 const SecSurvey = ({ mode = 'first', onComplete }) => {
   const isRefresh = mode === 'refresh';
   const isEdit = mode === 'edit';
@@ -62,6 +74,8 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
   const submittingRef = useRef(false);
   const [stepId, setStepId] = useState(null);
   const stepPinned = useRef(false);
+  const questionAnchorRef = useRef(null);
+  const skipQuestionScroll = useRef(true);
 
   useEffect(() => {
     let cancel = false;
@@ -143,6 +157,27 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
     if (unanswered) return unanswered;
     return screens[screens.length - 1] || null;
   }, [spec, isEdit, screens, editCursor, stepId, unanswered]);
+
+  useEffect(() => {
+    if (!qid) return undefined;
+    if (skipQuestionScroll.current) {
+      skipQuestionScroll.current = false;
+      return undefined;
+    }
+    const el = questionAnchorRef.current;
+    if (!el) return undefined;
+    // The Continue button stays focused. Some phones then keep that button
+    // in view, so the new question heading never reaches the top.
+    const active = document.activeElement;
+    if (active instanceof HTMLElement) active.blur();
+    const scroll = () => {
+      el.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
+    };
+    scroll();
+    const frame = window.requestAnimationFrame(scroll);
+    return () => window.cancelAnimationFrame(frame);
+  }, [qid]);
+
   const screenIds = qid ? screenIdsFor(qid) : [];
   const progress = spec
     ? (isEdit
@@ -362,6 +397,7 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
         <span style={{ width: `${Math.max(6, Math.round(progress * 100))}%` }} />
       </div>
 
+      <div ref={questionAnchorRef} style={{ scrollMarginTop: 16 }} />
       {screenIds.map((id) => {
         const q = questionById(spec, id);
         const options = visibleOptions(spec, id, answers);
@@ -369,7 +405,7 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
         const help = questionText(spec, id, answers, 'help');
         return (
           <div key={id} className="onboard-field" style={{ marginTop: '1.25rem' }}>
-            <h3 className="text-base font-semibold text-[var(--navy)]">{text}</h3>
+            <h3 className="text-base font-semibold text-[var(--navy)]">{questionHeading(id, text)}</h3>
             {help ? <p className="text-sm text-[var(--muted)] mt-0.5">{help}</p> : null}
 
             {q.type === 'text' ? (

@@ -532,6 +532,27 @@
   overflow-wrap: break-word;
 }
 
+button.shop-card-title,
+button.shop-card-back-title {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-family: inherit;
+  letter-spacing: inherit;
+  text-align: center;
+  white-space: normal;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button.shop-card-title {
+  padding: 4px 0 0;
+}
+
+button.shop-card-back-title {
+  padding: 0;
+}
+
 .shop-card-meta {
   margin-top: auto;
   padding-top: 8px;

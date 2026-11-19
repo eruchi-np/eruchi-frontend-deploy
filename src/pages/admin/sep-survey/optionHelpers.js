@@ -1,5 +1,13 @@
 import { newOptionId, normalizeOptions, optionLabel } from '../../../utils/surveyLogic';
 
+/** Raw label for a controlled input. optionLabel() trims, which eats a trailing space while typing. */
+export function optionDraftLabel(option) {
+  if (option == null) return '';
+  if (typeof option === 'string') return option;
+  if (typeof option === 'object') return String(option.label ?? option.text ?? '');
+  return String(option);
+}
+
 export function asOptionObject(value, previous) {
   if (value && typeof value === 'object' && !Array.isArray(value)) {
     return {

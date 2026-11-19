@@ -41,15 +41,29 @@ const emptyRule = (questionIdValue) => ({
   conditions: [emptyCondition(questionIdValue)],
 });
 
+const shortLabel = (label, max = 72) => {
+  const text = String(label || '');
+  if (text.length <= max) return text;
+  return `${text.slice(0, max - 1)}…`;
+};
+
+/** Resolve a saved condition value to a known option id (id or legacy label). */
+const resolveOptionValue = (options, raw) => {
+  const value = String(raw ?? '').trim();
+  if (!value) return '';
+  if (options.some((o) => o.id === value)) return value;
+  const byLabel = options.find((o) => o.label === value);
+  return byLabel ? byLabel.id : value;
+};
+
 function ConditionRow({
   condition,
   sources,
   onChange,
   onRemove,
   canRemove,
-  locked,
 }) {
-  const source = sources.find((s) => s.id === condition.question) || sources[0];
+  const source = sources.find((s) => String(s.id) === String(condition.question)) || sources[0];
   const ops = allowedOperatorsFor(source?.question || { questionType: 'text_short' });
   const needsValue = !['was_answered', 'was_not_answered', 'was_skipped'].includes(condition.op);
   const multi = ['is_any_of', 'is_none_of', 'includes_any_of', 'includes_all_of'].includes(condition.op);
@@ -57,126 +71,126 @@ function ConditionRow({
   const choiceOps = ['is', 'is_not', 'is_any_of', 'is_none_of', 'includes', 'does_not_include', 'includes_any_of', 'includes_all_of'];
   const useOptions = choiceOps.includes(condition.op);
   const options = normalizeOptions(source?.question?.options || []);
+  const singleValue = resolveOptionValue(options, condition.value);
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/80 p-2.5">
       <select
-        className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
-        value={condition.question}
-        disabled={locked}
+        className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+        value={String(condition.question || source?.id || '')}
+        title={source?.label}
         onChange={(e) => {
-          const nextSource = sources.find((s) => s.id === e.target.value);
+          const nextSource = sources.find((s) => String(s.id) === String(e.target.value));
           const nextOps = allowedOperatorsFor(nextSource?.question || {});
           onChange({
             ...condition,
             question: e.target.value,
-            op: nextOps[0] || 'was_answered',
+            op: nextOps.includes(condition.op) ? condition.op : (nextOps[0] || 'was_answered'),
             value: '',
           });
         }}
       >
         {sources.map((s) => (
-          <option key={s.id} value={s.id}>{s.label}</option>
+          <option key={s.id} value={s.id} title={s.label}>{shortLabel(s.label)}</option>
         ))}
       </select>
-      <select
-        className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
-        value={condition.op}
-        disabled={locked}
-        onChange={(e) => onChange({ ...condition, op: e.target.value, value: e.target.value === 'between' ? ['', ''] : '' })}
-      >
-        {ops.map((op) => (
-          <option key={op} value={op}>{OP_LABELS[op] || op}</option>
-        ))}
-      </select>
-      {needsValue && useOptions && !multi && (
+      <div className="flex flex-wrap items-center gap-2">
         <select
-          className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white min-w-[8rem]"
-          value={String(condition.value || '')}
-          disabled={locked}
-          onChange={(e) => onChange({ ...condition, value: e.target.value })}
+          className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+          value={condition.op}
+          onChange={(e) => onChange({ ...condition, op: e.target.value, value: e.target.value === 'between' ? ['', ''] : '' })}
         >
-          <option value="">Pick option</option>
-          {options.map((o) => (
-            <option key={o.id} value={o.id}>{o.label}</option>
+          {ops.map((op) => (
+            <option key={op} value={op}>{OP_LABELS[op] || op}</option>
           ))}
         </select>
-      )}
-      {needsValue && useOptions && multi && (
-        <select
-          multiple
-          className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white min-w-[8rem] min-h-[4.5rem]"
-          value={Array.isArray(condition.value) ? condition.value.map(String) : (condition.value ? [String(condition.value)] : [])}
-          disabled={locked}
-          onChange={(e) => {
-            const vals = Array.from(e.target.selectedOptions).map((o) => o.value);
-            onChange({ ...condition, value: vals });
-          }}
-        >
-          {options.map((o) => (
-            <option key={o.id} value={o.id}>{o.label}</option>
-          ))}
-        </select>
-      )}
-      {needsValue && !useOptions && isBetween && (
-        <>
+        {needsValue && useOptions && !multi && (
+          <select
+            className="flex-1 min-w-[10rem] border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+            value={singleValue}
+            onChange={(e) => onChange({ ...condition, value: e.target.value })}
+          >
+            <option value="">Pick option</option>
+            {options.map((o) => (
+              <option key={o.id} value={o.id}>{o.label}</option>
+            ))}
+          </select>
+        )}
+        {needsValue && useOptions && multi && (
+          <select
+            multiple
+            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white min-h-[4.5rem]"
+            value={(Array.isArray(condition.value) ? condition.value : (condition.value ? [condition.value] : []))
+              .map((v) => resolveOptionValue(options, v))
+              .filter(Boolean)}
+            onChange={(e) => {
+              const vals = Array.from(e.target.selectedOptions).map((o) => o.value);
+              onChange({ ...condition, value: vals });
+            }}
+          >
+            {options.map((o) => (
+              <option key={o.id} value={o.id}>{o.label}</option>
+            ))}
+          </select>
+        )}
+        {needsValue && !useOptions && isBetween && (
+          <>
+            <input
+              type="number"
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-20"
+              value={Array.isArray(condition.value) ? condition.value[0] ?? '' : ''}
+              onChange={(e) => {
+                const cur = Array.isArray(condition.value) ? [...condition.value] : ['', ''];
+                cur[0] = e.target.value;
+                onChange({ ...condition, value: cur });
+              }}
+            />
+            <span className="text-xs text-gray-500">and</span>
+            <input
+              type="number"
+              className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-20"
+              value={Array.isArray(condition.value) ? condition.value[1] ?? '' : ''}
+              onChange={(e) => {
+                const cur = Array.isArray(condition.value) ? [...condition.value] : ['', ''];
+                cur[1] = e.target.value;
+                onChange({ ...condition, value: cur });
+              }}
+            />
+          </>
+        )}
+        {needsValue && !useOptions && !isBetween && (
           <input
             type="number"
-            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-20"
-            value={Array.isArray(condition.value) ? condition.value[0] ?? '' : ''}
-            disabled={locked}
-            onChange={(e) => {
-              const cur = Array.isArray(condition.value) ? [...condition.value] : ['', ''];
-              cur[0] = e.target.value;
-              onChange({ ...condition, value: cur });
-            }}
+            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-24"
+            value={condition.value ?? ''}
+            onChange={(e) => onChange({ ...condition, value: e.target.value })}
           />
-          <span className="text-xs text-gray-500">and</span>
-          <input
-            type="number"
-            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-20"
-            value={Array.isArray(condition.value) ? condition.value[1] ?? '' : ''}
-            disabled={locked}
-            onChange={(e) => {
-              const cur = Array.isArray(condition.value) ? [...condition.value] : ['', ''];
-              cur[1] = e.target.value;
-              onChange({ ...condition, value: cur });
-            }}
-          />
-        </>
-      )}
-      {needsValue && !useOptions && !isBetween && (
-        <input
-          type="number"
-          className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm w-24"
-          value={condition.value ?? ''}
-          disabled={locked}
-          onChange={(e) => onChange({ ...condition, value: e.target.value })}
-        />
-      )}
-      {canRemove && !locked ? (
-        <button type="button" className="p-1.5 text-red-600 hover:bg-red-50 rounded" onClick={onRemove}>
-          <Trash2 className="h-4 w-4" />
-        </button>
+        )}
+        {canRemove ? (
+          <button type="button" className="p-1.5 text-red-600 hover:bg-red-50 rounded" onClick={onRemove}>
+            <Trash2 className="h-4 w-4" />
+          </button>
+        ) : null}
+      </div>
+      {needsValue && useOptions && !options.length ? (
+        <p className="text-xs text-amber-700">That question has no options to pick from.</p>
       ) : null}
     </div>
   );
 }
 
-function RuleEditor({ title, rule, onChange, onClear, sources, locked }) {
+function RuleEditor({ title, rule, onChange, onClear, sources }) {
   if (!rule) {
     return (
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm text-gray-600">{title}: none</p>
-        {!locked ? (
-          <button
-            type="button"
-            className="text-sm font-semibold text-green-700 hover:underline"
-            onClick={() => onChange(emptyRule(sources[0]?.id))}
-          >
-            Add rule
-          </button>
-        ) : null}
+        <button
+          type="button"
+          className="text-sm font-semibold text-green-700 hover:underline"
+          onClick={() => onChange(emptyRule(sources[0]?.id))}
+        >
+          Add rule
+        </button>
       </div>
     );
   }
@@ -185,18 +199,15 @@ function RuleEditor({ title, rule, onChange, onClear, sources, locked }) {
     <div className="space-y-3 rounded-xl border border-gray-200 bg-white p-4">
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-semibold text-gray-900">{title}</p>
-        {!locked ? (
-          <button type="button" className="text-xs font-semibold text-red-600 hover:underline" onClick={onClear}>
-            Remove
-          </button>
-        ) : null}
+        <button type="button" className="text-xs font-semibold text-red-600 hover:underline" onClick={onClear}>
+          Remove
+        </button>
       </div>
       <div className="flex items-center gap-2 text-sm">
         <span className="text-gray-600">Match</span>
         <select
           className="border border-gray-300 rounded-lg px-2 py-1.5 bg-white"
           value={rule.match || 'all'}
-          disabled={locked}
           onChange={(e) => onChange({ ...rule, match: e.target.value })}
         >
           <option value="all">ALL conditions</option>
@@ -209,7 +220,6 @@ function RuleEditor({ title, rule, onChange, onClear, sources, locked }) {
             key={index}
             condition={condition}
             sources={sources}
-            locked={locked}
             canRemove={(rule.conditions || []).length > 1}
             onRemove={() => {
               const next = rule.conditions.filter((_, i) => i !== index);
@@ -223,19 +233,17 @@ function RuleEditor({ title, rule, onChange, onClear, sources, locked }) {
           />
         ))}
       </div>
-      {!locked ? (
-        <button
-          type="button"
-          className="inline-flex items-center gap-1 text-sm font-semibold text-green-700"
-          onClick={() => onChange({
-            ...rule,
-            conditions: [...(rule.conditions || []), emptyCondition(sources[0]?.id)],
-          })}
-        >
-          <Plus className="h-4 w-4" />
-          Add condition
-        </button>
-      ) : null}
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 text-sm font-semibold text-green-700"
+        onClick={() => onChange({
+          ...rule,
+          conditions: [...(rule.conditions || []), emptyCondition(sources[0]?.id)],
+        })}
+      >
+        <Plus className="h-4 w-4" />
+        Add condition
+      </button>
     </div>
   );
 }
@@ -245,7 +253,7 @@ export default function QuestionLogicPanel({
   index,
   questions,
   onChange,
-  locked = false,
+  structureLocked = false,
 }) {
   const [open, setOpen] = useState(Boolean(hasLogicRules(question)));
   const qid = questionId(question, index);
@@ -285,9 +293,9 @@ export default function QuestionLogicPanel({
       </button>
       {open ? (
         <div className="space-y-4">
-          {locked ? (
+          {structureLocked ? (
             <p className="text-xs text-amber-700">
-              Published logic surveys are text-only. Rules stay locked — create a new survey to change them.
+              Structure is locked on this published survey. You can still edit routing rules, then save.
             </p>
           ) : null}
           {canShow ? (
@@ -295,7 +303,6 @@ export default function QuestionLogicPanel({
               title="Show this question only if"
               rule={question.show_if || null}
               sources={earlier}
-              locked={locked}
               onClear={() => onChange('show_if', null)}
               onChange={(rule) => onChange('show_if', rule)}
             />
@@ -313,7 +320,6 @@ export default function QuestionLogicPanel({
               title="End the survey after this question if"
               rule={question.end_after_if || null}
               sources={endSources}
-              locked={locked}
               onClear={() => onChange('end_after_if', null)}
               onChange={(rule) => onChange('end_after_if', rule)}
             />

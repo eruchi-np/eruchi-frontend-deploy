@@ -1,11 +1,59 @@
 import OneSignal from 'react-onesignal';
 import { isStaffAdmin } from './adminRoles';
+import { healthAPI } from '../services/api';
 
 const APP_ID = String(import.meta.env.VITE_ONESIGNAL_APP_ID || '').trim();
 const DISMISS_KEY = 'eruchi_push_prompt_dismissed_at';
 const DISMISS_MS = 14 * 24 * 60 * 60 * 1000;
 
 let initPromise = null;
+let listenersBound = false;
+
+const reportPushEvent = (event, extra = {}) => {
+  const sendId = extra.send_id || extra.sendId;
+  if (!sendId) return;
+  healthAPI.pushEvent({
+    send_id: sendId,
+    event,
+    action: extra.action || null,
+  }).catch(() => {});
+};
+
+const dataFromNotification = (event) => {
+  const raw = event?.notification?.additionalData
+    || event?.notification?.data
+    || event?.additionalData
+    || {};
+  return raw;
+};
+
+/** Report received / click / dismiss for lifecycle MessageLog rows. */
+export function bindPushLifecycleListeners() {
+  if (listenersBound || typeof window === 'undefined') return;
+  try {
+    const notifications = OneSignal.Notifications;
+    if (!notifications?.addEventListener) return;
+    listenersBound = true;
+
+    notifications.addEventListener('foregroundWillDisplay', (event) => {
+      const data = dataFromNotification(event);
+      reportPushEvent('received', data);
+    });
+
+    notifications.addEventListener('click', (event) => {
+      const data = dataFromNotification(event);
+      const action = event?.result?.actionId || event?.actionId || 'open';
+      reportPushEvent('clicked', { ...data, action });
+    });
+
+    notifications.addEventListener('dismiss', (event) => {
+      const data = dataFromNotification(event);
+      reportPushEvent('closed', data);
+    });
+  } catch (err) {
+    console.warn('[OneSignal] lifecycle listeners failed', err);
+  }
+}
 
 export function isOneSignalConfigured() {
   return Boolean(APP_ID);
@@ -122,6 +170,7 @@ export function initOneSignal() {
         },
       },
     });
+    bindPushLifecycleListeners();
     return true;
   })().catch((err) => {
     console.warn('[OneSignal] init failed', err);

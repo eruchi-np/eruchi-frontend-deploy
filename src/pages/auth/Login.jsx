@@ -78,7 +78,8 @@ const Login = () => {
       navigate("/business/dashboard", { replace: true });
       return;
     }
-    if (!authLoading && user) {
+    // Limited one-tap sessions may open /login to upgrade to full access.
+    if (!authLoading && user && !user.limitedSession) {
       navigate(
         getPostLoginPath(user, location.state?.from || searchParams.get("next")),
         { replace: true }

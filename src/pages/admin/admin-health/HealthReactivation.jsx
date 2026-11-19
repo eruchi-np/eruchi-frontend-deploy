@@ -1,4 +1,4 @@
-// Re-activation tab. Lifecycle email and WhatsApp only. Channel stays on the older reminder mail.
+// Re-activation tab. Lifecycle email, WhatsApp, and push.
 
 import { useState } from 'react';
 import { Card, Mini, Missing, Status, int, num, when } from './healthUi.jsx';
@@ -8,20 +8,23 @@ const SEGMENT = {
   at_risk: 'At risk',
   dormant: 'Dormant',
   backlog: 'Backlog',
+  transactional: 'Transactional',
   none: 'None',
 };
 
 const TOUCH = {
   s1: 'S1', s2: 'S2', s3: 'S3', sw: 'SW', r1: 'R1', r2: 'R2', rw: 'RW', b1: 'B1',
+  streak_save: 'Streak', voucher_5d: 'Voucher 5d', voucher_1d: 'Voucher 1d',
 };
 
-const CHANNEL = { email: 'Email', whatsapp: 'WhatsApp', none: 'None' };
+const CHANNEL = { email: 'Email', whatsapp: 'WhatsApp', push: 'Push', none: 'None' };
 
 const ASSIGNMENT = {
   always: 'Always',
   treated: 'Treated',
   control: 'Control',
   emailed: 'Emailed',
+  pushed: 'Pushed',
   holdout: 'Holdout',
   capped_out: 'Capped out',
   none: 'None',
@@ -34,12 +37,14 @@ const PAUSES = [
   ['dormant', 'Dormant'],
   ['backlog', 'Backlog'],
   ['whatsapp', 'WhatsApp'],
+  ['push', 'Push'],
 ];
 
 const FIELDS = [
-  'rows', 'sent', 'delivered', 'read', 'clicked', 'bounced', 'complaint', 'consentFail',
+  'rows', 'sent', 'delivered', 'received', 'read', 'clicked', 'bounced', 'complaint', 'consentFail',
   'outsideWindow', 'holdoutLeak', 'cappedOut', 'costUsd', 'waAttempts', 'waFailFirst',
   'surveyedKnown', 'surveyedYes', 'activatedKnown', 'activatedYes', 'clickedKnown', 'clickedSurveyed',
+  'fallbackPushFailed', 'fallbackNotReceived', 'fallbackNotTapped',
 ];
 
 const labelOf = (map, key) => map[key] || key;
@@ -280,8 +285,9 @@ export function Reactivation({ data }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">
-        Lifecycle email and WhatsApp only. The Channel tab still counts the older reminder mail.
+        Lifecycle email, WhatsApp, and browser push. The Channel tab still counts older reminder mail.
         Green, amber, and red here follow the lifecycle limits. Dry-run rows are left out. Opens are not used.
+        Push-eligible versus not is descriptive only — people who allow notifications are already more engaged.
       </p>
       <div className="flex flex-wrap gap-3">
         <Select label="Cycle" value={filter.cycle} onChange={setCycle}>
@@ -300,6 +306,7 @@ export function Reactivation({ data }) {
           <option value="all">All channels</option>
           <option value="email">Email</option>
           <option value="whatsapp">WhatsApp</option>
+          <option value="push">Push</option>
         </Select>
       </div>
 
@@ -392,9 +399,9 @@ export function Reactivation({ data }) {
         />
       </Card>
 
-      <Card metricId="RE6" title="Sends and delivery" summary="Sent, delivered, read, and clicked, by channel, template, and touch." note="Delivered, read, and clicked need an event on the message. A send that is only marked sent is not counted as delivered.">
+      <Card metricId="RE6" title="Sends and delivery" summary="Sent, delivered, read, and clicked, by channel, template, and touch." note="Delivered, read, and clicked need an event on the message. A send that is only marked sent is not counted as delivered. For push, received is the service-worker / client report.">
         <SimpleTable
-          headers={['Channel', 'Template', 'Touch', 'Sent', 'Delivered', 'Read', 'Clicked']}
+          headers={['Channel', 'Template', 'Touch', 'Sent', 'Delivered', 'Received', 'Read', 'Clicked']}
           rows={deliveryRows.map((row) => {
             const [ch, template, touch] = row.key.split('|');
             return {
@@ -405,12 +412,59 @@ export function Reactivation({ data }) {
                 labelOf(TOUCH, touch),
                 int(row.sent),
                 int(row.delivered),
+                int(row.received),
                 int(row.read),
                 int(row.clicked),
               ],
             };
           })}
         />
+      </Card>
+
+      <Card metricId="RE6b" title="Push funnel and fallbacks" summary="Push sent → received → tapped, who is push-eligible, and follow-up emails by reason." note="Received under half of sent for a touch is a same-day check. Fallbacks are emails (or rare WA) that went out because push failed, was not received, or was not tapped. Push-eligible share is descriptive only.">
+        {filter.channel === 'email' || filter.channel === 'whatsapp' ? (
+          <p className="text-sm text-gray-500">Choose Push or all channels for this card.</p>
+        ) : (
+          <>
+            <div className="grid sm:grid-cols-3 gap-3 mb-3">
+              <Mini label="Live push subscriptions" value={int(report.pushEligible?.liveSubscriptions)} />
+              <Mini label="Push sent" value={int(collect(cube, filter, (row) => row.channel === 'push').sent)} />
+              <Mini label="Push tapped" value={int(collect(cube, filter, (row) => row.channel === 'push').clicked)} />
+            </div>
+            <SimpleTable
+              headers={['Segment', 'Push-eligible', 'Share']}
+              rows={(report.pushEligible?.bySegment || []).map((row) => ({
+                key: row.segment,
+                cells: [
+                  labelOf(SEGMENT, row.segment),
+                  `${int(row.optedIn)} / ${int(row.total)}`,
+                  row.share == null ? '–' : `${Math.round(row.share * 1000) / 10}%`,
+                ],
+              }))}
+            />
+            <div className="grid sm:grid-cols-3 gap-3 mt-3">
+              <Mini label="Fallback: push failed" value={int(all.fallbackPushFailed)} />
+              <Mini label="Fallback: not received" value={int(all.fallbackNotReceived)} />
+              <Mini label="Fallback: not tapped" value={int(all.fallbackNotTapped)} />
+            </div>
+            <SimpleTable
+              headers={['Touch', 'Sent', 'Received', 'Tapped', 'Survey in 7d']}
+              rows={grouped(cube, filter, (row) => row.touch, (row) => row.channel === 'push')
+                .filter((row) => row.sent > 0)
+                .sort((a, b) => b.sent - a.sent)
+                .map((row) => ({
+                  key: row.key,
+                  cells: [
+                    labelOf(TOUCH, row.key),
+                    int(row.sent),
+                    int(row.received),
+                    int(row.clicked),
+                    rateText(row.surveyedYes, row.surveyedKnown),
+                  ],
+                }))}
+            />
+          </>
+        )}
       </Card>
 
       <Card metricId="RE7" title="Email delivery quality" summary="Delivered, clicked, bounced, unsubscribed, and complaints on lifecycle email." note="Bounce and complaint stay blank until the mail provider writes one of those events onto a lifecycle message. Unsubscribes are new suppression-list rows in the selected cycle.">

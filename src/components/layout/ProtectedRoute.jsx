@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { isStaffAdmin } from '../../utils/adminRoles';
 import { rememberReturnPath } from '../../utils/auth';
+import { isLimitedSessionAllowedPath } from '../../utils/limitedSession';
 
 const ProtectedRoute = ({ children, requireProfileComplete = false }) => {
   const { user, loading } = useAuth();
@@ -29,7 +30,19 @@ const ProtectedRoute = ({ children, requireProfileComplete = false }) => {
     return children;
   }
 
+  if (
+    user.limitedSession &&
+    !isLimitedSessionAllowedPath(location.pathname, user.limitedSession)
+  ) {
+    rememberReturnPath(location);
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
   if (isCompletionRoute) {
+    if (user.limitedSession === 'rn') {
+      rememberReturnPath(location);
+      return <Navigate to="/login" state={{ from: location }} replace />;
+    }
     if (location.pathname === '/complete-profile' && !user.isRegistrationComplete) {
       return <Navigate to="/complete-basic-info" state={{ from: location }} replace />;
     }
