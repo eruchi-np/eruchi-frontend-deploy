@@ -72,6 +72,16 @@ function ConditionRow({
   const useOptions = choiceOps.includes(condition.op);
   const options = normalizeOptions(source?.question?.options || []);
   const singleValue = resolveOptionValue(options, condition.value);
+  const selectedIds = (Array.isArray(condition.value) ? condition.value : (condition.value ? [condition.value] : []))
+    .map((v) => resolveOptionValue(options, v))
+    .filter((id) => options.some((o) => o.id === id));
+
+  const toggleOption = (id) => {
+    const next = selectedIds.includes(id)
+      ? selectedIds.filter((v) => v !== id)
+      : [...selectedIds, id];
+    onChange({ ...condition, value: next });
+  };
 
   return (
     <div className="space-y-2 rounded-lg border border-gray-100 bg-gray-50/80 p-2.5">
@@ -116,23 +126,6 @@ function ConditionRow({
             ))}
           </select>
         )}
-        {needsValue && useOptions && multi && (
-          <select
-            multiple
-            className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white min-h-[4.5rem]"
-            value={(Array.isArray(condition.value) ? condition.value : (condition.value ? [condition.value] : []))
-              .map((v) => resolveOptionValue(options, v))
-              .filter(Boolean)}
-            onChange={(e) => {
-              const vals = Array.from(e.target.selectedOptions).map((o) => o.value);
-              onChange({ ...condition, value: vals });
-            }}
-          >
-            {options.map((o) => (
-              <option key={o.id} value={o.id}>{o.label}</option>
-            ))}
-          </select>
-        )}
         {needsValue && !useOptions && isBetween && (
           <>
             <input
@@ -172,6 +165,21 @@ function ConditionRow({
           </button>
         ) : null}
       </div>
+      {needsValue && useOptions && multi && options.length ? (
+        <div className="space-y-1 rounded-lg border border-gray-300 bg-white p-2">
+          {options.map((o) => (
+            <label key={o.id} className="flex items-start gap-2 text-sm text-gray-800">
+              <input
+                type="checkbox"
+                className="mt-0.5"
+                checked={selectedIds.includes(o.id)}
+                onChange={() => toggleOption(o.id)}
+              />
+              <span>{o.label}</span>
+            </label>
+          ))}
+        </div>
+      ) : null}
       {needsValue && useOptions && !options.length ? (
         <p className="text-xs text-amber-700">That question has no options to pick from.</p>
       ) : null}

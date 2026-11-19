@@ -85,6 +85,46 @@ export function surveyHasLogic(questions) {
   return (questions || []).some(hasLogicRules);
 }
 
+const remapRuleQuestionIds = (rule, idMap) => {
+  if (!rule || !Array.isArray(rule.conditions)) return rule || null;
+  return {
+    match: rule.match === 'any' ? 'any' : 'all',
+    conditions: rule.conditions.map((c) => ({
+      ...c,
+      question: idMap.get(String(c?.question || '')) || String(c?.question || ''),
+    })),
+  };
+};
+
+/**
+ * Give every question a stable _id (same scheme as questionId) and rewrite
+ * show_if / end_after_if condition.question refs so preview/engine always match.
+ */
+export function stabilizeLogicQuestions(questions) {
+  const list = Array.isArray(questions) ? questions : [];
+  const idMap = new Map();
+  list.forEach((q, i) => {
+    const stable = questionId(q, i);
+    idMap.set(stable, stable);
+    if (q?._id != null) idMap.set(String(q._id), stable);
+    if (q?.id != null) idMap.set(String(q.id), stable);
+    idMap.set(`q_idx_${i}`, stable);
+    idMap.set(`preview_q_${i + 1}`, stable);
+  });
+  return list.map((q, i) => {
+    const stableId = questionId(q, i);
+    const next = {
+      ...q,
+      _id: stableId,
+    };
+    if (q.show_if) next.show_if = remapRuleQuestionIds(q.show_if, idMap);
+    else next.show_if = null;
+    if (q.end_after_if) next.end_after_if = remapRuleQuestionIds(q.end_after_if, idMap);
+    else next.end_after_if = null;
+    return next;
+  });
+}
+
 export function computeLogicCredits(fullCredits, answeredCount, questionCount) {
   const X = Math.max(0, Number(fullCredits) || 0);
   const answered = Math.max(0, Number(answeredCount) || 0);
@@ -188,22 +228,38 @@ function evaluateCondition(condition, ctx) {
   const num = numericAnswer(source, raw);
 
   switch (op) {
-    case 'is':
-      return answerIds.length === 1 && values[0] != null && answerIds[0] === String(values[0]);
-    case 'is_not':
-      return !(answerIds.length === 1 && values[0] != null && answerIds[0] === String(values[0]));
-    case 'is_any_of':
-      return answerIds.some((id) => values.map(String).includes(id));
-    case 'is_none_of':
-      return !answerIds.some((id) => values.map(String).includes(id));
-    case 'includes':
-      return answerIds.includes(String(values[0]));
-    case 'does_not_include':
-      return !answerIds.includes(String(values[0]));
-    case 'includes_any_of':
-      return answerIds.some((id) => values.map(String).includes(id));
-    case 'includes_all_of':
-      return values.map(String).every((v) => answerIds.includes(v));
+    case 'is': {
+      const want = resolveAnswerToOptionIds(source, values[0]);
+      return answerIds.length === 1 && want.length === 1 && answerIds[0] === want[0];
+    }
+    case 'is_not': {
+      const want = resolveAnswerToOptionIds(source, values[0]);
+      return !(answerIds.length === 1 && want.length === 1 && answerIds[0] === want[0]);
+    }
+    case 'is_any_of': {
+      const want = resolveAnswerToOptionIds(source, values);
+      return answerIds.some((id) => want.includes(id));
+    }
+    case 'is_none_of': {
+      const want = resolveAnswerToOptionIds(source, values);
+      return !answerIds.some((id) => want.includes(id));
+    }
+    case 'includes': {
+      const want = resolveAnswerToOptionIds(source, values[0]);
+      return want.some((id) => answerIds.includes(id));
+    }
+    case 'does_not_include': {
+      const want = resolveAnswerToOptionIds(source, values[0]);
+      return !want.some((id) => answerIds.includes(id));
+    }
+    case 'includes_any_of': {
+      const want = resolveAnswerToOptionIds(source, values);
+      return want.some((id) => answerIds.includes(id));
+    }
+    case 'includes_all_of': {
+      const want = resolveAnswerToOptionIds(source, values);
+      return want.every((id) => answerIds.includes(id));
+    }
     case 'equals':
       return num != null && Number(values[0]) === num;
     case 'not_equals':
@@ -245,7 +301,13 @@ export function evaluateSurveyLogic(questions, answersByQuestionId = {}) {
   const list = Array.isArray(questions) ? questions : [];
   const questionsById = new Map();
   list.forEach((q, i) => {
-    questionsById.set(questionId(q, i), q);
+    const qid = questionId(q, i);
+    questionsById.set(qid, q);
+    // Alias keys so rules written before stabilize / preview still resolve.
+    questionsById.set(`q_idx_${i}`, q);
+    questionsById.set(`preview_q_${i + 1}`, q);
+    if (q?._id != null) questionsById.set(String(q._id), q);
+    if (q?.id != null) questionsById.set(String(q.id), q);
   });
 
   const visibleIds = new Set();

@@ -6,7 +6,7 @@ import SurveySettings from './SurveySettings.jsx';
 import SurveyQuestions from './SurveyQuestions.jsx';
 import useSepSurveyForm from './useSepSurveyForm.js';
 import StandaloneSurvey from '../../survey/StandaloneSurvey.jsx';
-import { buildSurveyQuestions } from './surveyFormPersist.js';
+import { buildPreviewSurvey } from './previewSurvey.js';
 
 export { SATISFACTION_SCALE } from './sepSurveyDefaults.js';
 
@@ -28,7 +28,6 @@ const CreateSepSurvey = () => {
     statusOptions,
     visibilityOptions,
     kindOptions,
-    hasLogic,
     logicTextOnlyLocked,
     logicRewardSummary,
     handleInputChange,
@@ -61,19 +60,7 @@ const CreateSepSurvey = () => {
   const [selectedSavedId, setSelectedSavedId] = useState('');
   const [previewOpen, setPreviewOpen] = useState(false);
 
-  const previewSurvey = useMemo(() => ({
-    _id: 'preview',
-    title: formData.title || 'Untitled survey',
-    description: formData.description || '',
-    credits: Number(formData.credits) || 0,
-    estimatedMinutes: Number(formData.estimatedMinutes) || null,
-    kind: formData.kind || 'normal',
-    hasLogic,
-    questions: buildSurveyQuestions(formData.questions).map((q, i) => ({
-      ...q,
-      _id: q._id || `preview_q_${i + 1}`,
-    })),
-  }), [formData, hasLogic]);
+  const previewSurvey = useMemo(() => buildPreviewSurvey(formData), [formData]);
 
   const requestLeave = () => {
     if (!isDirty) {
@@ -392,6 +379,7 @@ const CreateSepSurvey = () => {
       {previewOpen ? (
         <div className="fixed inset-0 z-[90] bg-white overflow-auto">
           <StandaloneSurvey
+            key="logic-preview"
             previewMode
             previewSurvey={previewSurvey}
             onExitPreview={() => setPreviewOpen(false)}

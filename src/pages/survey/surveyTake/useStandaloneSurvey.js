@@ -79,23 +79,32 @@ export default function useStandaloneSurvey({ previewMode = false, previewSurvey
     });
   });
 
+  // Preview: seed answers once on mount. Updating the survey definition must not wipe answers
+  // (parent formData changes would otherwise reset logic mid-test).
   useEffect(() => {
-    if (previewMode) {
-      if (previewSurvey) {
-        setSurvey(previewSurvey);
-        const initial = {};
-        (previewSurvey.questions || []).forEach((q) => {
-          if (q.questionType === "multiple_checkbox") initial[q.questionText] = [];
-          else if (q.questionType === "slider") initial[q.questionText] = null;
-          else if (q.questionType === "matrix_radio") {
-            initial[q.questionText] = emptyMatrixValue(q.rows || []);
-          } else initial[q.questionText] = "";
-        });
-        setResponses(initial);
-        setLoading(false);
-      }
-      return undefined;
-    }
+    if (!previewMode || !previewSurvey) return undefined;
+    setSurvey(previewSurvey);
+    const initial = {};
+    (previewSurvey.questions || []).forEach((q) => {
+      if (q.questionType === "multiple_checkbox") initial[q.questionText] = [];
+      else if (q.questionType === "slider") initial[q.questionText] = null;
+      else if (q.questionType === "matrix_radio") {
+        initial[q.questionText] = emptyMatrixValue(q.rows || []);
+      } else initial[q.questionText] = "";
+    });
+    setResponses(initial);
+    setLoading(false);
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only seed for preview
+  }, [previewMode]);
+
+  useEffect(() => {
+    if (!previewMode || !previewSurvey) return;
+    setSurvey(previewSurvey);
+  }, [previewMode, previewSurvey]);
+
+  useEffect(() => {
+    if (previewMode) return undefined;
 
     let cancelled = false;
     const fetchSurvey = async () => {
@@ -145,7 +154,7 @@ export default function useStandaloneSurvey({ previewMode = false, previewSurvey
     return () => {
       cancelled = true;
     };
-  }, [surveyId, isSprint, sprintWave, user?.profileSurveyBlocked, previewMode, previewSurvey]);
+  }, [surveyId, isSprint, sprintWave, user?.profileSurveyBlocked, previewMode, navigate]);
 
   const questions = survey?.questions || [];
   const logicEnabled = Boolean(survey?.hasLogic) || surveyHasLogic(questions);
