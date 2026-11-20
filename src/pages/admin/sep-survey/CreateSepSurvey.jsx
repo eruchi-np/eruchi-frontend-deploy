@@ -1,7 +1,7 @@
 // Create or edit a standalone survey. Settings, questions, and publish.
 
 import React, { useMemo, useState } from 'react';
-import { ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { ArrowLeft, Eye, Save, Loader2 } from 'lucide-react';
 import SurveySettings from './SurveySettings.jsx';
 import SurveyQuestions from './SurveyQuestions.jsx';
 import useSepSurveyForm from './useSepSurveyForm.js';
@@ -275,6 +275,15 @@ const CreateSepSurvey = () => {
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-3 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewOpen(true)}
+                    className="flex items-center justify-center gap-2 px-8 py-3 border-2 border-gray-300 text-gray-800 rounded-xl font-medium hover:bg-gray-50 transition-all"
+                  >
+                    <Eye className="h-5 w-5" />
+                    Test this survey
+                  </button>
+
                   <button
                     type="button"
                     onClick={requestLeave}

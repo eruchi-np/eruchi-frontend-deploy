@@ -7,7 +7,7 @@
                          "destination":  "https://api.eruchi.com.np/api/:path*"
                      },
                      {
-                         "source":  "/((?!api/).*)",
+                         "source":  "/((?!api/|assets/).*)",
                          "destination":  "/index.html"
                      }
                  ],

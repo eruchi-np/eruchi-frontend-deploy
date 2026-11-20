@@ -46,7 +46,7 @@ export default function StandaloneSurvey({ previewMode = false, previewSurvey = 
     requestSubmit,
     handleSubmit,
     exitSurvey,
-  } = useStandaloneSurvey({ previewMode, previewSurvey });
+  } = useStandaloneSurvey({ previewMode, previewSurvey, onExitPreview });
 
   if (loading) {
     return (
@@ -100,7 +100,7 @@ export default function StandaloneSurvey({ previewMode = false, previewSurvey = 
           type="button"
           className="x"
           aria-label={previewMode ? "Close preview" : "Exit survey"}
-          onClick={previewMode && onExitPreview ? onExitPreview : exitSurvey}
+          onClick={exitSurvey}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M6 6l12 12M18 6L6 18" />
@@ -128,7 +128,11 @@ export default function StandaloneSurvey({ previewMode = false, previewSurvey = 
         <div className="band-in">
           <div className="hdr">
             <img src={eruchiLogo} alt="eRuchi" />
-            <button type="button" className="hbtn" onClick={exitSurvey}>
+            <button
+              type="button"
+              className="hbtn"
+              onClick={exitSurvey}
+            >
               <svg
                 width="16"
                 height="16"
@@ -141,7 +145,7 @@ export default function StandaloneSurvey({ previewMode = false, previewSurvey = 
               >
                 <path d="M6 6l12 12M18 6L6 18" />
               </svg>
-              Exit survey
+              {previewMode ? "Back to editor" : "Exit survey"}
             </button>
           </div>
           <div className="hero sf-enter">

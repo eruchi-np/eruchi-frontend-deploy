@@ -468,7 +468,7 @@ function PromptAcceptance({ metric }) {
     <Mini
       label={label}
       value={shareText(row?.accepted)}
-      sub={row?.prompted ? null : 'No one prompted yet'}
+      sub={row?.prompted ? 'Team accounts are left out.' : 'No one prompted yet'}
     />
   );
   return (

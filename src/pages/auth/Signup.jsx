@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -44,6 +44,75 @@ const formSchema = z
     path: ["confirmPassword"],
   });
 
+const scrollRevealIntoView = (node) => {
+  if (!node || !window.matchMedia("(max-width: 720px)").matches) return;
+  const rect = node.getBoundingClientRect();
+  const viewport = window.visualViewport;
+  const offset = viewport?.offsetTop ?? 0;
+  const height = viewport?.height ?? window.innerHeight;
+  const top = rect.top - offset;
+  const bottom = rect.bottom - offset;
+  if (bottom > height - 16 || top < 16) {
+    node.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }
+};
+
+function FieldReveal({ open, children }) {
+  const nodeRef = useRef(null);
+  const innerRef = useRef(null);
+  const wasOpen = useRef(open);
+
+  useLayoutEffect(() => {
+    const node = nodeRef.current;
+    const inner = innerRef.current;
+    if (!node || !inner) return;
+    if (open) node.removeAttribute("inert");
+    else node.setAttribute("inert", "");
+    node.style.height = open ? `${inner.scrollHeight}px` : "0px";
+  }, [open]);
+
+  useEffect(() => {
+    const node = nodeRef.current;
+    const inner = innerRef.current;
+    if (!node || !inner || !open) return undefined;
+    const observer = new ResizeObserver(() => {
+      const next = `${inner.scrollHeight}px`;
+      if (node.style.height !== next) node.style.height = next;
+    });
+    observer.observe(inner);
+    return () => observer.disconnect();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || wasOpen.current) {
+      wasOpen.current = open;
+      return undefined;
+    }
+    wasOpen.current = open;
+    const node = nodeRef.current;
+    if (!node) return undefined;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      scrollRevealIntoView(node);
+      return undefined;
+    }
+    const timer = window.setTimeout(() => scrollRevealIntoView(node), 480);
+    return () => window.clearTimeout(timer);
+  }, [open]);
+
+  return (
+    <div
+      ref={nodeRef}
+      className={`onboard-reveal${open ? " is-open" : ""}`}
+      aria-hidden={open ? undefined : true}
+      {...(!open ? { inert: "" } : {})}
+    >
+      <div className="onboard-reveal-inner" ref={innerRef}>
+        <div className="onboard-reveal-stack">{children}</div>
+      </div>
+    </div>
+  );
+}
+
 const Signup = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -86,6 +155,12 @@ const Signup = () => {
   });
 
   const termsAcceptedValue = watch("termsAccepted");
+  const emailValue = watch("email") || "";
+  const passwordValue = watch("password") || "";
+  const confirmPasswordValue = watch("confirmPassword") || "";
+  const showPasswords = emailValue.includes("@");
+  const showNationality =
+    showPasswords && passwordValue.length > 0 && passwordValue === confirmPasswordValue;
 
   useEffect(() => {
     if (codeFromUrl.length === 6) storeReferralCode(codeFromUrl);
@@ -138,8 +213,10 @@ const Signup = () => {
     <OnboardingShell>
       <div className="onboard-card onboard-card--auth">
         <div className="onboard-auth-head">
-          <h1 className="onboard-title">Glad to have you with us!</h1>
-          <p className="onboard-copy">Create your account. Phone, date of birth, and gender come next.</p>
+          <h1 className="onboard-title onboard-title--signup">
+            Ready to earn easy <span className="onboard-title-accent">rewards?</span>
+          </h1>
+          <p className="onboard-copy">First step is to create your eRuchi account.</p>
         </div>
 
         {googleOAuthHint && <GoogleOAuthHint />}
@@ -148,7 +225,7 @@ const Signup = () => {
           <span>Or register with email</span>
         </div>
 
-        <form className="onboard-form" onSubmit={handleSubmit(onSubmit)}>
+        <form className="onboard-form onboard-form--signup" onSubmit={handleSubmit(onSubmit)}>
           <div className="onboard-row">
             <div className={`onboard-field ${errors.firstName ? "is-error" : ""}`}>
               <label htmlFor="firstName">First name</label>
@@ -169,58 +246,71 @@ const Signup = () => {
             {errors.email && <p className="onboard-error">{errors.email.message}</p>}
           </div>
 
-          <div className={`onboard-field ${errors.password ? "is-error" : ""}`}>
-            <label htmlFor="password">Password</label>
-            <div className="onboard-password-wrap">
-              <input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="Password"
-                autoComplete="new-password"
-                {...register("password")}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((prev) => !prev)}
-                className="onboard-password-toggle"
-                aria-label={showPassword ? "Hide password" : "Show password"}
-              >
-                {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
+          <FieldReveal open={showPasswords}>
+            <div className={`onboard-field ${errors.password ? "is-error" : ""}`}>
+              <label htmlFor="password">Password</label>
+              <div className="onboard-password-wrap">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Password"
+                  autoComplete="new-password"
+                  tabIndex={showPasswords ? undefined : -1}
+                  {...register("password")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="onboard-password-toggle"
+                  tabIndex={showPasswords ? undefined : -1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              {errors.password && <p className="onboard-error">{errors.password.message}</p>}
             </div>
-            {errors.password && <p className="onboard-error">{errors.password.message}</p>}
-          </div>
 
-          <div className={`onboard-field ${errors.confirmPassword ? "is-error" : ""}`}>
-            <label htmlFor="confirmPassword">Confirm password</label>
-            <div className="onboard-password-wrap">
-              <input
-                id="confirmPassword"
-                type={showConfirmPassword ? "text" : "password"}
-                placeholder="Confirm password"
-                autoComplete="new-password"
-                {...register("confirmPassword")}
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirmPassword((prev) => !prev)}
-                className="onboard-password-toggle"
-                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
-              >
-                {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-              </button>
+            <div className={`onboard-field ${errors.confirmPassword ? "is-error" : ""}`}>
+              <label htmlFor="confirmPassword">Confirm password</label>
+              <div className="onboard-password-wrap">
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Confirm password"
+                  autoComplete="new-password"
+                  tabIndex={showPasswords ? undefined : -1}
+                  {...register("confirmPassword")}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="onboard-password-toggle"
+                  tabIndex={showPasswords ? undefined : -1}
+                  aria-label={showConfirmPassword ? "Hide password" : "Show password"}
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+              {errors.confirmPassword && <p className="onboard-error">{errors.confirmPassword.message}</p>}
             </div>
-            {errors.confirmPassword && <p className="onboard-error">{errors.confirmPassword.message}</p>}
-          </div>
+          </FieldReveal>
 
-          <div className="onboard-field">
-            <label htmlFor="nationality">Nationality</label>
-            <select id="nationality" {...register("nationality")} defaultValue="">
-              <option value="">Select nationality</option>
-              <option value="Nepali">Nepali</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
+          <FieldReveal open={showNationality}>
+            <div className="onboard-field">
+              <label htmlFor="nationality">Nationality</label>
+              <select
+                id="nationality"
+                {...register("nationality")}
+                defaultValue=""
+                tabIndex={showNationality ? undefined : -1}
+              >
+                <option value="">Select nationality</option>
+                <option value="Nepali">Nepali</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+          </FieldReveal>
 
           <div className="onboard-terms">
             <div className="onboard-terms-row">

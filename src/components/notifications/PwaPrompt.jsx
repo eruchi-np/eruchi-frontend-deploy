@@ -5,6 +5,11 @@ import { useAuth } from '../../context/AuthContext';
 import { isStaffAdmin } from '../../utils/adminRoles';
 import { isAndroidDevice, isIosDevice, isStandaloneDisplay } from '../../utils/oneSignal';
 import { healthSessionId, trackHealthEvent } from '../../utils/healthEvents';
+import {
+  evaluatePwaInstallPending,
+  setPwaSurfaceActive,
+  wasPushSlidedownOpened,
+} from '../../utils/promptSurface';
 import './pushPrompt.css';
 
 const DISMISS_KEY = 'eruchi_pwa_prompt_dismissed_at';
@@ -37,6 +42,21 @@ const wasDismissed = () => {
     return false;
   }
 };
+
+/** Sync check for OneSignalBridge — install card would own the screen. */
+export function isPwaInstallPromptPending({ user, pathname } = {}) {
+  return evaluatePwaInstallPending({
+    hasDeferredInstall: Boolean(deferredInstall),
+    dismissed: wasDismissed(),
+    standalone: isStandaloneDisplay(),
+    user,
+    isStaff: Boolean(user && isStaffAdmin(user.role)),
+    pathname,
+    surveyCompletePath: SURVEY_COMPLETE_PATH,
+    isAndroid: isAndroidDevice(),
+    pushSlidedownOpened: wasPushSlidedownOpened(),
+  });
+}
 
 const rememberDismiss = () => {
   try {
@@ -88,7 +108,13 @@ export default function PwaPrompt() {
     && promptEvent
     && !wasDismissed()
     && !pushOwnsThisScreen
+    && !wasPushSlidedownOpened()
   );
+
+  useEffect(() => {
+    setPwaSurfaceActive(visible);
+    return () => setPwaSurfaceActive(false);
+  }, [visible]);
 
   useEffect(() => {
     if (!visible || trackedShow) return;

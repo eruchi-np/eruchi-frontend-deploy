@@ -30,7 +30,11 @@ import {
   isQuestionValid,
 } from "./validation";
 
-export default function useStandaloneSurvey({ previewMode = false, previewSurvey = null } = {}) {
+export default function useStandaloneSurvey({
+  previewMode = false,
+  previewSurvey = null,
+  onExitPreview = null,
+} = {}) {
   const { surveyId } = useParams();
   const [searchParams] = useSearchParams();
   const isSprint = searchParams.get("sprint") === "1";
@@ -354,7 +358,13 @@ export default function useStandaloneSurvey({ previewMode = false, previewSurvey
     }
   };
 
-  const exitSurvey = () => navigate(-1);
+  const exitSurvey = () => {
+    if (previewMode && typeof onExitPreview === "function") {
+      onExitPreview();
+      return;
+    }
+    navigate(-1);
+  };
 
   return {
     user,

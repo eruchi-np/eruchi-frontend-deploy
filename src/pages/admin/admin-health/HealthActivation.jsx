@@ -337,6 +337,18 @@ export function Activation({ data }) {
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">How many people finish the path from signup to a first survey.</p>
+      <div className="grid sm:grid-cols-2 gap-4">
+        <Mini
+          label="App install"
+          value={shareText(data.C9?.pwa?.accepted)}
+          sub="Of people shown Add to Home Screen. Team accounts are left out."
+        />
+        <Mini
+          label="Notifications"
+          value={shareText(data.C9?.notifications?.accepted)}
+          sub="Of people shown the Android prompt. Team accounts are left out."
+        />
+      </div>
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <Mini label="Effective acquired" value={int(data.A4.total)} sub={`As of ${when(data.A4.asOf)}`} tone="info" />
         <Mini

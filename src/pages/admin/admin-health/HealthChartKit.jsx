@@ -73,7 +73,10 @@ export function WeekChecklist({
   defaultWeek,
   label = 'Weeks',
   getKey = (row) => row.week || row.key,
-  getLabel = (row) => row.week || row.key,
+  getLabel = (row) => {
+    const name = row.week || row.key || '';
+    return row.inProgress ? `${name} · in progress` : name;
+  },
 }) {
   const rows = weeks || [];
   const toggle = (key) => {
@@ -133,7 +136,12 @@ export function WeekChecklist({
 
 export function useDefaultWeekSelection(weeks, getKey = (row) => row.week) {
   const keys = useMemo(() => (weeks || []).map(getKey).filter(Boolean), [weeks, getKey]);
-  const defaultWeek = keys.length ? keys[keys.length - 1] : null;
+  const finishedKeys = useMemo(
+    () => (weeks || []).filter((row) => !row?.inProgress).map(getKey).filter(Boolean),
+    [weeks, getKey]
+  );
+  const defaultPool = finishedKeys.length ? finishedKeys : keys;
+  const defaultWeek = defaultPool.length ? defaultPool[defaultPool.length - 1] : null;
   const [selected, setSelected] = useState(() => new Set(defaultWeek ? [defaultWeek] : []));
   useEffect(() => {
     setSelected(new Set(defaultWeek ? [defaultWeek] : []));

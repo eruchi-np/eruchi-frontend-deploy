@@ -13,24 +13,72 @@
     <!-- POPPINS FONT – THIS IS THE MAGIC -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,500;1,600;1,700&family=Poppins:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="referrer" content="no-referrer-when-downgrade" />
     <title>eRuchi | Where simple responses can earn real rewards.</title>
     <meta name="description" content="Earn Ruchi Credits by sharing feedback through surveys, then redeem them at partner cafes, gyms, and shops in Nepal." />
     <meta name="robots" content="index, follow" />
-    <link rel="canonical" href="__SITE_ORIGIN__/" />
+    <link rel="canonical" href="%VITE_SITE_ORIGIN%/" />
     <meta property="og:title" content="eRuchi | Where simple responses can earn real rewards." />
     <meta property="og:description" content="Earn Ruchi Credits by sharing feedback through surveys, then redeem them at partner cafes, gyms, and shops in Nepal." />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="__SITE_ORIGIN__/" />
-    <meta property="og:image" content="__SITE_ORIGIN__/logo.png" />
+    <meta property="og:url" content="%VITE_SITE_ORIGIN%/" />
+    <meta property="og:image" content="%VITE_SITE_ORIGIN%/logo.png" />
     <!-- ANALYTICS_PIXEL_HEAD -->
   </head>
   <body>
     <!-- ANALYTICS_GTM_NOSCRIPT -->
     <!-- ANALYTICS_PIXEL_NOSCRIPT -->
     <div id="root"></div>
+    <script>
+      (function () {
+        var KEY = 'eruchi_css_retry';
+        function applied() {
+          return getComputedStyle(document.documentElement).getPropertyValue('--app-css').trim() === '1';
+        }
+        function markOk() {
+          try { sessionStorage.removeItem(KEY); } catch (e) {}
+        }
+        function reloadOnce() {
+          try {
+            if (sessionStorage.getItem(KEY) === '1') return;
+            sessionStorage.setItem(KEY, '1');
+          } catch (e) {
+            return;
+          }
+          location.reload();
+        }
+        window.addEventListener('error', function (event) {
+          var el = event.target;
+          if (!el || el.tagName !== 'LINK' || el.rel !== 'stylesheet') return;
+          var href = el.getAttribute('href') || '';
+          if (href.indexOf('fonts.googleapis.com') !== -1) return;
+          reloadOnce();
+        }, true);
+        window.addEventListener('vite:preloadError', function (event) {
+          if (event && event.preventDefault) event.preventDefault();
+          reloadOnce();
+        });
+        function appSheetLinked() {
+          var links = document.getElementsByTagName('link');
+          for (var i = 0; i < links.length; i++) {
+            var href = links[i].getAttribute('href') || '';
+            if (links[i].rel === 'stylesheet' && href.indexOf('/assets/') !== -1) return true;
+          }
+          return false;
+        }
+        function check() {
+          if (applied()) {
+            markOk();
+            return;
+          }
+          if (appSheetLinked()) reloadOnce();
+        }
+        window.addEventListener('load', function () { setTimeout(check, 500); });
+        setTimeout(check, 4000);
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

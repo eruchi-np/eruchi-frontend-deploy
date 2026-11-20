@@ -454,6 +454,14 @@
   line-height: 1.12;
 }
 
+.onboard-card--auth .onboard-title--signup {
+  font-size: clamp(26px, 3.2vw, 34px);
+}
+
+.onboard-title-accent {
+  color: #30fdd4;
+}
+
 .onboard-card--auth .onboard-copy {
   margin: 0;
   color: var(--muted);
@@ -478,6 +486,75 @@
 
 .onboard-card--auth .onboard-form {
   gap: 18px;
+}
+
+.onboard-card--auth .onboard-form--signup {
+  gap: 0;
+}
+
+.onboard-form--signup > * + * {
+  margin-top: 18px;
+}
+
+.onboard-form--signup > .onboard-reveal {
+  margin-top: 0;
+}
+
+.onboard-form--signup > .onboard-reveal.is-open {
+  margin-top: 18px;
+}
+
+.onboard-card--auth .onboard-form--signup .onboard-links {
+  margin-top: 18px;
+}
+
+.onboard-card--auth .onboard-form--signup .onboard-actions {
+  margin-top: 22px;
+}
+
+.onboard-reveal {
+  height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition:
+    height 0.42s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.2s ease,
+    margin-top 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.onboard-reveal.is-open {
+  opacity: 1;
+  transition:
+    height 0.48s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.32s ease 0.05s,
+    margin-top 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.onboard-reveal-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.onboard-reveal-stack {
+  display: grid;
+  gap: 18px;
+  transform: translateY(8px);
+  transition: transform 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.onboard-reveal.is-open .onboard-reveal-stack {
+  transform: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboard-reveal,
+  .onboard-reveal-stack {
+    transition: none;
+  }
+
+  .onboard-reveal-stack {
+    transform: none;
+  }
 }
 
 .onboard-card--auth .onboard-links {
