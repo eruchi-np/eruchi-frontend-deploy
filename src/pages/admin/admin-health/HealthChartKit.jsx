@@ -443,13 +443,15 @@ export function MultiSeriesHybridChart({
 
 export function HorizontalRateChart({ rows, yKey, rateKey = 'rate', label = 'Rate', xLabel, yLabel }) {
   const data = useMemo(
-    () => (rows || []).map((row) => ({
-      ...row,
-      _ratePct: row[rateKey] == null ? 0 : Number(row[rateKey]) * 100,
-    })),
+    () => (rows || [])
+      .filter((row) => row[rateKey] != null && Number.isFinite(Number(row[rateKey])))
+      .map((row) => ({
+        ...row,
+        _ratePct: Number(row[rateKey]) * 100,
+      })),
     [rows, rateKey]
   );
-  if (!data.length) return <p className="text-sm text-gray-500">No rows yet.</p>;
+  if (!data.length) return <p className="text-sm text-gray-500">No rates yet.</p>;
   return (
     <AxisFrame yLabel={yLabel} xLabel={xLabel || label}>
     <div className="w-full" style={{ height: Math.max(220, data.length * 36) }}>

@@ -1,7 +1,7 @@
 // Retention tab. Who comes back to survey or visit, and who is active, at risk, or dormant.
 
 import { useMemo } from 'react';
-import { afterRetentionCutoff } from './healthChartMath';
+import { afterRetentionCutoff, RETENTION_WEEK_CUTOFF } from './healthChartMath';
 import { HybridPeopleShareChart, MultiSeriesHybridChart } from './HealthChartKit.jsx';
 import {
   Card,
@@ -47,7 +47,7 @@ function ReturnVisits({ data }) {
               </tr>
             </thead>
             <tbody>
-              {latestFirst(data.L2.cohorts.filter((cohort) => afterRetentionCutoff(cohort.week))).map((cohort) => (
+              {latestFirst(data.L2.cohorts.filter((cohort) => afterRetentionCutoff(cohort.week, data.retentionWeekCutoff || RETENTION_WEEK_CUTOFF))).map((cohort) => (
                 <tr key={cohort.week} className="border-t border-gray-100">
                   <td className="py-2 pr-3 pl-0 whitespace-nowrap sticky left-0 z-10 bg-white w-[7.5rem] min-w-[7.5rem]">{cohort.week}</td>
                   <td className="py-2 pr-3 tabular-nums sticky left-[7.5rem] z-10 bg-white w-14 min-w-14 shadow-[2px_0_0_0_#e5e7eb]">{int(cohort.cohortSize)}</td>
@@ -163,6 +163,7 @@ function WhoLeft({ data }) {
 }
 
 export function Retention({ data }) {
+  const cutoff = data.retentionWeekCutoff || RETENTION_WEEK_CUTOFF;
   const tiles = [
     ['week1', 'Week 1', 1],
     ['week2', 'Week 2', 2],
@@ -170,7 +171,7 @@ export function Retention({ data }) {
     ['week8', 'Week 8', 8],
   ];
   const l1Chart = useMemo(() => (data.L1.cohorts || [])
-    .filter((cohort) => afterRetentionCutoff(cohort.week))
+    .filter((cohort) => afterRetentionCutoff(cohort.week, cutoff))
     .map((cohort) => {
       const point = (weekN) => cohort.points.find((row) => row.week === weekN);
       return {
@@ -181,7 +182,7 @@ export function Retention({ data }) {
         week4: point(4)?.complete && point(4).survey?.rate != null ? point(4).survey.rate * 100 : null,
         week8: point(8)?.complete && point(8).survey?.rate != null ? point(8).survey.rate * 100 : null,
       };
-    }), [data.L1.cohorts]);
+    }), [data.L1.cohorts, cutoff]);
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">Who comes back to finish another survey, and who has gone quiet.</p>
@@ -201,7 +202,7 @@ export function Retention({ data }) {
       </div>
       <Card metricId="L1" title="Survey retention by signup week" summary="Of each signup week, who finished a survey in week 1, week 2, week 4, and week 8." note={(data.L1.gaps || []).join(' ')}>
         <p className="text-xs text-gray-500 mb-3">
-          Checkpoint view only. The cohort matrix below is the same rule for every later week 0–12. A week still open shows the people whose own window has already closed, marked n=. Signup weeks on or before 2026-06-18 are left out.
+          Checkpoint view only. The cohort matrix below is the same rule for every later week 0–12. A week still open shows the people whose own window has already closed, marked n=. Signup weeks on or before {cutoff} are left out.
         </p>
         <MultiSeriesHybridChart
           rows={l1Chart}
@@ -228,7 +229,7 @@ export function Retention({ data }) {
               </tr>
             </thead>
             <tbody>
-              {latestFirst(data.L1.cohorts.filter((cohort) => afterRetentionCutoff(cohort.week))).map((cohort) => (
+              {latestFirst(data.L1.cohorts.filter((cohort) => afterRetentionCutoff(cohort.week, cutoff))).map((cohort) => (
                 <tr key={cohort.week} className="border-t border-gray-100">
                   <td className="py-2 pr-3">{cohort.week}</td>
                   <td className="py-2 pr-3">{int(cohort.cohortSize)}</td>

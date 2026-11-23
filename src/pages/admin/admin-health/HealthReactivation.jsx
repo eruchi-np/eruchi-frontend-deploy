@@ -512,11 +512,13 @@ export function Reactivation({ data }) {
         </div>
       </Card>
 
-      <Card metricId="RE10" title="Send window" summary="Share of sends that went out inside the Nepal window." note="Email is 7:00–7:30am and 8:00–8:45pm Nepal. WhatsApp is 8:00–8:45pm Nepal. Holdouts and skipped rows are not sends.">
+      <Card metricId="RE10" title="Send window" summary="How many sends landed inside the Nepal window (not outside)." note="Email is 7:00–7:30am and 8:00–8:45pm Nepal. WhatsApp is 8:00–8:45pm Nepal. Holdouts and skipped rows are not sends. RE2’s outside-window row uses the same counts.">
         <div className="flex items-center gap-3">
           <Status status={!all.sent ? 'unavailable' : all.outsideWindow ? 'fail' : 'pass'} />
           <span className="text-sm text-gray-800">
-            {all.sent ? rateText(all.sent - all.outsideWindow, all.sent) : 'No sends in this view.'}
+            {!all.sent
+              ? 'No sends in this view.'
+              : `${rateText(all.sent - all.outsideWindow, all.sent)} inside · ${int(all.outsideWindow)} outside`}
           </span>
         </div>
       </Card>

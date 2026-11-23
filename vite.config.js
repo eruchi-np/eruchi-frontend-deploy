@@ -138,7 +138,6 @@ export default defineConfig(({ mode }) => {
         name: 'html-site-config',
         transformIndexHtml(html) {
           return html
-            .replaceAll('__SITE_ORIGIN__', siteOrigin)
             .replaceAll('%VITE_SITE_ORIGIN%', siteOrigin)
             .replace('<!-- ANALYTICS_GTM_HEAD -->', snippets.gtmHead)
             .replace('<!-- ANALYTICS_PIXEL_HEAD -->', snippets.pixelHead)

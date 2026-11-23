@@ -30,16 +30,18 @@ import {
 
 function SurveyVolume({ data }) {
   if (!data.S1) return null;
-  const latest = data.S6.weeks[data.S6.weeks.length - 1];
+  const s6Weeks = data.S6?.weeks || [];
+  const latest = s6Weeks.length ? s6Weeks[s6Weeks.length - 1] : null;
   const streakRows = Object.entries(STREAK_LABELS).map(([key, label]) => ({
     label,
-    count: data.S14.length.buckets[key] || 0,
+    count: data.S14?.length?.buckets?.[key] || 0,
   }));
-  const s16Weeks = (data.S16.weeks || []).map((week) => ({ week }));
+  const s16Weeks = (data.S16?.weeks || []).map((week) => ({ week }));
   const s16Select = useDefaultWeekSelection(s16Weeks);
   const s16Clusters = useMemo(() => {
     const selected = s16Select.selected;
-    const pairs = (data.S16.pairs || []).filter((pair) => !selected.size || selected.has(pair.week));
+    if (!selected.size) return [];
+    const pairs = (data.S16?.pairs || []).filter((pair) => selected.has(pair.week));
     const byCluster = new Map();
     for (const pair of pairs) {
       if (!byCluster.has(pair.clusterId)) {
@@ -58,14 +60,14 @@ function SurveyVolume({ data }) {
       ...row,
       rate: row.denominator ? row.numerator / row.denominator : null,
     })).sort((a, b) => (b.rate || 0) - (a.rate || 0));
-  }, [data.S16.pairs, s16Select.selected]);
+  }, [data.S16?.pairs, s16Select.selected]);
 
   return (
     <>
       <div className="grid sm:grid-cols-3 gap-4">
         <Mini label="Median responses per survey" value={num(data.S1.finals.median)} sub={data.S1.finals.n ? `Mean ${num(data.S1.finals.mean)} · ${int(data.S1.finals.n)} surveys` : 'No surveys'} />
         <Mini label="Depth last complete week" value={num(latest?.median)} sub={latest ? `Mean ${num(latest.mean)} · ${int(latest.n)} people` : ''} />
-        <Mini label="Active streaks now" value={int(data.S14.activeNow)} sub={data.S14.length.n ? `Median length ${num(data.S14.length.median)}` : ''} />
+        <Mini label="Active streaks now" value={int(data.S14?.activeNow)} sub={data.S14?.length?.n ? `Median length ${num(data.S14.length.median)}` : ''} />
       </div>
       <Card metricId="S1" title="Responses per survey" summary="Weekly totals for surveys published that week, with first-day and first-three-day finishes." note={data.S1.note}>
         <MultiSeriesHybridChart
@@ -81,9 +83,9 @@ function SurveyVolume({ data }) {
           showWmaFor="total"
         />
       </Card>
-      <Card metricId="S6" title="Surveys per person, by week" summary="How many surveys a person finished in each complete week." note={data.S6.note}>
+      <Card metricId="S6" title="Surveys per person, by week" summary="How many surveys a person finished in each complete week." note={data.S6?.note}>
         <MultiSeriesHybridChart
-          rows={data.S6.weeks || []}
+          rows={s6Weeks}
           xKey="week"
           yLabel="People and responses"
           yRightLabel="Surveys per person"
@@ -98,15 +100,15 @@ function SurveyVolume({ data }) {
           showWmaFor="totalResponses"
         />
       </Card>
-      <Card metricId="S14" title="Streaks" summary="How long current answer streaks are, and who reached 7, 14, and 30 days." note={data.S14.gaps?.[0]}>
-        <SimpleBarChart rows={streakRows} xKey="label" yKey="count" label="People" xLabel="Streak length" yLabel="People" percentOnTop totalForPercent={data.S14.activeNow || 0} />
-        <p className="text-sm text-gray-700 mt-3">Reached day 7: {shareText(data.S14.milestones.day7, false, 'people who ever streaked')}</p>
-        <p className="text-sm text-gray-700">Reached day 14: {shareText(data.S14.milestones.day14, false, 'people who ever streaked')}</p>
-        <p className="text-sm text-gray-700">Reached day 30: {shareText(data.S14.milestones.day30, false, 'people who ever streaked')}</p>
-        <p className="text-sm text-gray-700">Streak Guard purchases: {int(data.S14.guards.purchases)} · buyers {int(data.S14.guards.buyers)}</p>
-        <Notes items={data.S14.gaps.slice(1)} />
+      <Card metricId="S14" title="Streaks" summary="How long current answer streaks are, and who reached 7, 14, and 30 days." note={data.S14?.gaps?.[0]}>
+        <SimpleBarChart rows={streakRows} xKey="label" yKey="count" label="People" xLabel="Streak length" yLabel="People" percentOnTop totalForPercent={data.S14?.activeNow || 0} />
+        <p className="text-sm text-gray-700 mt-3">Reached day 7: {shareText(data.S14?.milestones?.day7, false, 'people who ever streaked')}</p>
+        <p className="text-sm text-gray-700">Reached day 14: {shareText(data.S14?.milestones?.day14, false, 'people who ever streaked')}</p>
+        <p className="text-sm text-gray-700">Reached day 30: {shareText(data.S14?.milestones?.day30, false, 'people who ever streaked')}</p>
+        <p className="text-sm text-gray-700">Streak Guard purchases: {int(data.S14?.guards?.purchases)} · buyers {int(data.S14?.guards?.buyers)}</p>
+        <Notes items={(data.S14?.gaps || []).slice(1)} />
       </Card>
-      <Card metricId="S16" title="Survey to the next survey" summary="Cluster-targeted survey K to survey K+1 in the same cluster." note={data.S16.note}>
+      <Card metricId="S16" title="Survey to the next survey" summary="Cluster-targeted survey K to survey K+1 in the same cluster." note={data.S16?.note}>
         {s16Weeks.length ? (
           <WeekChecklist
             weeks={latestFirst(s16Weeks)}
@@ -116,8 +118,10 @@ function SurveyVolume({ data }) {
             label="Next-survey weeks"
           />
         ) : null}
-        <p className="text-sm text-gray-700 mb-3">Median across pairs: {data.S16.median == null ? '–' : <Pct rate={data.S16.median} />}</p>
-        {s16Clusters.length ? (
+        <p className="text-sm text-gray-700 mb-3">Median across pairs: {data.S16?.median == null ? '–' : <Pct rate={data.S16.median} />}</p>
+        {!s16Select.selected.size ? (
+          <p className="text-sm text-gray-500">Select one or more weeks.</p>
+        ) : s16Clusters.length ? (
           <HorizontalRateChart rows={s16Clusters} yKey="clusterName" rateKey="rate" label="Survey to next survey" yLabel="Cluster" xLabel="Share who took the next survey" />
         ) : (
           <p className="text-sm text-gray-500">No cluster survey pairs in the selected weeks yet.</p>
@@ -212,11 +216,13 @@ function QuestionDropoff({ metric }) {
 
 function SurveyQuality({ data }) {
   if (!data.S8) return null;
-  const shown = data.S8.surveys.slice(0, 12);
-  const hourMax = Math.max(...data.S12.hours.map((row) => row.count), 1);
+  const surveys = data.S8.surveys || [];
+  const shown = surveys.slice(0, 12);
+  const hours = data.S12?.hours || [];
+  const hourMax = Math.max(...hours.map((row) => row.count), 1);
   const impact = useMemo(() => {
     const weights = standardizedImpactWeights(
-      data.S8.surveys,
+      surveys,
       ['questions', 'avgMinutes', 'reportedMinutes', 'credits'],
       'ratePct'
     );
@@ -228,7 +234,7 @@ function SurveyQuality({ data }) {
       credits: 'Credits',
     };
     return weights.map((row) => ({ ...row, variable: labels[row.variable] || row.variable }));
-  }, [data.S8.surveys]);
+  }, [surveys]);
   return (
     <>
       <Card metricId="S8" title="Survey traits" summary="How first-72h response rate relates to questions, observed time, reported time, and credits." note={data.S8.note}>
@@ -283,8 +289,8 @@ function SurveyQuality({ data }) {
             </tbody>
           </table>
         </div>
-        {data.S8.surveys.length > shown.length ? (
-          <p className="text-xs text-gray-500 mt-2">Showing {shown.length} of {int(data.S8.surveys.length)} surveys.</p>
+        {surveys.length > shown.length ? (
+          <p className="text-xs text-gray-500 mt-2">Showing {shown.length} of {int(surveys.length)} surveys.</p>
         ) : null}
       </Card>
       <Card metricId="S10" title="Response quality" summary="Finishes that were much faster than the usual time for that survey." note={data.S10.note}>
@@ -338,7 +344,7 @@ function SurveyQuality({ data }) {
           </table>
         </div>
         <div className="grid grid-cols-8 sm:grid-cols-12 gap-1">
-          {data.S12.hours.map((row) => (
+          {hours.map((row) => (
             <div key={row.hour} className="text-center">
               <div className="h-10 bg-gray-100 rounded flex items-end overflow-hidden">
                 <div className="w-full" style={{ height: `${(row.count / hourMax) * 100}%`, backgroundColor: NAVY }} />
@@ -355,9 +361,9 @@ function SurveyQuality({ data }) {
 }
 
 export function Surveys({ data }) {
-  const recentDays = data.S4.days.slice(-14);
+  const recentDays = (data.S4?.days || []).slice(-14);
   const denomLabel = data.denominator === 'effective' ? 'acquired' : 'survey-activated';
-  const s5Weeks = data.S5.weeks || [];
+  const s5Weeks = data.S5?.weeks || [];
   const s5Select = useDefaultWeekSelection(s5Weeks);
   const s5Picked = s5Weeks.filter((week) => s5Select.selected.has(week.week));
   const s5Merged = useMemo(() => {
@@ -381,25 +387,25 @@ export function Surveys({ data }) {
       top10: { ...shareOf(topNum, topDen), people: s5Picked.reduce((sum, week) => sum + (week.top10?.people || 0), 0), of: s5Picked.reduce((sum, week) => sum + (week.top10?.of || 0), 0) },
     };
   }, [s5Picked]);
-  const s7Weeks = data.S7.starvedWeeks || data.S7.publishedWeeks || [];
+  const s7Weeks = data.S7?.starvedWeeks || data.S7?.publishedWeeks || [];
   const s7Select = useDefaultWeekSelection(s7Weeks);
-  const s7Starved = (data.S7.starvedWeeks || []).filter((week) => s7Select.selected.has(week.week));
+  const s7Starved = (data.S7?.starvedWeeks || []).filter((week) => s7Select.selected.has(week.week));
   const s7StarvedShare = useMemo(() => {
     const numerator = s7Starved.reduce((sum, week) => sum + (week.numerator || 0), 0);
     const denominator = s7Starved.reduce((sum, week) => sum + (week.denominator || 0), 0);
     return shareOf(numerator, denominator);
   }, [s7Starved]);
-  const bucketMax = Math.max(...Object.values(s5Merged?.buckets || data.S5.buckets || { x: 1 }), 1);
+  const bucketMax = Math.max(...Object.values(s5Merged?.buckets || data.S5?.buckets || { x: 1 }), 1);
 
   return (
     <div className="space-y-4">
       <p className="text-sm text-gray-600">Who is answering surveys, how often, and where people stop.</p>
       <div className="grid sm:grid-cols-3 gap-4">
-        <Mini label="Unique responders, last 28 days" value={shareText(data.S4.rolling28, false, denomLabel)} sub={`${data.S4.rolling28.from} to ${data.S4.rolling28.to}`} />
-        <Mini label="Average per complete day" value={num(data.S4.dailyAverage)} sub="Today is left out" tone="info" />
-        <Mini label="This week so far" value={int(data.S4.inProgressWeek.users)} sub="In progress, not in the average" tone="info" />
+        <Mini label="Unique responders, last 28 days" value={shareText(data.S4?.rolling28, false, denomLabel)} sub={data.S4?.rolling28 ? `${data.S4.rolling28.from} to ${data.S4.rolling28.to}` : ''} />
+        <Mini label="Average per complete day" value={num(data.S4?.dailyAverage)} sub="Today is left out" tone="info" />
+        <Mini label="This week so far" value={int(data.S4?.inProgressWeek?.users)} sub="In progress, not in the average" tone="info" />
       </div>
-      <Card metricId="S4" title="Last 14 complete days" summary="People who finished a survey on each of the last 14 complete days." note={data.S4.gaps?.[0]}>
+      <Card metricId="S4" title="Last 14 complete days" summary="People who finished a survey on each of the last 14 complete days." note={data.S4?.gaps?.[0]}>
         <HybridPeopleShareChart
           rows={recentDays}
           xKey="day"
@@ -409,7 +415,7 @@ export function Surveys({ data }) {
           rateLabel={`Share of ${denomLabel}`}
         />
       </Card>
-      {data.S4.weeks?.length ? (
+      {data.S4?.weeks?.length ? (
         <Card metricId="S4" title="Complete weeks" summary="People who finished a survey in each complete Nepal week. The current week is left out.">
           <HybridPeopleShareChart
             rows={data.S4.weeks}
@@ -421,7 +427,7 @@ export function Surveys({ data }) {
           />
         </Card>
       ) : null}
-      <Card metricId="S5" title="How answers are spread" summary="Whether a few people answer most of the surveys." note={`${data.S5.from} to ${data.S5.to}. ${data.S5.top10.note}`}>
+      <Card metricId="S5" title="How answers are spread" summary="Whether a few people answer most of the surveys." note={`${data.S5?.from || ''} to ${data.S5?.to || ''}. ${data.S5?.top10?.note || ''}`}>
         {s5Weeks.length ? (
           <WeekChecklist
             weeks={latestFirst(s5Weeks)}
@@ -436,7 +442,7 @@ export function Surveys({ data }) {
             <div className="grid sm:grid-cols-3 gap-3 mb-4">
               <Mini label="Top 10% share" value={shareText(s5Merged.top10, false, 'completions')} sub={`${int(s5Merged.top10.people)} of ${int(s5Merged.top10.of)} people`} />
               <Mini label="Survey-activated with none in selected weeks" value={int(s5Merged.zeroInPeriod)} />
-              <Mini label="Never survey-activated" value={int(data.S5.neverSurveyActivated)} sub={`of ${int(data.S5.effectiveAcquired)} acquired`} />
+              <Mini label="Never survey-activated" value={int(data.S5?.neverSurveyActivated)} sub={`of ${int(data.S5?.effectiveAcquired)} acquired`} />
             </div>
             <SimpleBarChart
               rows={Object.entries(s5Merged.buckets).map(([label, count]) => ({ label, count }))}
@@ -452,14 +458,14 @@ export function Surveys({ data }) {
           <p className="text-sm text-gray-500">Select one or more weeks.</p>
         )}
       </Card>
-      <Card metricId="S7" title="Survey supply" summary="Surveys that are live now, and people who have nothing left they can answer." note={data.S7.gaps?.join(' ')}>
+      <Card metricId="S7" title="Survey supply" summary="Surveys that are live now, and people who have nothing left they can answer." note={data.S7?.gaps?.join(' ')}>
         <div className="grid sm:grid-cols-3 gap-3 mb-4">
-          <Mini label="Live public surveys" value={int(data.S7.liveNow.public)} />
-          <Mini label="Live targeted surveys" value={int(data.S7.liveNow.targeted)} />
-          <Mini label="Published 15-day surveys" value={int(data.S7.liveNow.fifteenDayPublished)} />
+          <Mini label="Live public surveys" value={int(data.S7?.liveNow?.public)} />
+          <Mini label="Live targeted surveys" value={int(data.S7?.liveNow?.targeted)} />
+          <Mini label="Published 15-day surveys" value={int(data.S7?.liveNow?.fifteenDayPublished)} />
         </div>
         <MultiSeriesHybridChart
-          rows={data.S7.publishedWeeks || []}
+          rows={data.S7?.publishedWeeks || []}
           xKey="week"
           yLabel="Surveys published"
           yRightLabel="3-period average"
@@ -469,16 +475,16 @@ export function Surveys({ data }) {
         {s7Weeks.length ? (
           <div className="mt-4">
             <WeekChecklist
-              weeks={latestFirst(data.S7.starvedWeeks || [])}
+              weeks={latestFirst(data.S7?.starvedWeeks || [])}
               selected={s7Select.selected}
               onChange={s7Select.setSelected}
               defaultWeek={s7Select.defaultWeek}
               label="Nothing-left weeks"
             />
-            <p className="text-sm text-gray-700">Nothing left to answer: {s7Starved.length ? shareText(s7StarvedShare, false, 'recent responders') : (data.S7.starved.users ? shareText(data.S7.starved, false, 'recent responders') : data.S7.starved.note)}</p>
+            <p className="text-sm text-gray-700">Nothing left to answer: {s7Starved.length ? shareText(s7StarvedShare, false, 'recent responders') : (data.S7?.starved?.users ? shareText(data.S7.starved, false, 'recent responders') : data.S7?.starved?.note)}</p>
           </div>
         ) : (
-          <p className="text-sm text-gray-700 mt-4">Nothing left to answer: {data.S7.starved.users ? shareText(data.S7.starved, false, 'recent responders') : data.S7.starved.note}</p>
+          <p className="text-sm text-gray-700 mt-4">Nothing left to answer: {data.S7?.starved?.users ? shareText(data.S7.starved, false, 'recent responders') : data.S7?.starved?.note}</p>
         )}
       </Card>
       <SurveyVolume data={data} />

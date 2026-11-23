@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { adminAPI } from '../../../services/api';
+import { rememberReturnPath } from '../../../utils/auth';
+import { healthLoadFailureRedirect } from './healthAuthRedirect.js';
 import UserDetailDrawer from '../components/UserDetailDrawer.jsx';
 import { BackToTop } from './HealthChartKit.jsx';
 import { Activation } from './HealthActivation.jsx';
@@ -47,8 +49,10 @@ export default function AdminHealth() {
         })
         .catch((err) => {
           if (cancelled) return;
-          if (err.response?.status === 401 || err.response?.status === 403) {
-            navigate('/admin');
+          const redirect = healthLoadFailureRedirect(err.response?.status);
+          if (redirect) {
+            if (redirect.remember) rememberReturnPath(redirect.remember);
+            navigate(redirect.to, { replace: true, ...(redirect.state ? { state: redirect.state } : {}) });
             return;
           }
           if (!hasData) setError('The health counts could not be loaded.');

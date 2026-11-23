@@ -1,4 +1,4 @@
-pull the # Logs
+# Logs
 logs
 *.log
 npm-debug.log*
@@ -7,19 +7,37 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies and build output
 node_modules
 dist
 dist-ssr
+.vite
+.turbo
+.cache
+coverage
+
+# Env and secrets — never commit
 *.local
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.p12
+credentials.json
+service-account*.json
 
-# Editor directories and files
+# Hosting local state
+.vercel
+.netlify
+
+# Editor / OS
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+Thumbs.db
+Desktop.ini
 *.suo
 *.ntvs*
 *.njsproj

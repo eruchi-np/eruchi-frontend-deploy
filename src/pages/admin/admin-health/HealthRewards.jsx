@@ -311,36 +311,26 @@ function CreditUse({ data }) {
 }
 
 export function Rewards({ data }) {
-  const bucketMax = data.R2.available ? Math.max(...Object.values(data.R2.buckets), 1) : 1;
-  const r4Weeks = data.R4.weeks || [];
+  const bucketMax = data.R2?.available ? Math.max(...Object.values(data.R2.buckets || {}), 1) : 1;
+  const r4Weeks = data.R4?.weeks || [];
   const r4Select = useDefaultWeekSelection(r4Weeks);
   const r4Picked = r4Weeks.filter((week) => r4Select.selected.has(week.week));
   const r4Stages = useMemo(() => {
-    if (!r4Picked.length) return data.R4.stages || [];
+    if (!r4Picked.length) return data.R4?.stages || [];
+    // Funnel stages are one-week coherent. Multi-week select uses the latest selected week only.
+    const latest = [...r4Picked].sort((a, b) => String(a.week).localeCompare(String(b.week))).at(-1);
     const ids = ['eligible', 'eligibleOnline', 'shop', 'voucher', 'buyTap', 'purchased', 'redeemed'];
-    const counts = Object.fromEntries(ids.map((id) => [id, 0]));
-    for (const week of r4Picked) {
-      for (const stage of week.stages || []) counts[stage.id] = (counts[stage.id] || 0) + (stage.count || 0);
-    }
-    // Eligible should not be summed across weeks; use max/end-of-range style: take last selected week's eligible, sum activity stages.
-    const last = r4Picked[r4Picked.length - 1];
-    const eligible = last?.stages?.find((stage) => stage.id === 'eligible')?.count ?? counts.eligible;
-    const online = counts.eligibleOnline;
-    const ordered = [
-      ['eligible', eligible],
-      ['eligibleOnline', online],
-      ['shop', counts.shop],
-      ['voucher', counts.voucher],
-      ['buyTap', counts.buyTap],
-      ['purchased', counts.purchased],
-      ['redeemed', counts.redeemed],
-    ];
+    const byId = Object.fromEntries((latest?.stages || []).map((stage) => [stage.id, stage.count || 0]));
+    const ordered = ids.map((id) => [id, byId[id] || 0]);
     return ordered.map(([id, count], index, all) => ({
       id,
       count,
       ofPrevious: index === 0 ? null : shareOf(count, all[index - 1][1]),
     }));
-  }, [r4Picked, data.R4.stages]);
+  }, [r4Picked, data.R4?.stages]);
+  const r4MultiWeekNote = r4Picked.length > 1
+    ? 'More than one week is selected, so the funnel uses the latest selected week only.'
+    : null;
   const priceLabel = data.R2.available
     ? `${int(data.R2.price)} credits${data.R2.priceTitle ? ` · ${data.R2.priceTitle}` : ''}${data.R2.priceBusiness ? ` (${data.R2.priceBusiness})` : ''}`
     : null;
@@ -378,7 +368,7 @@ export function Rewards({ data }) {
       ) : (
         <Card metricId="R2" title="Balance and eligibility" summary="Credit balances compared with the cheapest voucher."><p className="text-sm text-gray-600">{data.R2.note}</p></Card>
       )}
-      <Card metricId="R4" title="Reward funnel" summary="From being able to afford a voucher, through the shop and a purchase, to redeeming it. Each share is of the previous step." note={data.R4.gaps?.join(' ')}>
+      <Card metricId="R4" title="Reward funnel" summary="From being able to afford a voucher, through the shop and a purchase, to redeeming it. Each share is of the previous step." note={[r4MultiWeekNote, ...(data.R4?.gaps || [])].filter(Boolean).join(' ')}>
         {r4Weeks.length ? (
           <WeekChecklist
             weeks={latestFirst(r4Weeks)}
@@ -399,7 +389,7 @@ export function Rewards({ data }) {
             />
           ))}
         </div>
-        {data.R4.months?.length ? (
+        {data.R4?.months?.length ? (
           <div className="mt-4 overflow-x-auto">
             <table className="w-full text-sm">
               <thead>

@@ -24,6 +24,8 @@ export const displayName = (row) => {
   return full || row.username || row.userId || '';
 };
 
+/** Fallback when the snapshot has no server cutoff (older payloads). */
 export const RETENTION_WEEK_CUTOFF = '2026-06-18';
 
-export const afterRetentionCutoff = (week) => String(week || '') > RETENTION_WEEK_CUTOFF;
+export const afterRetentionCutoff = (week, cutoff = RETENTION_WEEK_CUTOFF) =>
+  String(week || '') > String(cutoff || RETENTION_WEEK_CUTOFF);
