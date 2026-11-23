@@ -124,7 +124,7 @@ export default function useStandaloneSurvey({
       try {
         const res = isSprint
           ? await fifteenDaySurveyAPI.getToTake(surveyId, sprintWave, { skipErrorToast: true })
-          : await sepSurveyAPI.getById(surveyId);
+          : await sepSurveyAPI.getById(surveyId, { skipErrorToast: true });
         if (cancelled) return;
         setSurvey(res.data.data);
 

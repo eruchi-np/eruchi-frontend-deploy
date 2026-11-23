@@ -97,30 +97,29 @@ export default function SurveySettings({
                 />
               </div>
 
-              {isSprint ? (
-                <div className="rounded-xl border border-gray-200 p-4">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(formData.isPoll)}
-                      disabled={structureLocked}
-                      onChange={(e) => handleInputChange('isPoll', e.target.checked)}
-                      className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                    />
-                    <span>
-                      <span className="block text-sm font-semibold text-gray-900">
-                        Quick poll
-                      </span>
-                      <span className="block text-xs text-gray-500 mt-0.5">
-                        One single-choice question on the survey list. Does not count toward streaks.
-                      </span>
-                    </span>
-                  </label>
-                </div>
-              ) : null}
-
               {!isSprint && (
               <>
+              <div className="rounded-xl border border-gray-200 p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(formData.isPoll)}
+                    disabled={structureLocked}
+                    onChange={(e) => handleInputChange('isPoll', e.target.checked)}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span>
+                    <span className="block text-sm font-semibold text-gray-900">
+                      Quick poll
+                    </span>
+                    <span className="block text-xs text-gray-500 mt-0.5">
+                      One single-choice question on the survey list. Does not count toward streaks.
+                    </span>
+                  </span>
+                </label>
+              </div>
+
+              {!formData.isPoll ? (
               <div>
                 <label className="block text-sm font-semibold text-gray-900 mb-2">
                   Survey type
@@ -149,6 +148,7 @@ export default function SurveySettings({
                   })}
                 </div>
               </div>
+              ) : null}
 
               {/* Visibility selector */}
               <div>

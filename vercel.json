@@ -1,15 +1,12 @@
 {
-    "outputDirectory":  "dist",
-    "buildCommand":  "npm run build",
-    "rewrites":  [
-                     {
-                         "source":  "/api/:path*",
-                         "destination":  "https://api.eruchi.com.np/api/:path*"
-                     },
-                     {
-                         "source":  "/((?!api/|assets/).*)",
-                         "destination":  "/index.html"
-                     }
-                 ],
-    "framework":  "vite"
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://api.eruchi.com.np/api/:path*"
+    },
+    {
+      "source": "/((?!api/|assets/).*)",
+      "destination": "/index.html"
+    }
+  ]
 }

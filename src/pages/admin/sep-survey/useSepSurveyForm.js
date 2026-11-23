@@ -291,8 +291,7 @@ export default function useSepSurveyForm() {
           credits: Number(current.credits),
           estimatedMinutes: minutes,
           questions,
-          hasLogic: current.isPoll ? false : formHasLogic(current),
-          isPoll: Boolean(current.isPoll),
+          hasLogic: formHasLogic(current),
         };
         let savedId = surveyId;
         if (surveyId) {
@@ -356,6 +355,7 @@ export default function useSepSurveyForm() {
       const buildPayload = (publishedAt) => {
         const derivedEndDate = new Date(publishedAt);
         derivedEndDate.setDate(derivedEndDate.getDate() + availableDays);
+        const isPoll = Boolean(current.isPoll);
         return {
           title: trimmedTitle,
           hiddenName: String(current.hiddenName || '').trim(),
@@ -363,7 +363,8 @@ export default function useSepSurveyForm() {
           status,
           credits: Number(current.credits),
           estimatedMinutes: minutes,
-          kind: current.kind === 'daily' ? 'daily' : 'normal',
+          kind: isPoll ? 'normal' : (current.kind === 'daily' ? 'daily' : 'normal'),
+          isPoll,
           startDate: publishedAt.toISOString(),
           endDate: needsWindow ? derivedEndDate.toISOString() : null,
           visibility: current.visibility,
@@ -373,7 +374,7 @@ export default function useSepSurveyForm() {
           clusterIds: current.visibility === 'targeted' ? current.clusterIds : [],
           clusterSendAt,
           questions,
-          hasLogic: formHasLogic(current),
+          hasLogic: isPoll ? false : formHasLogic(current),
         };
       };
 

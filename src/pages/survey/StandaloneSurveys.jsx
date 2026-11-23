@@ -57,12 +57,8 @@ export default function StandaloneSurveys() {
   const [showFirstSurveyNudge, setShowFirstSurveyNudge] = useState(false);
 
   const pollSurveys = useMemo(
-    () => sprintSurveys.filter((survey) => survey.isPoll),
-    [sprintSurveys]
-  );
-  const sprintRows = useMemo(
-    () => sprintSurveys.filter((survey) => !survey.isPoll),
-    [sprintSurveys]
+    () => surveys.filter((survey) => survey.isPoll),
+    [surveys]
   );
 
   const setListParams = useCallback(
@@ -198,12 +194,16 @@ export default function StandaloneSurveys() {
   }, [user, retryTick]);
 
   const filteredCatalog = useMemo(() => {
-    const items = surveys.filter(isSurveyOpen).filter((survey) => survey.kind !== "daily");
+    const items = surveys
+      .filter(isSurveyOpen)
+      .filter((survey) => !survey.isPoll && survey.kind !== "daily");
     return sortSurveys(items, sortOrder);
   }, [sortOrder, surveys]);
 
   const dailyCatalog = useMemo(() => {
-    const items = surveys.filter(isSurveyOpen).filter((survey) => survey.kind === "daily");
+    const items = surveys
+      .filter(isSurveyOpen)
+      .filter((survey) => !survey.isPoll && survey.kind === "daily");
     return sortSurveys(items, sortOrder);
   }, [sortOrder, surveys]);
 
@@ -250,11 +250,9 @@ export default function StandaloneSurveys() {
   };
 
   const handlePollVoted = useCallback((survey, data) => {
-    setSprintSurveys((prev) =>
+    setSurveys((prev) =>
       prev.map((item) => {
-        if (String(item._id) !== String(survey._id) || item.wave !== survey.wave) {
-          return item;
-        }
+        if (String(item._id) !== String(survey._id)) return item;
         return {
           ...item,
           poll: data?.poll || {
@@ -322,7 +320,7 @@ export default function StandaloneSurveys() {
               <div className="mb-10">
                 {pollSurveys.map((survey) => (
                   <QuickPoll
-                    key={`poll-${survey._id}-${survey.wave}`}
+                    key={`poll-${survey._id}`}
                     survey={survey}
                     onVoted={handlePollVoted}
                   />
@@ -330,7 +328,7 @@ export default function StandaloneSurveys() {
               </div>
             ) : null}
             {!user?.profileSurveyBlocked ? <ProfileSurveySection /> : null}
-            {!user?.profileSurveyBlocked && !loading && sprintRows.length > 0 ? (
+            {!user?.profileSurveyBlocked && !loading && sprintSurveys.length > 0 ? (
               <div className="mb-12">
                 <div className="shop-head mb-6">
                   <div>
@@ -348,7 +346,7 @@ export default function StandaloneSurveys() {
                   </div>
                 </div>
                 <div className="surveys-list">
-                  {sprintRows.map((survey) => (
+                  {sprintSurveys.map((survey) => (
                     <SurveyRow key={`${survey._id}-${survey.wave}`} survey={survey} onView={openSurvey} />
                   ))}
                 </div>

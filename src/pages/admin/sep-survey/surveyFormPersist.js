@@ -87,7 +87,7 @@ export const validateSurveyForm = (
   }
 
   if (formData.isPoll) {
-    if (!isSprint) return fail('Polls are only for Daily Sprint surveys');
+    if (isSprint) return fail('Quick polls are for SEP surveys, not Daily Sprint');
     if (formData.questions.length !== 1) return fail('A poll can only have one question');
     const pollQuestion = formData.questions[0];
     if (pollQuestion.questionType !== 'single_checkbox') {

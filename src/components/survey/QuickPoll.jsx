@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { fifteenDaySurveyAPI } from "../../services/api";
+import { sepSurveyAPI } from "../../services/api";
 import { healthSessionId } from "../../utils/healthEvents";
 
 function formatVotes(total) {
@@ -24,7 +24,7 @@ function CheckIcon() {
 }
 
 /**
- * Inline Daily Sprint quick poll on /standalone-surveys.
+ * Inline SEP quick poll on /standalone-surveys.
  * One tap votes; results replace the options in place.
  */
 export default function QuickPoll({ survey, onVoted }) {
@@ -53,13 +53,11 @@ export default function QuickPoll({ survey, onVoted }) {
     setBusy(true);
     try {
       const responses = { [questionText]: label };
-      const wave = Number(survey.wave) >= 1 ? Number(survey.wave) : 1;
       const sessionId = healthSessionId() || undefined;
-      const res = await fifteenDaySurveyAPI.submit(
+      const res = await sepSurveyAPI.submit(
         survey._id,
         responses,
         null,
-        wave,
         sessionId,
         { skipErrorToast: true }
       );
@@ -127,7 +125,7 @@ export default function QuickPoll({ survey, onVoted }) {
             <p className="qp-hint">Tap an answer to see what everyone else picked.</p>
           ) : (
             <>
-              <p className="qp-hint">Thanks for voting. A new poll arrives tomorrow.</p>
+              <p className="qp-hint">Thanks for voting.</p>
               <div className="qp-foot qp-foot-side">
                 {results?.showCount ? (
                   <span>{formatVotes(results.total)} votes</span>

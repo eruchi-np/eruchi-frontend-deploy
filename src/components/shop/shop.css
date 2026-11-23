@@ -1281,6 +1281,7 @@ button.shop-card-back-title {
   position: absolute;
   top: 14px;
   right: 14px;
+  z-index: 3;
   width: 32px;
   height: 32px;
   border: 0;

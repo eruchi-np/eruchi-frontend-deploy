@@ -88,8 +88,9 @@ const CreateSepSurvey = () => {
   const summaryItems = [
     { label: 'Title', value: formData.title?.trim() || '—' },
     { label: 'Description', value: descriptionPreview },
-    ...(!isSprint ? [{ label: 'Survey type', value: kindLabel }] : []),
-    ...(isSprint ? [{ label: 'Format', value: formData.isPoll ? 'Quick poll' : 'Survey' }] : []),
+    ...(!isSprint
+      ? [{ label: 'Format', value: formData.isPoll ? 'Quick poll' : kindLabel }]
+      : []),
     ...(!isSprint ? [{ label: 'Visibility', value: visibilityLabel }] : []),
     { label: 'Status', value: statusLabel },
     { label: 'Credits', value: String(formData.credits ?? 0) },
