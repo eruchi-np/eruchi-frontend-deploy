@@ -22,12 +22,6 @@ const PUBLIC_PAGES = [
     index: true,
   },
   {
-    test: (path) => path === '/for-business',
-    title: 'For businesses',
-    description: 'Become an eRuchi merchant and reach customers who share real product feedback.',
-    index: true,
-  },
-  {
     test: (path) => path === '/faqs',
     title: 'FAQs',
     description: 'Answers to common questions about eRuchi surveys, credits, and rewards.',

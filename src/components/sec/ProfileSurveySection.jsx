@@ -65,7 +65,7 @@ export default function ProfileSurveySection() {
                 if (item.code === 'PC2') navigate(openSecPath(item));
               }}
             >
-              open
+              view
             </button>
           </article>
         ))}

@@ -26,7 +26,7 @@ const COPY = {
 
 const SecProfile = ({ mode = 'first' }) => {
   const navigate = useNavigate();
-  const { logout, refreshUser, user } = useAuth();
+  const { refreshUser, user } = useAuth();
   const copy = COPY[mode] || COPY.first;
 
   const done = async (awarded = 0) => {
@@ -46,12 +46,7 @@ const SecProfile = ({ mode = 'first' }) => {
   };
 
   return (
-    <OnboardingShell
-      onLogout={async () => {
-        await logout();
-        navigate('/login', { replace: true });
-      }}
-    >
+    <OnboardingShell footer={false}>
       <div className="onboard-card">
         {copy.credits > 0 ? (
           <div className="onboard-kicker">

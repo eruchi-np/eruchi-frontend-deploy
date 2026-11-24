@@ -30,7 +30,6 @@ import PushPrompt from './components/notifications/PushPrompt';
 import PwaPrompt from './components/notifications/PwaPrompt';
 
 const Homepage = lazy(() => import('./pages/public/Homepage'));
-const ForBusiness = lazy(() => import('./pages/public/ForBusiness.jsx'));
 const FAQs = lazy(() => import('./pages/public/FAQs.jsx'));
 const Signup = lazy(() => import('./pages/auth/Signup'));
 const Login = lazy(() => import('./pages/auth/Login'));
@@ -147,7 +146,10 @@ function AppChrome({ children }) {
       <BusinessAccessGuard />
       <div className={`min-w-0 max-w-full ${overlayNav || isSurveyTake ? 'overflow-x-clip' : 'overflow-x-hidden'}`}>
         {children}
-        {!isHome && !isProfile && !isShop && !isSurveys && !isSurveyTake && !isSurveyComplete && !isBusiness && !isBrand && !isOnboarding && <Footer />}
+        {pathname === '/faqs' ? <Footer /> : null}
+        {pathname !== '/' && pathname !== '/faqs' && !isBusiness && !isBrand && !hideNav ? (
+          <div className="h-[calc(5.25rem+env(safe-area-inset-bottom))] md:hidden" aria-hidden="true" />
+        ) : null}
       </div>
     </>
   );
@@ -227,7 +229,6 @@ function App() {
             <Route path="/reset-password/:token" element={<ResetPasswordToken />} />
             <Route path="/unsubscribe" element={<Unsubscribe />} />
             <Route path="/" element={<Homepage />} />
-            <Route path="/for-business" element={<ForBusiness />} />
            <Route path="/faqs" element={<FAQs />} />
            <Route path="/email-verification" element={<EmailVerificationPending />} />
             <Route path="/verify-email/:token" element={<VerifyEmail />} />

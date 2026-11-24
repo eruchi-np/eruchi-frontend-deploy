@@ -1,7 +1,6 @@
 import React, { useEffect } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import VoucherRedeemModal from "../../components/widgets/VoucherRedeemModal";
-import HomeFooter from "../../components/homepage/HomeFooter";
 import RewardCard from "../../components/shop/RewardCard";
 import SurveyRow from "../../components/survey/SurveyRow";
 import { useAuth } from "../../context/AuthContext";
@@ -283,8 +282,6 @@ export default function SurveyComplete() {
           </div>
         </div>
       </div>
-
-      <HomeFooter />
 
       {selectedOffer && (
         <VoucherRedeemModal

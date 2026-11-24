@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { secAPI } from '../../services/api';
 import ConfirmSame, { valuesMatch } from '../demographics/ConfirmSame';
@@ -58,6 +59,7 @@ function questionHeading(id, text) {
 }
 
 const SecSurvey = ({ mode = 'first', onComplete }) => {
+  const navigate = useNavigate();
   const isRefresh = mode === 'refresh';
   const isEdit = mode === 'edit';
   const [spec, setSpec] = useState(null);
@@ -75,6 +77,7 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
   const [stepId, setStepId] = useState(null);
   const stepPinned = useRef(false);
   const questionAnchorRef = useRef(null);
+  const actionsRef = useRef(null);
   const skipQuestionScroll = useRef(true);
 
   useEffect(() => {
@@ -178,6 +181,27 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
     return () => window.cancelAnimationFrame(frame);
   }, [qid]);
 
+  useEffect(() => {
+    if (qid !== 'OCC') return undefined;
+    const actions = actionsRef.current;
+    if (!actions) return undefined;
+    const bringIntoView = () => {
+      const rect = actions.getBoundingClientRect();
+      const view = window.visualViewport;
+      const height = view?.height ?? window.innerHeight;
+      const offset = view?.offsetTop ?? 0;
+      const bottom = rect.bottom - offset;
+      const top = rect.top - offset;
+      if (bottom > height - 16 || top < 16) {
+        actions.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'smooth' });
+      }
+    };
+    const frame = window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(bringIntoView);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [qid]);
+
   const screenIds = qid ? screenIdsFor(qid) : [];
   const progress = spec
     ? (isEdit
@@ -228,14 +252,19 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
       setSoftCheck(false);
       return;
     }
-    if (!spec) return;
+    if (!spec) {
+      navigate(-1);
+      return;
+    }
     if (isEdit) {
-      setEditCursor((c) => Math.max(0, c - 1));
+      if (editCursor <= 0) navigate(-1);
+      else setEditCursor((c) => Math.max(0, c - 1));
       return;
     }
     const current = qid ? screenIdsFor(qid)[0] : null;
     const idx = screens.indexOf(current);
     if (idx > 0) setStepId(screens[idx - 1]);
+    else navigate(-1);
   };
 
   const submit = async () => {
@@ -338,7 +367,7 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
   if (softCheck) {
     return (
       <div>
-        <div className="onboard-progress" aria-hidden="true">
+        <div className="onboard-progress is-blue" aria-hidden="true">
           <span style={{ width: '100%' }} />
         </div>
         <p className="onboard-copy" style={{ marginTop: '1rem' }}>
@@ -347,7 +376,7 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
         </p>
         {error ? <p className="onboard-error">{error}</p> : null}
         <div className="onboard-actions">
-          <button type="button" className="home-pill home-pill-navy" disabled={submitting} onClick={submit}>
+          <button type="button" className="home-pill home-pill-blue" disabled={submitting} onClick={submit}>
             Yes, that is right
           </button>
           <button
@@ -375,7 +404,7 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
       <div>
         <p className="onboard-copy">Ready to save your answers.</p>
         {error ? <p className="onboard-error">{error}</p> : null}
-        <button type="button" className="home-pill home-pill-lg home-pill-navy" disabled={submitting} onClick={submit}>
+        <button type="button" className="home-pill home-pill-lg home-pill-blue" disabled={submitting} onClick={submit}>
           {submitting ? 'Saving…' : 'Submit'}
         </button>
       </div>
@@ -388,7 +417,7 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
   return (
     <div>
       <div
-        className="onboard-progress"
+        className="onboard-progress is-blue"
         role="progressbar"
         aria-valuenow={Math.round(progress * 100)}
         aria-valuemin={0}
@@ -431,7 +460,7 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
                     <OptionPill
                       key={opt.code}
                       label={opt.label}
-                      help={opt.help}
+                      help={id === 'HH1' && (opt.code === 'AWAY_FROM_FAMILY' || opt.code === 'OWN_HOUSEHOLD') ? null : opt.help}
                       selected={selected}
                       onClick={() => {
                         if (q.type === 'multi') toggleMulti(id, opt.code, opt.exclusive);
@@ -465,13 +494,13 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
 
       {error ? <p className="onboard-error" role="alert">{error}</p> : null}
 
-      <div className="onboard-actions mt-10 pt-6 border-t border-[#eef1f4]">
+      <div ref={actionsRef} className="onboard-actions mt-10 pt-6 border-t border-[#eef1f4]">
         <button type="button" className="home-pill home-pill-outline" onClick={goBack}>
           Back
         </button>
         <button
           type="button"
-          className="home-pill home-pill-lg home-pill-lime"
+          className="home-pill home-pill-lg home-pill-blue"
           disabled={!screenReady() || submitting}
           onClick={continueNext}
         >

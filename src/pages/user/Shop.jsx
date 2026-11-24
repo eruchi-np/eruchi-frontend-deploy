@@ -5,7 +5,6 @@ import { userAPI, voucherAPI } from "../../services/api";
 import VoucherRedeemModal from "../../components/widgets/VoucherRedeemModal";
 import RewardCard from "../../components/shop/RewardCard";
 import CreditArc, { pageWindow } from "../../components/shop/CreditArc";
-import HomeFooter from "../../components/homepage/HomeFooter";
 import { flipShopCatalog, initShopCinema, scrollShopToCatalog } from "../../components/shop/shopCinema";
 import { useAuth } from "../../context/AuthContext";
 import { rememberReturnPath } from "../../utils/auth";
@@ -509,8 +508,6 @@ export default function Shop() {
         </div>
       </div>
       </div>
-
-      <HomeFooter />
 
       {selectedOffer && (
         <VoucherRedeemModal

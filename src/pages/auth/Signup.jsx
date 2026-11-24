@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
@@ -12,6 +12,7 @@ import GoogleOAuthHint from "../../components/auth/GoogleOAuthHint";
 import GoogleSignInButton from "../../components/auth/GoogleSignInButton";
 import { consumeIncompleteGoogleOAuthAttempt } from "../../utils/googleOAuth";
 import OnboardingShell from "../../components/onboarding/OnboardingShell";
+import FieldReveal from "../../components/onboarding/FieldReveal";
 import { readAcquisition } from "../../utils/acquisition";
 import { readVisitorId } from "../../utils/healthEvents";
 import { digitsOnly, storeReferralCode } from "../../utils/referral";
@@ -43,75 +44,6 @@ const formSchema = z
     message: "Passwords do not match",
     path: ["confirmPassword"],
   });
-
-const scrollRevealIntoView = (node) => {
-  if (!node || !window.matchMedia("(max-width: 720px)").matches) return;
-  const rect = node.getBoundingClientRect();
-  const viewport = window.visualViewport;
-  const offset = viewport?.offsetTop ?? 0;
-  const height = viewport?.height ?? window.innerHeight;
-  const top = rect.top - offset;
-  const bottom = rect.bottom - offset;
-  if (bottom > height - 16 || top < 16) {
-    node.scrollIntoView({ behavior: "smooth", block: "nearest" });
-  }
-};
-
-function FieldReveal({ open, children }) {
-  const nodeRef = useRef(null);
-  const innerRef = useRef(null);
-  const wasOpen = useRef(open);
-
-  useLayoutEffect(() => {
-    const node = nodeRef.current;
-    const inner = innerRef.current;
-    if (!node || !inner) return;
-    if (open) node.removeAttribute("inert");
-    else node.setAttribute("inert", "");
-    node.style.height = open ? `${inner.scrollHeight}px` : "0px";
-  }, [open]);
-
-  useEffect(() => {
-    const node = nodeRef.current;
-    const inner = innerRef.current;
-    if (!node || !inner || !open) return undefined;
-    const observer = new ResizeObserver(() => {
-      const next = `${inner.scrollHeight}px`;
-      if (node.style.height !== next) node.style.height = next;
-    });
-    observer.observe(inner);
-    return () => observer.disconnect();
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || wasOpen.current) {
-      wasOpen.current = open;
-      return undefined;
-    }
-    wasOpen.current = open;
-    const node = nodeRef.current;
-    if (!node) return undefined;
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      scrollRevealIntoView(node);
-      return undefined;
-    }
-    const timer = window.setTimeout(() => scrollRevealIntoView(node), 480);
-    return () => window.clearTimeout(timer);
-  }, [open]);
-
-  return (
-    <div
-      ref={nodeRef}
-      className={`onboard-reveal${open ? " is-open" : ""}`}
-      aria-hidden={open ? undefined : true}
-      {...(!open ? { inert: "" } : {})}
-    >
-      <div className="onboard-reveal-inner" ref={innerRef}>
-        <div className="onboard-reveal-stack">{children}</div>
-      </div>
-    </div>
-  );
-}
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -214,7 +146,7 @@ const Signup = () => {
       <div className="onboard-card onboard-card--auth">
         <div className="onboard-auth-head">
           <h1 className="onboard-title onboard-title--signup">
-            Ready to earn easy <span className="onboard-title-accent">rewards?</span>
+            Ready to earn easy <span className="onboard-title-accent">rewards</span><span className="onboard-title-mark">?</span>
           </h1>
           <p className="onboard-copy">First step is to create your eRuchi account.</p>
         </div>

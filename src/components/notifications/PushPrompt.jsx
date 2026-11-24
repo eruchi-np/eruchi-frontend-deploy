@@ -7,13 +7,13 @@ import {
   dismissPushPrompt,
   getPushPermission,
   canOpenSurveys,
-  isOneSignalConfigured,
+  isPushConfigured,
   isPushOptedIn,
   isPushPilotEligible,
   isWebPushSupported,
   requestPushSubscription,
   wasPushPromptDismissed,
-} from '../../utils/oneSignal';
+} from '../../utils/pushClient';
 import { healthSessionId, trackHealthEvent } from '../../utils/healthEvents';
 import { reportPushOptIn } from '../../utils/pushOptIn';
 import './pushPrompt.css';
@@ -46,7 +46,7 @@ export default function PushPrompt() {
       setVisible(false);
       return;
     }
-    if (!isOneSignalConfigured() || loading || !canOpenSurveys(user)) {
+    if (!isPushConfigured() || loading || !canOpenSurveys(user)) {
       setVisible(false);
       return;
     }

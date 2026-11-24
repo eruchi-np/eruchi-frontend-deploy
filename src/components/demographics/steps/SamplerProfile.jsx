@@ -99,7 +99,7 @@ const languageOptions = [
         <span>Step 1 of 3</span>
         <strong>About You</strong>
       </div>
-      <div className="onboard-progress">
+      <div className="onboard-progress is-blue">
         <span style={{ width: "33%" }} />
       </div>
     </div>

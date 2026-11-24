@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { Instagram, Linkedin } from "lucide-react";
-import { INSTAGRAM_URL, LINKEDIN_URL, SUPPORT_EMAIL } from "../../utils/siteConfig";
+import { INSTAGRAM_URL, LINKEDIN_JOBS_URL, LINKEDIN_URL, SUPPORT_EMAIL } from "../../utils/siteConfig";
 import "./homepage.css";
 
 function FooterCol({ title, links }) {
@@ -12,7 +12,12 @@ function FooterCol({ title, links }) {
         {links.map((item) => (
           <li key={item.label}>
             {item.href ? (
-              <a href={item.href}>{item.label}</a>
+              <a
+                href={item.href}
+                {...(item.href.startsWith("mailto:") ? {} : { target: "_blank", rel: "noreferrer" })}
+              >
+                {item.label}
+              </a>
             ) : (
               <Link to={item.to}>{item.label}</Link>
             )}
@@ -54,8 +59,8 @@ export default function HomeFooter() {
           title="Company"
           links={[
             { label: "About", to: "/faqs" },
-            { label: "Careers", href: `mailto:${SUPPORT_EMAIL}?subject=Careers` },
-            { label: "Contact", href: `mailto:${SUPPORT_EMAIL}` },
+            { label: "Careers", href: LINKEDIN_JOBS_URL },
+            { label: "Contact", to: "/faqs#contact" },
           ]}
         />
         <FooterCol

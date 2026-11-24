@@ -361,7 +361,7 @@ export default function useSepSurveyForm() {
           hiddenName: String(current.hiddenName || '').trim(),
           description: trimmedDesc,
           status,
-          credits: Number(current.credits),
+          credits: isPoll ? 0 : Number(current.credits),
           estimatedMinutes: minutes,
           kind: isPoll ? 'normal' : (current.kind === 'daily' ? 'daily' : 'normal'),
           isPoll,
@@ -539,6 +539,7 @@ export default function useSepSurveyForm() {
         return {
           ...prev,
           isPoll: true,
+          credits: 0,
           questions: [ensurePollQuestion(first)],
         };
       });

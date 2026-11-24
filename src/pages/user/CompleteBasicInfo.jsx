@@ -9,6 +9,7 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import OnboardingShell from "../../components/onboarding/OnboardingShell";
 import CreditRewardBadge from "../../components/onboarding/CreditRewardBadge";
+import FieldReveal from "../../components/onboarding/FieldReveal";
 import { BASIC_DETAILS_CREDITS } from "../../utils/onboardingCredits";
 import {
   caretAfterNepalPhoneFormat,
@@ -50,11 +51,10 @@ const schema = z.object({
 });
 
 const CompleteBasicInfo = () => {
-  const { user, refreshUser, loading: authLoading, logout } = useAuth();
+  const { user, refreshUser, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [loggingOut, setLoggingOut] = useState(false);
   const storedReferral = readStoredReferralCode();
   const [hasReferral, setHasReferral] = useState(storedReferral ? "yes" : "no");
   const [referralCode, setReferralCode] = useState(storedReferral);
@@ -181,16 +181,6 @@ const CompleteBasicInfo = () => {
     }
   };
 
-  const handleLogout = async () => {
-    setLoggingOut(true);
-    try {
-      await logout();
-      navigate("/login", { replace: true });
-    } finally {
-      setLoggingOut(false);
-    }
-  };
-
   if (authLoading) {
     return (
       <OnboardingShell footer={false}>
@@ -202,7 +192,7 @@ const CompleteBasicInfo = () => {
   }
 
   return (
-    <OnboardingShell onLogout={handleLogout} loggingOut={loggingOut || submitting}>
+    <OnboardingShell footer={false}>
       <div className="onboard-card">
         <div className="onboard-kicker">
           <CreditRewardBadge amount={BASIC_DETAILS_CREDITS} />
@@ -275,48 +265,50 @@ const CompleteBasicInfo = () => {
           </div>
 
           {canEnterReferral && (
-            <div className="onboard-field">
-              <label>Do you have a referral code?</label>
-              <div className="onboard-tabs" role="group" aria-label="Do you have a referral code?">
-                <button
-                  type="button"
-                  className={`onboard-tab ${hasReferral === "no" ? "is-on" : ""}`}
-                  onClick={() => {
-                    setHasReferral("no");
-                    clearStoredReferralCode();
-                  }}
-                >
-                  No
-                </button>
-                <button
-                  type="button"
-                  className={`onboard-tab ${hasReferral === "yes" ? "is-on" : ""}`}
-                  onClick={() => setHasReferral("yes")}
-                >
-                  Yes
-                </button>
+            <div className="onboard-referral">
+              <div className="onboard-field">
+                <label>Do you have a referral code?</label>
+                <div className="onboard-tabs" role="group" aria-label="Do you have a referral code?">
+                  <button
+                    type="button"
+                    className={`onboard-tab ${hasReferral === "no" ? "is-on" : ""}`}
+                    onClick={() => {
+                      setHasReferral("no");
+                      clearStoredReferralCode();
+                    }}
+                  >
+                    No
+                  </button>
+                  <button
+                    type="button"
+                    className={`onboard-tab ${hasReferral === "yes" ? "is-on" : ""}`}
+                    onClick={() => setHasReferral("yes")}
+                  >
+                    Yes
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-
-          {canEnterReferral && hasReferral === "yes" && (
-            <div className={`onboard-field ${submitError && digitsOnly(referralCode).length !== 6 ? "is-error" : ""}`}>
-              <label htmlFor="referralCode">Referral code</label>
-              <input
-                id="referralCode"
-                type="text"
-                inputMode="numeric"
-                autoComplete="off"
-                maxLength={6}
-                placeholder="6-digit code"
-                value={referralCode}
-                onChange={(event) => {
-                  const next = digitsOnly(event.target.value);
-                  setReferralCode(next);
-                  storeReferralCode(next);
-                }}
-              />
-              <p className="onboard-hint">You get 10 extra credits with this code.</p>
+              <FieldReveal open={hasReferral === "yes"}>
+                <div className={`onboard-field ${submitError && digitsOnly(referralCode).length !== 6 ? "is-error" : ""}`}>
+                  <label htmlFor="referralCode">Referral code</label>
+                  <input
+                    id="referralCode"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={6}
+                    placeholder="6-digit code"
+                    tabIndex={hasReferral === "yes" ? undefined : -1}
+                    value={referralCode}
+                    onChange={(event) => {
+                      const next = digitsOnly(event.target.value);
+                      setReferralCode(next);
+                      storeReferralCode(next);
+                    }}
+                  />
+                  <p className="onboard-hint">You get 10 extra credits with this code.</p>
+                </div>
+              </FieldReveal>
             </div>
           )}
 

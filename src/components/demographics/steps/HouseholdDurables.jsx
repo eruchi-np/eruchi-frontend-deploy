@@ -3,6 +3,13 @@ import { HelpCircle, Check } from 'lucide-react';
 import EnhancedSelect from '../ui/EnhancedSelect';
 import ConfirmSame from '../ConfirmSame';
 
+const earnerEducationLabel = (earner) => {
+  if (earner === "Other guardian or relative") {
+    return "What is the highest level of completed education completed by this guardian or relative?";
+  }
+  return `What is the highest level of completed education completed by your ${earner}?`;
+};
+
 const HouseholdDurables = ({ formData, updateFormData, errors = {}, saved = null, confirmed = {}, onConfirm }) => {
   const [showTooltip, setShowTooltip] = useState(false);
 
@@ -63,9 +70,8 @@ const educationOptions = [
 
   return (
     <div className="onboard-step">
-      <h2>Household and Durables</h2>
-      <p className="onboard-copy">Tell us about your household assets and income source</p>
-      
+      <h2 className="onboard-step-lead">Household and Durables</h2>
+
       <div className="space-y-8">
         {/* Durable Goods Selection */}
         <div>
@@ -147,15 +153,15 @@ const educationOptions = [
 
         {/* Conditional Education Field */}
         {showEarnerEducation && (
-          <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-xl transition-all duration-300">
+          <div className="onboard-followup">
             <EnhancedSelect
               options={educationOptions}
               value={formData.earnerEducation}
               onChange={(value) => updateFormData('earnerEducation', value)}
               placeholder="Select education level"
-              label={`What is the highest level of completed education completed by ${formData.mainHouseholdEarner?.toLowerCase()}?`}
+              label={earnerEducationLabel(formData.mainHouseholdEarner)}
             />
-            
+
             {formData.earnerEducation && (
               <div className="mt-3 p-2 bg-green-50 border border-green-200 rounded-lg">
                 <div className="flex items-center">
@@ -170,37 +176,13 @@ const educationOptions = [
             <ConfirmSame saved={saved?.earnerEducation} value={formData.earnerEducation} confirmed={confirmed.earnerEducation} onConfirm={() => onConfirm?.('earnerEducation')} />
           </div>
         )}
-
-        {/* Summary Card */}
-        <div className="p-4 bg-gray-50 border border-gray-200 rounded-xl">
-          <h3 className="font-semibold text-gray-900 mb-3">Summary</h3>
-          <div className="space-y-2 text-sm text-gray-600">
-            <div>
-              <span className="font-medium">Durable goods selected:</span>{' '}
-              {formData.durableGoods && formData.durableGoods.length > 0 
-                ? formData.durableGoods.join(', ')
-                : 'None selected'
-              }
-            </div>
-            <div>
-              <span className="font-medium">Main household earner:</span>{' '}
-              {formData.mainHouseholdEarner || 'Not selected'}
-            </div>
-            {showEarnerEducation && (
-              <div>
-                <span className="font-medium">Earner's education:</span>{' '}
-                {formData.earnerEducation || 'Not selected'}
-              </div>
-            )}
-          </div>
-        </div>
       </div>
 
       <div className="onboard-step-meta">
         <span>Step 3 of 3</span>
         <strong>Household & Durables</strong>
       </div>
-      <div className="onboard-progress">
+      <div className="onboard-progress is-blue">
         <span style={{ width: "100%" }} />
       </div>
     </div>

@@ -24,6 +24,12 @@ const publishInstall = (event) => {
   listeners.forEach((fn) => fn(event));
 };
 
+/** Fires when the browser install offer arrives or is cleared. */
+export function onDeferredInstallChange(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeinstallprompt', (event) => {
     event.preventDefault();
@@ -80,9 +86,12 @@ const trackPwa = (event) => {
   });
 };
 
+const ANDROID_INSTALL_COPY = 'Improve your eRuchi experience by installing our web-app.';
+
 /**
  * Install card for browsers that offer Add to Home Screen.
- * Shown to signed-in customers. Android survey-complete keeps the notification card.
+ * Shown to signed-in customers. On Android the sentence below replaces the
+ * subscribe sheet for that visit. Survey-complete keeps the notification card.
  */
 export default function PwaPrompt() {
   const { user, loading } = useAuth();
@@ -124,6 +133,8 @@ export default function PwaPrompt() {
 
   if (!visible) return null;
 
+  const android = isAndroidDevice();
+
   const close = () => {
     rememberDismiss();
     setHidden(true);
@@ -159,8 +170,15 @@ export default function PwaPrompt() {
       <div className="push-prompt-icon" aria-hidden="true">
         <Download size={22} />
       </div>
-      <h2 id="pwa-prompt-title">Add eRuchi to your home screen</h2>
-      <p>Open surveys and rewards from an app icon. You can remove it any time.</p>
+      <h2
+        id="pwa-prompt-title"
+        className={android ? 'push-prompt-sentence' : undefined}
+      >
+        {android ? ANDROID_INSTALL_COPY : 'Add eRuchi to your home screen'}
+      </h2>
+      {!android && (
+        <p>Open surveys and rewards from an app icon. You can remove it any time.</p>
+      )}
       <div className="push-prompt-actions">
         <button
           type="button"
@@ -168,7 +186,7 @@ export default function PwaPrompt() {
           onClick={close}
           disabled={busy}
         >
-          Not now
+          {android ? 'Later' : 'Not now'}
         </button>
         <button
           type="button"

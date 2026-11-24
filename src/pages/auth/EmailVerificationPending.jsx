@@ -33,7 +33,7 @@ const EmailVerificationPending = () => {
   };
 
   return (
-    <OnboardingShell>
+    <OnboardingShell footer={false}>
       <div className="onboard-card">
         <h1 className="onboard-title">Verify your email</h1>
         <p className="onboard-copy">

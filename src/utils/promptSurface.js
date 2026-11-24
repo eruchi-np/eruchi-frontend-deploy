@@ -66,6 +66,24 @@ export function shouldDeferSubscribeForPwa({ pwaPending = false, pwaActive = fal
   return Boolean(pwaPending || pwaActive);
 }
 
+/**
+ * Android phone browser, install offer ready: the install card replaces
+ * the notification subscribe sheet for this visit.
+ * Already installed, no install offer, desktop, iPhone, and survey-complete
+ * stay on the notification sheet.
+ */
+export function androidInstallReplacesSubscribe({
+  isAndroid = false,
+  standalone = false,
+  hasDeferredInstall = false,
+  pathname = '',
+  surveyCompletePath = '/survey-complete',
+} = {}) {
+  if (!isAndroid || standalone || !hasDeferredInstall) return false;
+  if (pathname === surveyCompletePath) return false;
+  return true;
+}
+
 /** Test helper — resets module state between cases. */
 export function resetPromptSurfaceForTests() {
   pwaSurfaceActive = false;

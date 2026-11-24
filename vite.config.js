@@ -61,11 +61,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   const siteOrigin = (
     env.VITE_SITE_ORIGIN ||
-    process.env.VITE_SITE_ORIGIN ||
     (mode === 'production' ? PRODUCTION_ORIGIN : 'http://localhost:5173')
   ).replace(/\/$/, '')
-  // So Vercel (no .env) still fills import.meta.env.VITE_SITE_ORIGIN and HTML.
-  process.env.VITE_SITE_ORIGIN = siteOrigin
 
   // Production keeps current IDs if env is unset. Empty string omits scripts (staging/local).
   const gtmId = sanitizeAnalyticsId(
@@ -139,20 +136,13 @@ export default defineConfig(({ mode }) => {
       react({ jsxRuntime: 'automatic' }),
       {
         name: 'html-site-config',
-        transformIndexHtml: {
-          // Vite only runs `pre` HTML hooks before decodeURI on href/src.
-          // `%VITE_SITE_ORIGIN%` is invalid percent-encoding and crashes the
-          // Vercel build when that env var is unset.
-          order: 'pre',
-          handler(html) {
-            return html
-              .replaceAll('__SITE_ORIGIN__', siteOrigin)
-              .replaceAll('%VITE_SITE_ORIGIN%', siteOrigin)
-              .replace('<!-- ANALYTICS_GTM_HEAD -->', snippets.gtmHead)
-              .replace('<!-- ANALYTICS_PIXEL_HEAD -->', snippets.pixelHead)
-              .replace('<!-- ANALYTICS_GTM_NOSCRIPT -->', snippets.gtmNoscript)
-              .replace('<!-- ANALYTICS_PIXEL_NOSCRIPT -->', snippets.pixelNoscript)
-          },
+        transformIndexHtml(html) {
+          return html
+            .replaceAll('__SITE_ORIGIN__', siteOrigin)
+            .replace('<!-- ANALYTICS_GTM_HEAD -->', snippets.gtmHead)
+            .replace('<!-- ANALYTICS_PIXEL_HEAD -->', snippets.pixelHead)
+            .replace('<!-- ANALYTICS_GTM_NOSCRIPT -->', snippets.gtmNoscript)
+            .replace('<!-- ANALYTICS_PIXEL_NOSCRIPT -->', snippets.pixelNoscript)
         },
       },
     ],

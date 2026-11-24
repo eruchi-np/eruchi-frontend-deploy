@@ -2,8 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { secAPI } from '../../services/api';
 import ProfileShell from '../../components/layout/ProfileShell';
-import HomeFooter from '../../components/homepage/HomeFooter';
-
 const EditProfiles = () => {
   const navigate = useNavigate();
   const [editList, setEditList] = useState([]);
@@ -30,7 +28,7 @@ const EditProfiles = () => {
   };
 
   return (
-    <ProfileShell footer={<HomeFooter />}>
+    <ProfileShell>
       <main className="profile-main">
         <section className="profile-hero">
           <h1>Edit profiles</h1>

@@ -9,7 +9,7 @@ import "./onboarding.css";
 
 export default function OnboardingShell({
   children,
-  footer = true,
+  footer = false,
   onLogout,
   loggingOut = false,
 }) {

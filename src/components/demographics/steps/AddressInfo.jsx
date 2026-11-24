@@ -271,7 +271,7 @@ const AddressInfo = ({ formData, updateFormData, errors = {}, title = 'Address',
             <span>Step 2 of 3</span>
             <strong>Address</strong>
           </div>
-          <div className="onboard-progress">
+          <div className="onboard-progress is-blue">
             <span style={{ width: "66%" }} />
           </div>
         </>

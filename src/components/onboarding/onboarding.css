@@ -88,8 +88,8 @@
   height: 28px;
   padding: 0 12px;
   border-radius: 999px;
-  background: var(--lime);
-  color: var(--navy);
+  background: #3399ff;
+  color: #fff;
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -173,6 +173,22 @@
   color: var(--navy);
 }
 
+.onboard-step h2.onboard-step-lead {
+  margin-bottom: 12px;
+}
+
+.onboard-lead-clip {
+  position: relative;
+  overflow: hidden;
+}
+
+.onboard-followup {
+  padding: 18px 20px;
+  border: 1.5px solid #e4e8ee;
+  border-radius: 20px;
+  background: #fff;
+}
+
 .onboard-step-meta {
   display: flex;
   align-items: center;
@@ -206,6 +222,10 @@
   height: 100%;
   border-radius: inherit;
   background: var(--lime);
+}
+
+.onboard-progress.is-blue span {
+  background: #3399ff;
 }
 
 .onboard-pills {
@@ -459,7 +479,11 @@
 }
 
 .onboard-title-accent {
-  color: #30fdd4;
+  color: #3399ff;
+}
+
+.onboard-title-mark {
+  color: #000;
 }
 
 .onboard-card--auth .onboard-copy {
@@ -504,57 +528,20 @@
   margin-top: 18px;
 }
 
+.onboard-referral > .onboard-reveal {
+  margin-top: 0;
+}
+
+.onboard-referral > .onboard-reveal.is-open {
+  margin-top: 22px;
+}
+
 .onboard-card--auth .onboard-form--signup .onboard-links {
   margin-top: 18px;
 }
 
 .onboard-card--auth .onboard-form--signup .onboard-actions {
   margin-top: 22px;
-}
-
-.onboard-reveal {
-  height: 0;
-  overflow: hidden;
-  opacity: 0;
-  transition:
-    height 0.42s cubic-bezier(0.4, 0, 0.2, 1),
-    opacity 0.2s ease,
-    margin-top 0.42s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.onboard-reveal.is-open {
-  opacity: 1;
-  transition:
-    height 0.48s cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 0.32s ease 0.05s,
-    margin-top 0.48s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.onboard-reveal-inner {
-  min-height: 0;
-  overflow: hidden;
-}
-
-.onboard-reveal-stack {
-  display: grid;
-  gap: 18px;
-  transform: translateY(8px);
-  transition: transform 0.48s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.onboard-reveal.is-open .onboard-reveal-stack {
-  transform: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .onboard-reveal,
-  .onboard-reveal-stack {
-    transition: none;
-  }
-
-  .onboard-reveal-stack {
-    transform: none;
-  }
 }
 
 .onboard-card--auth .onboard-links {

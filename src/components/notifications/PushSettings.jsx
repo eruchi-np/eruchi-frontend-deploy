@@ -6,14 +6,14 @@ import {
   clearPushPromptDismiss,
   getPushPermission,
   canOpenSurveys,
-  isOneSignalConfigured,
+  isPushConfigured,
   isPushOptedIn,
   isPushPilotEligible,
   isWebPushSupported,
   optInPush,
   optOutPush,
   requestPushSubscription,
-} from '../../utils/oneSignal';
+} from '../../utils/pushClient';
 import { healthSessionId, trackHealthEvent } from '../../utils/healthEvents';
 import { reportPushOptIn } from '../../utils/pushOptIn';
 import './pushPrompt.css';
@@ -32,7 +32,7 @@ export default function PushSettings() {
   const [busy, setBusy] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (loading || !activated || !isOneSignalConfigured() || !isPushPilotEligible()) {
+    if (loading || !activated || !isPushConfigured() || !isPushPilotEligible()) {
       setReady(!loading);
       setSupported(false);
       return;
@@ -63,7 +63,7 @@ export default function PushSettings() {
     });
   }, [ready]);
 
-  if (!activated || !isOneSignalConfigured() || !isPushPilotEligible() || !ready) return null;
+  if (!activated || !isPushConfigured() || !isPushPilotEligible() || !ready) return null;
 
   const unavailable = !supported;
   const blocked = permission === 'denied';

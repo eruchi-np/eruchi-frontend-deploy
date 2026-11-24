@@ -10,9 +10,9 @@ import {
   iosPushPromptAvailable,
   isIosDevice,
   isPushOptedIn,
-  loginOneSignalUser,
+  loginPushUser,
   requestPushSubscription,
-} from "../../utils/oneSignal";
+} from "../../utils/pushClient";
 import { reportPushOptIn } from "../../utils/pushOptIn";
 import SurveyAvailableReminderDialog from "./SurveyAvailableReminderDialog";
 
@@ -102,7 +102,7 @@ export default function SurveysEmptyReminder({ copyClassName = "" }) {
       }
 
       const externalId = String(user?.id || user?._id || "");
-      if (externalId) await loginOneSignalUser(externalId);
+      if (externalId) await loginPushUser(externalId);
 
       const result = await requestPushSubscription();
       if (result.ok) {

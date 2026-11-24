@@ -69,6 +69,8 @@ html:has(.sf-page) #root{overflow-x:clip}
 .jump{display:grid;grid-template-columns:repeat(5,44px);gap:8px;margin-top:24px}
 .jump a{display:grid;place-items:center;width:44px;height:44px;border-radius:12px;border:1.5px solid rgba(255,255,255,.4);color:#fff;font:600 15px/1 Inter,sans-serif;font-variant-numeric:tabular-nums;text-decoration:none;transition:transform .15s}
 .jump a:hover{transform:scale(1.06)}
+.jump a.jump-in{animation:sfJumpIn .48s cubic-bezier(.22,1,.36,1)}
+@keyframes sfJumpIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 .jump a.done{background:var(--azure);border-color:var(--azure);color:var(--navy)}
 .jump a.cur{background:#fff;border-color:#fff;color:var(--navy)}
 .jump a.bad{border-color:#ff9c9c;color:#ffd9d9}
@@ -78,9 +80,9 @@ html:has(.sf-page) #root{overflow-x:clip}
 
 /* ---------- questions ---------- */
 .q{display:grid;grid-template-columns:44px minmax(0,1fr);padding:44px 0;border-top:1px solid var(--line);scroll-margin-top:24px}
-.sf-logic-q{animation:sfLogicIn .22s ease}
-@keyframes sfLogicIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.q:first-child{border-top:0;padding-top:0}
+.qs > .onboard-reveal.is-open .q{border-top:0;padding-top:0}
+.qs > .onboard-reveal.is-open ~ .onboard-reveal.is-open .q,
+.qs > .banner ~ .onboard-reveal.is-open .q{border-top:1px solid var(--line);padding-top:44px}
 .q-n{font-size:20px;line-height:28px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
 .q-t{margin:0;font-size:20px;line-height:28px;font-weight:600;letter-spacing:-0.015em;text-wrap:pretty}
 .q-h{margin:6px 0 0;font-size:15px;line-height:1.5;color:var(--muted)}
@@ -155,15 +157,22 @@ textarea.tx{height:auto;min-height:168px;padding:16px 20px;line-height:1.55;resi
 /* matrix. Header row sticks to the page; brand column sticks while scrolling sideways. */
 .mx-block{border:1.5px solid var(--line);border-radius:16px;background:#fff;min-width:0;max-width:100%}
 .mx-head-sticky{position:sticky;top:var(--mx-stick-top);z-index:3;background:var(--surf);border-radius:14px 14px 0 0;box-shadow:inset 0 -1.5px 0 var(--line)}
-.mx-head-scroll{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;border-radius:14px 14px 0 0;min-width:0}
+.mx-head-scroll{overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:none;scrollbar-width:none;border-radius:14px 14px 0 0;min-width:0}
 .mx-head-scroll::-webkit-scrollbar{display:none;height:0}
-.mxw{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;position:relative;z-index:1;min-width:0;border-radius:0 0 14px 14px;background:#fff}
+.mxw{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior-x:none;position:relative;z-index:1;min-width:0;border-radius:0 0 14px 14px;background:#fff}
 .mx{width:100%;min-width:max(100%,calc(11rem + var(--mx-cols, 1) * 8.25rem));border-collapse:separate;border-spacing:0;table-layout:fixed}
 .mx col.mx-brand{width:11rem}
 .mx thead th{height:auto;min-height:52px;padding:10px 8px;background:var(--surf);font-size:13px;line-height:1.3;font-weight:600;color:#454c53;text-align:center;vertical-align:bottom;overflow-wrap:anywhere}
 .mx thead th:first-child{position:sticky;left:0;z-index:2;width:11rem;min-width:11rem;background:var(--surf);box-shadow:1px 0 0 var(--line)}
-.mx-sr-head{height:0}
-.mx-sr-head th{height:0;max-height:0;padding:0;border:0;font-size:0;line-height:0;color:transparent;overflow:hidden;position:static;box-shadow:none;background:transparent}
+/* Screen-reader header only. Must beat .mx thead th, or a sideways
+   overscroll paints a second header and splits the column line. */
+.mx thead.mx-sr-head{height:0;line-height:0}
+.mx thead.mx-sr-head th,
+.mx thead.mx-sr-head th:first-child{
+  position:static;left:auto;z-index:auto;width:auto;min-width:0;
+  height:0;min-height:0;max-height:0;padding:0;border:0;box-shadow:none;
+  background:transparent;font-size:0;line-height:0;color:transparent;overflow:hidden
+}
 .mx tbody th{position:sticky;left:0;z-index:1;width:11rem;min-width:11rem;padding:0 16px 0 20px;border-top:1.5px solid var(--line);background:#fff;box-shadow:1px 0 0 var(--line);font-size:16px;line-height:1.35;font-weight:500;text-align:left}
 .mx tbody td{padding:0;border-top:1.5px solid var(--line);text-align:center;background:#fff}
 .mx tbody tr:first-child th,.mx tbody tr:first-child td{border-top:0}
@@ -240,7 +249,11 @@ textarea.tx{height:auto;min-height:168px;padding:16px 20px;line-height:1.55;resi
 .mstrip .pill{display:inline-flex;align-items:center;height:32px;padding:0 12px;border-radius:999px;background:var(--azure);font:700 14px/1 Inter,sans-serif;font-variant-numeric:tabular-nums}
 .mstrip .mbar{position:absolute;left:0;right:0;bottom:-1px;height:4px;background:var(--surf2)}
 .mstrip .mbar i{display:block;height:100%;background:var(--navy);border-radius:0 4px 4px 0}
-.mxm{display:grid;gap:26px}
+.mxm{display:none;gap:26px}
+@media (max-width: 900px){
+  .mxm{display:grid}
+  .mx-block{display:none}
+}
 .mxm fieldset{margin:0;padding:0;border:0;min-width:0}
 .mxm legend{padding:0;margin-bottom:12px;font-size:16px;line-height:1.35;font-weight:600}
 .chs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -450,7 +463,8 @@ textarea.tx{height:auto;min-height:168px;padding:16px 20px;line-height:1.55;resi
 @keyframes sf-rise { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
 @media (prefers-reduced-motion: reduce) {
   .sf-page .bar i, .sf-page .mbar i, .sf-page .arc-ring,
-  .sf-confirm-scrim, .sf-confirm-dlg, .sf-page .sf-enter { animation: none !important; transition: none !important; }
+  .sf-confirm-scrim, .sf-confirm-dlg, .sf-page .sf-enter,
+  .jump a.jump-in { animation: none !important; transition: none !important; }
 }
 
 /* complete page uses in-band hdr (no HomeNav) */

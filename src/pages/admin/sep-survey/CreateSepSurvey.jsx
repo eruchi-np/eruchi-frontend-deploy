@@ -93,7 +93,7 @@ const CreateSepSurvey = () => {
       : []),
     ...(!isSprint ? [{ label: 'Visibility', value: visibilityLabel }] : []),
     { label: 'Status', value: statusLabel },
-    { label: 'Credits', value: String(formData.credits ?? 0) },
+    { label: 'Credits', value: formData.isPoll ? 'None' : String(formData.credits ?? 0) },
     { label: 'Estimated time', value: formData.estimatedMinutes ? `${formData.estimatedMinutes} min` : '—' },
     ...(!isSprint && formData.visibility === 'targeted'
       ? [

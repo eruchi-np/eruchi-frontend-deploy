@@ -3,13 +3,14 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   canOpenSurveys,
-  initOneSignal,
-  isOneSignalConfigured,
+  initPush,
+  isPushConfigured,
   isPushOptedIn,
-  loginOneSignalUser,
-  logoutOneSignalUser,
-  promptSubscribeSlidedown,
-} from '../../utils/oneSignal';
+  loginPushUser,
+  logoutPushUser,
+  usesNativeWebPush,
+} from '../../utils/pushClient';
+import { promptSubscribeSlidedown } from '../../utils/oneSignal';
 import { reportPushOptIn } from '../../utils/pushOptIn';
 import {
   isPwaSurfaceActive,
@@ -22,9 +23,8 @@ import { isPwaInstallPromptPending } from './PwaPrompt';
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Boots OneSignal only for accounts that can open Surveys.
- * The Subscribe card is shown after login, because the automatic prompt
- * is dropped when the anonymous visitor becomes a known user.
+ * Boots push (VAPID or OneSignal) for accounts that can open Surveys.
+ * OneSignal Subscribe card may show after login; VAPID relies on PushPrompt.
  * Yields to the PWA install card when that prompt is eligible.
  */
 export default function OneSignalBridge() {
@@ -36,12 +36,12 @@ export default function OneSignalBridge() {
   pathnameRef.current = pathname;
 
   useEffect(() => {
-    if (!isOneSignalConfigured() || loading) return;
+    if (!isPushConfigured() || loading) return;
 
     if (!canOpenSurveys(user)) {
       if (loggedInId.current) {
         loggedInId.current = null;
-        logoutOneSignalUser();
+        logoutPushUser();
       }
       return undefined;
     }
@@ -56,15 +56,16 @@ export default function OneSignalBridge() {
     const showSubscribe = async () => {
       if (cancelled || loggedInId.current !== externalId) return;
       if (promptedForId.current === externalId) return;
+      if (usesNativeWebPush()) return; // soft prompt owns VAPID UX
       promptedForId.current = externalId;
       markPushSlidedownOpened();
       await promptSubscribeSlidedown();
     };
 
     (async () => {
-      const ok = await initOneSignal();
+      const ok = await initPush();
       if (!ok || cancelled || loggedInId.current !== externalId) return;
-      await loginOneSignalUser(externalId);
+      await loginPushUser(externalId);
       if (cancelled || loggedInId.current !== externalId) return;
       if (await isPushOptedIn()) {
         reportPushOptIn(true);
@@ -72,7 +73,6 @@ export default function OneSignalBridge() {
       }
       if (cancelled || loggedInId.current !== externalId) return;
 
-      // Let PwaPrompt claim the surface if the browser install event is ready.
       await wait(450);
       if (cancelled || loggedInId.current !== externalId) return;
 

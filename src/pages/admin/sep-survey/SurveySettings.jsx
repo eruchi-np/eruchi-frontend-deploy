@@ -113,7 +113,7 @@ export default function SurveySettings({
                       Quick poll
                     </span>
                     <span className="block text-xs text-gray-500 mt-0.5">
-                      One single-choice question on the survey list. Does not count toward streaks.
+                      One single-choice question on the survey list. No credits and does not count toward streaks.
                     </span>
                   </span>
                 </label>
@@ -318,6 +318,7 @@ export default function SurveySettings({
                   </select>
                 </div>
 
+                {!formData.isPoll ? (
                 <div>
                   <label className="block text-sm font-semibold text-gray-900 mb-2">
                     Credits to Award <span className="text-red-500">*</span>
@@ -332,6 +333,16 @@ export default function SurveySettings({
                     required
                   />
                 </div>
+                ) : (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Credits
+                  </label>
+                  <p className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-600">
+                    None — quick polls do not award credits.
+                  </p>
+                </div>
+                )}
               </div>
 
               {needsPublicWindow && (

@@ -120,6 +120,12 @@ export const userAPI = {
   getNotifications: (options = {}) => getRequest('/users/me/notifications', options),
   setPushOptIn: (optedIn, config = {}) =>
     api.put('/users/me/push-opt-in', { optedIn: Boolean(optedIn) }, config),
+  listPushSubscriptions: (config = {}) =>
+    api.get('/users/me/push-subscription', config),
+  savePushSubscription: (data, config = {}) =>
+    api.post('/users/me/push-subscription', data, config),
+  deletePushSubscription: (endpoint, config = {}) =>
+    api.delete('/users/me/push-subscription', { data: { endpoint }, ...config }),
 };
 
 /** PC2 SEC household survey + shared profile-survey list. */

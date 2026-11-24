@@ -234,6 +234,11 @@
   font-size: 13px;
 }
 
+.home-pill-wide {
+  padding: 0 36px;
+  white-space: nowrap;
+}
+
 .home-pill-lime {
   background: var(--lime);
   color: var(--navy);

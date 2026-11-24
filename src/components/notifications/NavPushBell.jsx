@@ -6,11 +6,11 @@ import { useAuth } from '../../context/AuthContext';
 import {
   clearPushPromptDismiss,
   canOpenSurveys,
-  isOneSignalConfigured,
+  isPushConfigured,
   isPushOptedIn,
   isPushPilotEligible,
   requestPushSubscription,
-} from '../../utils/oneSignal';
+} from '../../utils/pushClient';
 import { healthSessionId, trackHealthEvent } from '../../utils/healthEvents';
 import { userAPI } from '../../services/api';
 import './pushPrompt.css';
@@ -47,7 +47,7 @@ export default function NavPushBell({ light = false }) {
   const [loadingList, setLoadingList] = useState(false);
 
   const refreshOptIn = useCallback(async () => {
-    if (loading || !activated || !isOneSignalConfigured() || !isPushPilotEligible()) {
+    if (loading || !activated || !isPushConfigured() || !isPushPilotEligible()) {
       setReady(!loading);
       setOptedIn(false);
       return;
@@ -96,7 +96,7 @@ export default function NavPushBell({ light = false }) {
     if (open && optedIn) loadList();
   }, [open, optedIn, loadList]);
 
-  if (!activated || !ready || !isOneSignalConfigured() || !isPushPilotEligible()) return null;
+  if (!activated || !ready || !isPushConfigured() || !isPushPilotEligible()) return null;
 
   const onBellClick = () => setOpen((v) => !v);
 

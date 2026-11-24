@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import useDemographics, { clearDemographicsDraft } from "../../hooks/useDemographics";
 import Stepper, { Step } from "../layout/Stepper";
 import AboutYou from "./steps/SamplerProfile";
@@ -11,6 +12,84 @@ import { REFRESH_STORAGE_KEY, loadDraft } from "../../utils/demographicsDraft";
 import { hasSavedValue, valuesMatch } from "./ConfirmSame";
 import "../onboarding/onboarding.css";
 import { trackOnboardingError, trackOnboardingSubmit, trackOnboardingView } from "../../utils/healthEvents";
+import { PROFILE_COMPLETION_1_CREDITS } from "../../utils/onboardingCredits";
+
+const headingVariants = {
+  enter: (dir) => ({
+    x: dir >= 0 ? "100%" : "-100%",
+    opacity: 0,
+  }),
+  center: {
+    x: "0%",
+    opacity: 1,
+  },
+  exit: (dir) => ({
+    x: dir >= 0 ? "-100%" : "100%",
+    opacity: 0,
+  }),
+};
+
+const registrationHeadings = {
+  1: {
+    title: "Complete your profile",
+    body: `Tell us more about you — earn ${PROFILE_COMPLETION_1_CREDITS} Ruchi Credits, and we'll match you to more relevant surveys.`,
+  },
+  2: {
+    title: "Almost there",
+    body: "This helps us personalize your experience.",
+  },
+  3: {
+    title: "Final step!",
+    body: `Ready to start getting exclusive discounts? Complete this step and earn ${PROFILE_COMPLETION_1_CREDITS} Ruchi Credits!`,
+  },
+};
+
+function HeadingSlide({ step, direction, onHeight, play }) {
+  const ref = useRef(null);
+  const copy = registrationHeadings[step] || registrationHeadings[1];
+
+  useLayoutEffect(() => {
+    if (ref.current) onHeight(ref.current.offsetHeight);
+  }, [onHeight, step]);
+
+  return (
+    <motion.div
+      ref={ref}
+      custom={direction}
+      variants={headingVariants}
+      initial={play ? "enter" : false}
+      animate="center"
+      exit="exit"
+      transition={{ duration: 0.4, ease: "easeInOut" }}
+      style={{ position: "absolute", left: 0, right: 0, top: 0 }}
+    >
+      <h1 className="onboard-title">{copy.title}</h1>
+      <p className="onboard-copy">{copy.body}</p>
+    </motion.div>
+  );
+}
+
+function RegistrationHeading({ step, direction }) {
+  const [height, setHeight] = useState(0);
+  const played = useRef(false);
+  const play = played.current;
+
+  useEffect(() => {
+    played.current = true;
+  }, []);
+
+  return (
+    <motion.div
+      className="onboard-lead-clip"
+      animate={{ height }}
+      transition={play ? { type: "spring", duration: 0.4, bounce: 0 } : { duration: 0 }}
+    >
+      <AnimatePresence initial={false} mode="sync" custom={direction}>
+        <HeadingSlide key={step} step={step} direction={direction} onHeight={setHeight} play={play} />
+      </AnimatePresence>
+    </motion.div>
+  );
+}
 
 const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
   const isRefresh = mode === "refresh";
@@ -34,6 +113,13 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
   };
 
   const stepLabels = ["About You", "Address", "Household & Durables"];
+  const stepRef = useRef(currentStep);
+  const [slideDirection, setSlideDirection] = useState(0);
+  const handleStepChange = (step) => {
+    setSlideDirection(step > stepRef.current ? 1 : -1);
+    stepRef.current = step;
+    goToStep(step);
+  };
 
   useEffect(() => {
     trackOnboardingView("pc1");
@@ -252,9 +338,10 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
 
   return (
     <div className="w-full onboard-step">
+      {!isRefresh && <RegistrationHeading step={currentStep} direction={slideDirection} />}
       <Stepper
         initialStep={currentStep}
-        onStepChange={goToStep}
+        onStepChange={handleStepChange}
         onBeforeNext={(step) => {
           if (!checkStepValidation(step)) {
             revealError("Update the answers marked on this step.");
@@ -287,9 +374,7 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
         completeButtonText={isRefresh ? "Submit" : "Complete"}
         nextButtonProps={{
           disabled: submitting,
-          className: `home-pill home-pill-sm ${
-            currentStep === 3 ? "home-pill-lime" : "home-pill-navy"
-          }`,
+          className: "home-pill home-pill-sm home-pill-blue",
         }}
         backButtonProps={{
           className: "home-pill home-pill-sm profile-btn-outline",

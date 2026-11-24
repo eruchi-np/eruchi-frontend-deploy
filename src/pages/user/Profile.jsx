@@ -5,7 +5,6 @@ import toast from "react-hot-toast";
 import { userAPI, voucherAPI } from "../../services/api";
 import { getNextStreakBonus } from "../../utils/streakBonus";
 import { useAuth } from "../../context/AuthContext";
-import HomeFooter from "../../components/homepage/HomeFooter";
 import StreakGuardModal from "../../components/profile/StreakGuardModal";
 import { CreditDelta, SurveyStreakMark } from "../../components/profile/ActivityMarks";
 import { initProfileCinema } from "../../components/profile/profileCinema";
@@ -352,7 +351,7 @@ export default function Profile() {
   };
 
   return (
-    <ProfileShell footer={<HomeFooter />} shellRef={pageRef}>
+    <ProfileShell shellRef={pageRef}>
       <main className="profile-main">
         {(user.profileSurveyBlocked || user.profileOutdated) && (
           <button

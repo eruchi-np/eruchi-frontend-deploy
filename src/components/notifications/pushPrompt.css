@@ -48,6 +48,13 @@
   line-height: 1.25;
 }
 
+.push-prompt h2.push-prompt-sentence {
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 .push-prompt p {
   margin: 0 0 1rem;
   font-size: 0.875rem;

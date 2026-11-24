@@ -4,7 +4,6 @@ import { ChevronDown, SearchX } from "lucide-react";
 import toast from "react-hot-toast";
 import { sepSurveyAPI, fifteenDaySurveyAPI, userAPI } from "../../services/api";
 import { StreakArc, pageWindow } from "../../components/shop/CreditArc";
-import HomeFooter from "../../components/homepage/HomeFooter";
 import { flipShopCatalog, initShopCinema, scrollShopToCatalog } from "../../components/shop/shopCinema";
 import FirstSurveyNudge from "../../components/survey/FirstSurveyNudge";
 import { useAuth } from "../../context/AuthContext";
@@ -55,6 +54,8 @@ export default function StandaloneSurveys() {
   const [error, setError] = useState(null);
   const [retryTick, setRetryTick] = useState(0);
   const [showFirstSurveyNudge, setShowFirstSurveyNudge] = useState(false);
+
+  const awaitingFirstSurvey = Boolean(user?.isProfileComplete && !user.first_survey_completed);
 
   const pollSurveys = useMemo(
     () => surveys.filter((survey) => survey.isPoll),
@@ -277,19 +278,36 @@ export default function StandaloneSurveys() {
               <div className="shop-hero-inner">
                 <div className="shop-hero-copy">
                   <h1>
-                    <span className="shop-hero-line-wrap">
-                      <span className="shop-hero-line">Your path to rewards.</span>
-                    </span>
-                    <span className="shop-hero-line-wrap">
-                      <span className="shop-hero-line">Little bit every day.</span>
-                    </span>
+                    {awaitingFirstSurvey ? (
+                      <>
+                        <span className="shop-hero-line-wrap">
+                          <span className="shop-hero-line">First survey.</span>
+                        </span>
+                        <span className="shop-hero-line-wrap">
+                          <span className="shop-hero-line">First reward.</span>
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="shop-hero-line-wrap">
+                          <span className="shop-hero-line">Your path to rewards.</span>
+                        </span>
+                        <span className="shop-hero-line-wrap">
+                          <span className="shop-hero-line">Little bit every day.</span>
+                        </span>
+                      </>
+                    )}
                   </h1>
                   <p>
                     Surveys earn Ruchi Credits. Use Ruchi Credits to buy discount vouchers to your
                     favorite cafe, restaurant, sports venue, and more!
                   </p>
-                  <button type="button" className="home-pill home-pill-lg home-pill-white" onClick={goCatalog}>
-                    Surveys
+                  <button
+                    type="button"
+                    className={`home-pill home-pill-lg home-pill-white${awaitingFirstSurvey ? " home-pill-wide" : ""}`}
+                    onClick={goCatalog}
+                  >
+                    {awaitingFirstSurvey ? "My first survey" : "Surveys"}
                   </button>
                 </div>
                 <StreakArc streak={streak} />
@@ -490,8 +508,6 @@ export default function StandaloneSurveys() {
           </div>
         </div>
       </div>
-
-      <HomeFooter />
 
       <FirstSurveyNudge
         open={showFirstSurveyNudge}

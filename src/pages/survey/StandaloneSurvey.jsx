@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
   PROFILE_REFRESH_TITLE,
 } from "../../utils/profileRefreshCopy";
@@ -14,6 +14,7 @@ import MatrixFlow from "./surveyTake/MatrixFlow";
 import useStandaloneSurvey from "./surveyTake/useStandaloneSurvey";
 import { choiceLabel } from "./surveyTake/validation";
 import { questionId } from "../../utils/surveyLogic";
+import FieldReveal from "../../components/onboarding/FieldReveal";
 
 export default function StandaloneSurvey({ previewMode = false, previewSurvey = null, onExitPreview = null }) {
   const {
@@ -47,6 +48,33 @@ export default function StandaloneSurvey({ previewMode = false, previewSurvey = 
     handleSubmit,
     exitSurvey,
   } = useStandaloneSurvey({ previewMode, previewSurvey, onExitPreview });
+
+  const visibleJumpIds = questions.reduce((ids, q, i) => {
+    if (visibleIdSet.has(questionId(q, i))) ids.push(String(q._id || i));
+    return ids;
+  }, []);
+  const visibleJumpKey = visibleJumpIds.join("\n");
+  const surveyMark = String(survey?._id || survey?.id || "");
+  const jumpSeen = useRef(null);
+  const jumpSurvey = useRef(null);
+  const jumpFresh =
+    jumpSurvey.current !== surveyMark || jumpSeen.current === null
+      ? new Set()
+      : new Set(visibleJumpIds.filter((id) => !jumpSeen.current.has(id)));
+
+  useEffect(() => {
+    const ids = visibleJumpKey ? visibleJumpKey.split("\n") : [];
+    if (jumpSurvey.current !== surveyMark || jumpSeen.current === null) {
+      jumpSurvey.current = surveyMark;
+      jumpSeen.current = new Set(ids);
+      return;
+    }
+    const still = new Set(ids);
+    for (const id of [...jumpSeen.current]) {
+      if (!still.has(id)) jumpSeen.current.delete(id);
+    }
+    ids.forEach((id) => jumpSeen.current.add(id));
+  }, [surveyMark, visibleJumpKey]);
 
   if (loading) {
     return (
@@ -211,15 +239,14 @@ export default function StandaloneSurvey({ previewMode = false, previewSurvey = 
               const isBad = missed.has(q.questionText);
               const optional = q.isRequired === false;
               const isVisible = visibleIdSet.has(questionId(q, i));
-              if (!isVisible) return null;
               const visibleNumber = questions
                 .slice(0, i + 1)
                 .filter((item, idx) => visibleIdSet.has(questionId(item, idx))).length;
 
               return (
+                <FieldReveal key={q._id || qId} open={isVisible} scroll={false}>
                 <section
-                  key={q._id || qId}
-                  className={`q sf-logic-q${isBad ? " bad" : ""}${
+                  className={`q${isBad ? " bad" : ""}${
                     q.questionType === "matrix_radio" ? " q-matrix" : ""
                   }`}
                   id={qId}
@@ -427,6 +454,7 @@ export default function StandaloneSurvey({ previewMode = false, previewSurvey = 
                     </div>
                   </div>
                 </section>
+                </FieldReveal>
               );
             })}
 
@@ -488,10 +516,12 @@ export default function StandaloneSurvey({ previewMode = false, previewSurvey = 
                 const done = answeredFlags[visibleNumber - 1];
                 const bad = missed.has(q.questionText);
                 const cur = activeIndex === i;
+                const jumpId = String(q._id || i);
                 const className = [
                   done ? "done" : "",
                   cur ? "cur" : "",
                   bad ? "bad" : "",
+                  jumpFresh.has(jumpId) ? "jump-in" : "",
                 ]
                   .filter(Boolean)
                   .join(" ");

@@ -286,7 +286,8 @@ export function Reactivation({ data }) {
     <div className="space-y-4">
       <p className="text-sm text-gray-600">
         Lifecycle email, WhatsApp, and browser push. The Channel tab still counts older reminder mail.
-        Green, amber, and red here follow the lifecycle limits. Dry-run rows are left out. Opens are not used.
+        Green, amber, and red here follow the lifecycle limits. Dry-run rows are left out.
+        Email read is a provider open; email received counts with delivery. Push received is the client report.
         Push-eligible versus not is descriptive only — people who allow notifications are already more engaged.
       </p>
       <div className="flex flex-wrap gap-3">
@@ -399,7 +400,7 @@ export function Reactivation({ data }) {
         />
       </Card>
 
-      <Card metricId="RE6" title="Sends and delivery" summary="Sent, delivered, read, and clicked, by channel, template, and touch." note="Delivered, read, and clicked need an event on the message. A send that is only marked sent is not counted as delivered. For push, received is the service-worker / client report.">
+      <Card metricId="RE6" title="Sends and delivery" summary="Sent, delivered, read, and clicked, by channel, template, and touch." note="Delivered, read, and clicked need an event on the message. A send that is only marked sent is not counted as delivered. For email, received matches delivery, and read is a provider open. For push, received is the service-worker / client report.">
         <SimpleTable
           headers={['Channel', 'Template', 'Touch', 'Sent', 'Delivered', 'Received', 'Read', 'Clicked']}
           rows={deliveryRows.map((row) => {
