@@ -5,13 +5,15 @@ import { formatActivationDuration } from './healthActivationView';
 import { clarityDashboardUrl, clarityProjectId } from '../../../utils/clarity';
 
 const OpenUserContext = React.createContext(null);
+const PeopleNamesContext = React.createContext(null);
 
 const latestFirst = (rows) => [...(rows || [])].reverse();
 
 function UserIdButton({ id, name }) {
   const openUser = React.useContext(OpenUserContext);
+  const peopleNames = React.useContext(PeopleNamesContext);
   if (!id) return null;
-  const label = name || id;
+  const label = name || peopleNames?.[String(id)] || id;
   if (!openUser) return <span className="break-all">{label}</span>;
   return (
     <button type="button" onClick={() => openUser(String(id))} className="text-sky-800 underline break-all text-left" title={String(id)}>
@@ -309,7 +311,7 @@ function IdList({ count, userIds, truncated }) {
   if (!count) return null;
   return (
     <details className="mt-2">
-      <summary className="text-xs text-gray-500 cursor-pointer">{int(count)} user id{count === 1 ? '' : 's'}{truncated ? ', list shortened' : ''}</summary>
+      <summary className="text-xs text-gray-500 cursor-pointer">{int(count)} {count === 1 ? 'person' : 'people'}{truncated ? ', list shortened' : ''}</summary>
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
         {(userIds || []).map((id) => (
           <UserIdButton key={id} id={id} />
@@ -372,6 +374,7 @@ function Legend() {
 
 export {
   OpenUserContext,
+  PeopleNamesContext,
   latestFirst,
   UserIdButton,
   NAVY,

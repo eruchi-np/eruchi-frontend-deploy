@@ -19,6 +19,7 @@ import {
   Legend,
   NAVY,
   OpenUserContext,
+  PeopleNamesContext,
   SECTIONS,
   when,
 } from './healthUi.jsx';
@@ -70,6 +71,7 @@ export default function AdminHealth() {
 
   return (
     <OpenUserContext.Provider value={setSelectedUserId}>
+    <PeopleNamesContext.Provider value={data?.peopleNames || null}>
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
@@ -133,6 +135,7 @@ export default function AdminHealth() {
       ) : null}
       <BackToTop />
     </div>
+    </PeopleNamesContext.Provider>
     </OpenUserContext.Provider>
   );
 }

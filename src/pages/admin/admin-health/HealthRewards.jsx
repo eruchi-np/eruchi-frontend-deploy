@@ -438,7 +438,7 @@ export function Rewards({ data }) {
                 <tbody>
                   {data.R7.active.slice(0, 20).map((row) => (
                     <tr key={row.voucherId} className="border-t border-gray-100">
-                      <td className="py-2 pr-3"><UserIdButton id={row.userId} name={row.name} /></td>
+                      <td className="py-2 pr-3"><UserIdButton id={row.userId} name={row.name || displayName(row)} /></td>
                       <td className="py-2 pr-3">{int(row.daysToExpiry)}</td>
                       <td className="py-2">{int(row.ageDays)}</td>
                     </tr>
