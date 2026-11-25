@@ -147,7 +147,7 @@ function AppChrome({ children }) {
       <div className={`min-w-0 max-w-full ${overlayNav || isSurveyTake ? 'overflow-x-clip' : 'overflow-x-hidden'}`}>
         {children}
         {pathname === '/faqs' ? <HomeFooter /> : null}
-        {pathname !== '/' && pathname !== '/faqs' && !isBusiness && !isBrand && !hideNav ? (
+        {pathname !== '/' && pathname !== '/faqs' && !isBusiness && !isBrand && (!hideNav || pathname.startsWith('/sec-profile')) ? (
           <div className="h-[calc(5.25rem+env(safe-area-inset-bottom))] md:hidden" aria-hidden="true" />
         ) : null}
       </div>

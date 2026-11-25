@@ -77,7 +77,6 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
   const [stepId, setStepId] = useState(null);
   const stepPinned = useRef(false);
   const questionAnchorRef = useRef(null);
-  const actionsRef = useRef(null);
   const skipQuestionScroll = useRef(true);
 
   useEffect(() => {
@@ -178,27 +177,6 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
     };
     scroll();
     const frame = window.requestAnimationFrame(scroll);
-    return () => window.cancelAnimationFrame(frame);
-  }, [qid]);
-
-  useEffect(() => {
-    if (qid !== 'OCC') return undefined;
-    const actions = actionsRef.current;
-    if (!actions) return undefined;
-    const bringIntoView = () => {
-      const rect = actions.getBoundingClientRect();
-      const view = window.visualViewport;
-      const height = view?.height ?? window.innerHeight;
-      const offset = view?.offsetTop ?? 0;
-      const bottom = rect.bottom - offset;
-      const top = rect.top - offset;
-      if (bottom > height - 16 || top < 16) {
-        actions.scrollIntoView({ block: 'end', inline: 'nearest', behavior: 'smooth' });
-      }
-    };
-    const frame = window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(bringIntoView);
-    });
     return () => window.cancelAnimationFrame(frame);
   }, [qid]);
 
@@ -494,7 +472,7 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
 
       {error ? <p className="onboard-error" role="alert">{error}</p> : null}
 
-      <div ref={actionsRef} className="onboard-actions mt-10 pt-6 border-t border-[#eef1f4]">
+      <div className="onboard-actions mt-10 pt-6 border-t border-[#eef1f4]">
         <button type="button" className="home-pill home-pill-outline" onClick={goBack}>
           Back
         </button>

@@ -1088,6 +1088,11 @@ button.shop-card-back-title {
 }
 
 @media (max-width: 1024px) {
+  .shop-hero {
+    justify-content: flex-start;
+    padding-top: calc(88px + env(safe-area-inset-top, 0px));
+  }
+
   .shop-hero-inner {
     grid-template-columns: 1fr;
     justify-items: center;
