@@ -4,6 +4,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { isStaffAdmin } from '../../utils/adminRoles';
 import { isAndroidDevice, isIosDevice, isStandaloneDisplay } from '../../utils/oneSignal';
+import { initPush } from '../../utils/pushClient';
 import { healthSessionId, trackHealthEvent } from '../../utils/healthEvents';
 import {
   evaluatePwaInstallPending,
@@ -57,6 +58,7 @@ export function isPwaInstallPromptPending({ user, pathname } = {}) {
     standalone: isStandaloneDisplay(),
     user,
     isStaff: Boolean(user && isStaffAdmin(user.role)),
+    profileComplete: Boolean(user?.isProfileComplete),
     pathname,
     surveyCompletePath: SURVEY_COMPLETE_PATH,
     isAndroid: isAndroidDevice(),
@@ -90,8 +92,9 @@ const ANDROID_INSTALL_COPY = 'Improve your eRuchi experience by installing our w
 
 /**
  * Install card for browsers that offer Add to Home Screen.
- * Shown to signed-in customers. On Android the sentence below replaces the
- * subscribe sheet for that visit. Survey-complete keeps the notification card.
+ * The worker registers on load so Chrome can offer install during PC1.
+ * The card itself stays hidden until PC1 is finished.
+ * Survey complete keeps the notification card, so this card stays off that page.
  */
 export default function PwaPrompt() {
   const { user, loading } = useAuth();
@@ -102,16 +105,21 @@ export default function PwaPrompt() {
   const [trackedShow, setTrackedShow] = useState(false);
 
   useEffect(() => {
+    initPush();
+  }, []);
+
+  useEffect(() => {
     const onChange = (event) => setPromptEvent(event);
     listeners.add(onChange);
     return () => listeners.delete(onChange);
   }, []);
 
-  const pushOwnsThisScreen = pathname === SURVEY_COMPLETE_PATH && isAndroidDevice();
+  const pushOwnsThisScreen = pathname === SURVEY_COMPLETE_PATH;
   const visible = Boolean(
     !hidden
     && !loading
     && user
+    && user.isProfileComplete
     && !isStaffAdmin(user.role)
     && !isStandaloneDisplay()
     && promptEvent

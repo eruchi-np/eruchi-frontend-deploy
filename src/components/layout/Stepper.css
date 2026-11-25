@@ -11,7 +11,7 @@
 .step-indicator-row {
   display: flex;
   width: 100%;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   padding: 1rem 0 2rem 0;
 }
@@ -115,8 +115,8 @@
 
 .step-connector {
   position: relative;
-  margin-left: 0.75rem;
-  margin-right: 0.75rem;
+  /* Sit on the vertical center of the 2.25rem step circles */
+  margin: 1rem 0.75rem 0;
   height: 4px;
   flex: 1;
   overflow: hidden;

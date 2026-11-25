@@ -6,7 +6,7 @@ import toast, { Toaster } from "react-hot-toast";
 // Layout & Components
 import HomeNav from './components/homepage/HomeNav';
 import BottomNavigation from './components/layout/BottomNavigation';
-import Footer from './components/layout/Footer';
+import HomeFooter from './components/homepage/HomeFooter';
 import LimitedSessionBanner from './components/layout/LimitedSessionBanner';
 import ProtectedRoute from './components/layout/ProtectedRoute';
 import OnboardingGate from './components/layout/OnboardingGate';
@@ -146,7 +146,7 @@ function AppChrome({ children }) {
       <BusinessAccessGuard />
       <div className={`min-w-0 max-w-full ${overlayNav || isSurveyTake ? 'overflow-x-clip' : 'overflow-x-hidden'}`}>
         {children}
-        {pathname === '/faqs' ? <Footer /> : null}
+        {pathname === '/faqs' ? <HomeFooter /> : null}
         {pathname !== '/' && pathname !== '/faqs' && !isBusiness && !isBrand && !hideNav ? (
           <div className="h-[calc(5.25rem+env(safe-area-inset-bottom))] md:hidden" aria-hidden="true" />
         ) : null}

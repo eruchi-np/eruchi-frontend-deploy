@@ -49,14 +49,15 @@ export function evaluatePwaInstallPending({
   standalone = false,
   user = null,
   isStaff = false,
+  profileComplete = true,
   pathname = '',
   surveyCompletePath = '/survey-complete',
-  isAndroid = false,
   pushSlidedownOpened: pushOpened = false,
 } = {}) {
   if (!hasDeferredInstall || dismissed || standalone) return false;
-  if (!user || isStaff) return false;
-  if (pathname === surveyCompletePath && isAndroid) return false;
+  if (!user || isStaff || !profileComplete) return false;
+  // Survey complete belongs to the notification card, on every device.
+  if (pathname === surveyCompletePath) return false;
   if (pushOpened) return false;
   return true;
 }

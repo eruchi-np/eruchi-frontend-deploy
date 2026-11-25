@@ -103,6 +103,9 @@ self.addEventListener('notificationclick', (event) => {
   })());
 });
 
+// Chrome only offers Add to Home Screen when the worker handles fetch.
+self.addEventListener('fetch', () => {});
+
 self.addEventListener('notificationclose', (event) => {
   const data = event.notification?.data || {};
   event.waitUntil(reportEvent({ data }, 'closed'));

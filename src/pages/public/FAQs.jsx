@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Mail, Instagram } from "lucide-react";
 import SearchBar from "../../components/widgets/SearchBar";
 import AnimatedContent from "../../components/animations/AnimatedContent";
@@ -45,6 +46,7 @@ const FAQCard = ({ faq }) => (
 );
 
 const FAQs = () => {
+    const { hash } = useLocation();
     const [query, setQuery] = useState("");
     const [hasSearched, setHasSearched] = useState(false);
     const [faqs, setFaqs] = useState([]);
@@ -74,6 +76,11 @@ const FAQs = () => {
             cancelled = true;
         };
     }, []);
+
+    useLayoutEffect(() => {
+        if (hash !== "#contact" || loading) return;
+        document.getElementById("contact")?.scrollIntoView({ block: "start" });
+    }, [hash, loading, faqs.length]);
 
     const handleSearch = (e) => {
         const value = e.target.value;
@@ -170,8 +177,7 @@ const FAQs = () => {
                     )}
 
                     {/* Bottom Contact Section Animation */}
-                    <AnimatedContent direction="vertical" distance={40} duration={0.8} threshold={0.15}>
-                        <div id="contact" className="scroll-mt-24 bg-blue-50 rounded-3xl p-5 sm:p-8 border-2 border-blue-200 text-center">
+                    <div id="contact" className="scroll-mt-24 bg-blue-50 rounded-3xl p-5 sm:p-8 border-2 border-blue-200 text-center">
                             <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3">
                                 Still have questions?
                             </h3>
@@ -208,8 +214,7 @@ const FAQs = () => {
                                     <span className="hidden sm:inline">WhatsApp</span>
                                 </a>
                             </div>
-                        </div>
-                    </AnimatedContent>
+                    </div>
                 </div>
             </div>
         </section>

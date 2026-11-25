@@ -51,7 +51,6 @@ export default function HomeFooter() {
           links={[
             { label: "Surveys", to: "/standalone-surveys" },
             { label: "Rewards", to: "/shop" },
-            { label: "Businesses", to: "/for-business" },
             { label: "How it Works", to: "/faqs" },
           ]}
         />

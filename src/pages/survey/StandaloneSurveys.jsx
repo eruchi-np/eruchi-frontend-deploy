@@ -281,10 +281,10 @@ export default function StandaloneSurveys() {
                     {awaitingFirstSurvey ? (
                       <>
                         <span className="shop-hero-line-wrap">
-                          <span className="shop-hero-line">First survey.</span>
+                          <span className="shop-hero-line">Start earning rewards.</span>
                         </span>
                         <span className="shop-hero-line-wrap">
-                          <span className="shop-hero-line">First reward.</span>
+                          <span className="shop-hero-line">Complete your first survey.</span>
                         </span>
                       </>
                     ) : (

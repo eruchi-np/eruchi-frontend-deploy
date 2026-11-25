@@ -9,7 +9,6 @@ import {
   canOpenSurveys,
   isPushConfigured,
   isPushOptedIn,
-  isPushPilotEligible,
   isWebPushSupported,
   requestPushSubscription,
   wasPushPromptDismissed,
@@ -31,8 +30,8 @@ function trackPush(event, detail = {}) {
 }
 
 /**
- * Android pilot soft prompt — survey complete, accounts that can open Surveys.
- * iOS A2HS + desktop are deferred.
+ * Notification card after a survey is finished.
+ * Wording stays on this card. It does not show when surveys first unlock.
  */
 export default function PushPrompt() {
   const { user, loading } = useAuth();
@@ -50,7 +49,7 @@ export default function PushPrompt() {
       setVisible(false);
       return;
     }
-    if (!isPushPilotEligible() || wasPushPromptDismissed()) {
+    if (wasPushPromptDismissed()) {
       setVisible(false);
       return;
     }

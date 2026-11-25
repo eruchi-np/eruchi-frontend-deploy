@@ -10,8 +10,17 @@ const ProfileCompletionGuard = ({ children }) => {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
-  // If profile is already complete → BLOCK access
+  // Profile just finished. First visit goes to Surveys, where the install card shows.
   if (user?.isProfileComplete) {
+    if (!user.first_survey_completed) {
+      return (
+        <Navigate
+          to="/standalone-surveys"
+          replace
+          state={{ scrollToCatalog: true, firstSurveyNudge: true }}
+        />
+      );
+    }
     return <Navigate to={getPostLoginPath(user)} replace />;
   }
 

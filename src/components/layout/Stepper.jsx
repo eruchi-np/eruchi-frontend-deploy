@@ -212,7 +212,7 @@ function StepIndicator({ step, currentStep, onClickStep, disableStepIndicators }
         variants={{
           inactive: { scale: 1, backgroundColor: '#e5e7eb', color: '#9ca3af' },
           active: { scale: 1, backgroundColor: '#3b82f6', color: '#ffffff' },
-          complete: { scale: 1, backgroundColor: '#22c55e', color: '#ffffff' }
+          complete: { scale: 1, backgroundColor: '#2ed6fd', color: '#ffffff' }
         }}
         transition={{ duration: 0.3 }}
         className="step-indicator-inner"
@@ -230,7 +230,7 @@ function StepIndicator({ step, currentStep, onClickStep, disableStepIndicators }
 function StepConnector({ isComplete }) {
   const lineVariants = {
     incomplete: { width: 0, backgroundColor: 'transparent' },
-    complete: { width: '100%', backgroundColor: '#22c55e' }
+    complete: { width: '100%', backgroundColor: '#2ed6fd' }
   };
 
   return (

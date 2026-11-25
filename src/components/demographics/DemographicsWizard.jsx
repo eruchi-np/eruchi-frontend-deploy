@@ -304,7 +304,7 @@ const DemographicsWizard = ({ onComplete, mode = "registration" }) => {
             isActive
               ? "bg-[var(--navy)] border-[var(--navy)] text-white shadow-md scale-105"
               : isCompleted
-              ? "bg-[#7bd13a] border-[#7bd13a] text-white"
+              ? "bg-[#2ed6fd] border-[#2ed6fd] text-white"
               : "bg-white border-gray-300 text-gray-400"
           }`}
         >
