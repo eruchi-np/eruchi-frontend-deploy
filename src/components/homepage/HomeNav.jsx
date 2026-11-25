@@ -289,7 +289,7 @@ export default function HomeNav({ variant = "page", sidebarOffset = false }) {
           )}
           <button
             type="button"
-            className="home-pill home-pill-lg home-pill-lime mt-8 w-full"
+            className="home-pill home-pill-lg home-pill-blue mt-8 w-full"
             onClick={() => {
               setMenuOpen(false);
               onCta();

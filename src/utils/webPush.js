@@ -14,9 +14,25 @@ export function urlBase64ToUint8Array(base64String) {
   return out;
 }
 
+const nudgeWaitingWorker = (worker) => {
+  try {
+    worker?.postMessage({ type: 'SKIP_WAITING' });
+  } catch {
+    // ignore
+  }
+};
+
 export async function ensurePushServiceWorker() {
   if (!('serviceWorker' in navigator)) return null;
   const reg = await navigator.serviceWorker.register(SW_PATH, { scope: '/' });
+  nudgeWaitingWorker(reg.waiting);
+  reg.addEventListener('updatefound', () => {
+    const worker = reg.installing;
+    if (!worker) return;
+    worker.addEventListener('statechange', () => {
+      if (worker.state === 'installed') nudgeWaitingWorker(reg.waiting || worker);
+    });
+  });
   await navigator.serviceWorker.ready;
   return reg;
 }

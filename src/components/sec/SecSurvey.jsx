@@ -417,7 +417,7 @@ const SecSurvey = ({ mode = 'first', onComplete }) => {
   return (
     <div>
       <div
-        className="onboard-progress is-blue"
+        className="onboard-progress is-blue is-smooth"
         role="progressbar"
         aria-valuenow={Math.round(progress * 100)}
         aria-valuemin={0}

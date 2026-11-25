@@ -103,6 +103,19 @@ self.addEventListener('notificationclick', (event) => {
   })());
 });
 
+// Take over this visit so Chrome can offer install without a second open.
+self.addEventListener('install', () => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
+
 // Chrome only offers Add to Home Screen when the worker handles fetch.
 self.addEventListener('fetch', () => {});
 

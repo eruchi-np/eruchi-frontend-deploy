@@ -228,6 +228,16 @@
   background: #3399ff;
 }
 
+.onboard-progress.is-smooth span {
+  transition: width 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboard-progress.is-smooth span {
+    transition: none;
+  }
+}
+
 .onboard-pills {
   display: grid;
   grid-template-columns: 1fr 1fr;
