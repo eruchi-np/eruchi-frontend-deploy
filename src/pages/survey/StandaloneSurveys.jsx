@@ -263,7 +263,7 @@ export default function StandaloneSurveys() {
         };
       })
     );
-    if (data?.credits != null || data?.surveyCredits) {
+    if (Number(data?.creditsEarned) > 0 || Number(data?.surveyCredits) > 0) {
       refreshUser?.();
     }
   }, [refreshUser]);
