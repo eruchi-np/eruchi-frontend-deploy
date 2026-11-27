@@ -28,6 +28,7 @@ export function ensureQuestionOptions(question) {
     options: normalizeOptions(question.options || []),
     show_if: question.show_if || null,
     end_after_if: question.end_after_if || null,
+    options_from: question.options_from || null,
   };
 }
 

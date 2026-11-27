@@ -1,6 +1,8 @@
 import { plainSurveyText, sanitizeSurveyMarkup } from '../../../utils/surveyMarkup';
 import {
+  hasOptionsFrom,
   normalizeOptions,
+  normalizeOptionsFrom,
   optionLabel,
   surveyHasLogic,
   validateLogicOnQuestions,
@@ -96,7 +98,12 @@ export const validateSurveyForm = (
     if (optionTexts(pollQuestion.options).length < 2) {
       return fail('A poll needs at least two options');
     }
-    if (pollQuestion.show_if || pollQuestion.end_after_if || pollQuestion.attentionCheck) {
+    if (
+      pollQuestion.show_if
+      || pollQuestion.end_after_if
+      || pollQuestion.options_from
+      || pollQuestion.attentionCheck
+    ) {
       return fail('Polls cannot use logic or attention checks');
     }
   }
@@ -112,6 +119,7 @@ export const validateSurveyForm = (
 
   const invalidCheckboxes = formData.questions.filter((q) =>
     (q.questionType === 'single_checkbox' || q.questionType === 'multiple_checkbox' || q.questionType === 'attention_check')
+    && !hasOptionsFrom(q)
     && !optionTexts(q.options).length
   );
   if (invalidCheckboxes.length) return fail('Checkbox questions need at least one option');
@@ -213,6 +221,11 @@ export const buildSurveyQuestions = (questions) =>
     }
     if (q.show_if) base.show_if = q.show_if;
     if (q.end_after_if) base.end_after_if = q.end_after_if;
+    const from = normalizeOptionsFrom(q.options_from);
+    if (from) {
+      base.options_from = from;
+      if (!base.options?.length) base.options = [];
+    }
     return base;
   });
 

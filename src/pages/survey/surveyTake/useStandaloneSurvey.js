@@ -21,7 +21,10 @@ import {
   countAnsweredVisible,
   evaluateSurveyLogic,
   filterResponsesToVisible,
+  hasOptionsFrom,
+  optionLabel,
   questionId,
+  questionsWithResolvedOptions,
   surveyHasLogic,
 } from "../../../utils/surveyLogic";
 import {
@@ -29,6 +32,35 @@ import {
   isQuestionAnswered,
   isQuestionValid,
 } from "./validation";
+
+function pruneInvalidCarryAnswers(questions, responses, answersById, visibleIds) {
+  const resolved = questionsWithResolvedOptions(questions, answersById, visibleIds);
+  let changed = false;
+  const next = { ...responses };
+  resolved.forEach((q) => {
+    if (!hasOptionsFrom(q)) return;
+    const key = q.questionText;
+    const val = next[key];
+    const allowed = new Set((q.options || []).map((opt) => optionLabel(opt)));
+    if (q.questionType === "multiple_checkbox") {
+      if (!Array.isArray(val)) return;
+      const filtered = val.filter((item) => allowed.has(String(item)));
+      if (filtered.length !== val.length) {
+        next[key] = filtered;
+        changed = true;
+      }
+      return;
+    }
+    if (q.questionType === "single_checkbox") {
+      if (val == null || val === "") return;
+      if (!allowed.has(String(val))) {
+        next[key] = "";
+        changed = true;
+      }
+    }
+  });
+  return changed ? next : responses;
+}
 
 export default function useStandaloneSurvey({
   previewMode = false,
@@ -163,17 +195,32 @@ export default function useStandaloneSurvey({
   const questions = survey?.questions || [];
   const logicEnabled = Boolean(survey?.hasLogic) || surveyHasLogic(questions);
 
-  const logicState = useMemo(() => {
-    const answersById = answersByIdFromTextResponses(questions, responses);
-    return evaluateSurveyLogic(questions, answersById);
-  }, [questions, responses]);
+  const answersById = useMemo(
+    () => answersByIdFromTextResponses(questions, responses),
+    [questions, responses]
+  );
+
+  const logicState = useMemo(
+    () => evaluateSurveyLogic(questions, answersById),
+    [questions, answersById]
+  );
 
   const visibleIdSet = useMemo(() => new Set(logicState.visibleIds), [logicState.visibleIds]);
 
-  const visibleQuestions = useMemo(
-    () => questions.filter((q, i) => visibleIdSet.has(questionId(q, i))),
-    [questions, visibleIdSet]
+  const displayQuestions = useMemo(
+    () => questionsWithResolvedOptions(questions, answersById, visibleIdSet),
+    [questions, answersById, visibleIdSet]
   );
+
+  const visibleQuestions = useMemo(
+    () => displayQuestions.filter((q, i) => visibleIdSet.has(questionId(q, i))),
+    [displayQuestions, visibleIdSet]
+  );
+
+  useEffect(() => {
+    const pruned = pruneInvalidCarryAnswers(questions, responses, answersById, visibleIdSet);
+    if (pruned !== responses) setResponses(pruned);
+  }, [questions, responses, answersById, visibleIdSet]);
 
   const answeredFlags = useMemo(
     () =>
@@ -207,7 +254,11 @@ export default function useStandaloneSurvey({
   const maybeAdvanceAfter = (qText, nextResponses) => {
     const index = questions.findIndex((item) => item.questionText === qText);
     if (index < 0) return;
-    const question = questions[index];
+    const nextAnswers = answersByIdFromTextResponses(questions, nextResponses);
+    const nextLogic = evaluateSurveyLogic(questions, nextAnswers);
+    const nextVisible = new Set(nextLogic.visibleIds);
+    const resolved = questionsWithResolvedOptions(questions, nextAnswers, nextVisible);
+    const question = resolved[index];
     const value = nextResponses[qText];
     if (!isQuestionAnswered(question, value)) return;
 
@@ -219,11 +270,7 @@ export default function useStandaloneSurvey({
       if (picked < max) return;
     }
 
-    const answersById = answersByIdFromTextResponses(questions, nextResponses);
-    const nextLogic = evaluateSurveyLogic(questions, answersById);
-    const nextVisible = new Set(nextLogic.visibleIds);
-
-    const nextIndex = questions.findIndex(
+    const nextIndex = resolved.findIndex(
       (item, i) =>
         i > index
         && nextVisible.has(questionId(item, i))
@@ -248,7 +295,8 @@ export default function useStandaloneSurvey({
   };
 
   const handleCheckbox = (qText, option, checked) => {
-    const question = questions.find((item) => item.questionText === qText);
+    const index = questions.findIndex((item) => item.questionText === qText);
+    const question = index >= 0 ? displayQuestions[index] : null;
     const max = Math.max(1, Number(question?.maxSelections) || 1);
     const pickingNone = isNoneExclusiveOption(option);
 
@@ -379,7 +427,7 @@ export default function useStandaloneSurvey({
     missed,
     showBanner,
     activeIndex,
-    questions,
+    questions: displayQuestions,
     visibleQuestions,
     visibleIdSet,
     logicState,

@@ -26,6 +26,7 @@ export const EMPTY_QUESTION = {
   randomizeOptions: false,
   show_if: null,
   end_after_if: null,
+  options_from: null,
 };
 
 export const createEmptyFormData = () => ({

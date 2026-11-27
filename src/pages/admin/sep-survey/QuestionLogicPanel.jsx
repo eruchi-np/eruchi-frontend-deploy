@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { GitBranch, Plus, Trash2 } from 'lucide-react';
 import {
+  OPTIONS_FROM_SOURCE_TYPES,
+  OPTIONS_FROM_TARGET_TYPES,
   allowedOperatorsFor,
   hasLogicRules,
+  hasOptionsFrom,
   normalizeOptions,
+  normalizeOptionsFrom,
   optionLabel,
   questionId,
 } from '../../../utils/surveyLogic';
@@ -282,6 +286,15 @@ export default function QuestionLogicPanel({
 
   const canShow = index > 0 && question.questionType !== 'attention_check' && earlier.length > 0;
   const canEnd = endSources.length > 0 && allowedOperatorsFor(question).length > 0;
+  const carrySources = questions.slice(0, index).map((q, i) => ({
+    id: questionId(q, i),
+    label: `Q${i + 1}: ${plainSurveyText(q.questionText) || 'Untitled'}`,
+    question: q,
+  })).filter((s) => OPTIONS_FROM_SOURCE_TYPES.includes(s.question?.questionType));
+  const canCarry = index > 0
+    && OPTIONS_FROM_TARGET_TYPES.includes(question.questionType)
+    && carrySources.length > 0;
+  const optionsFrom = normalizeOptionsFrom(question.options_from);
 
   return (
     <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-4 space-y-3">
@@ -321,6 +334,75 @@ export default function QuestionLogicPanel({
                 : question.questionType === 'attention_check'
                   ? 'Attention checks are always shown.'
                   : 'Add an earlier choice/scale/text question to use a Show rule.'}
+            </p>
+          )}
+          {canCarry ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-gray-900">Answer options from earlier question</p>
+                {optionsFrom ? (
+                  <button
+                    type="button"
+                    className="text-xs font-medium text-red-600 hover:text-red-700"
+                    onClick={() => onChange('options_from', null)}
+                  >
+                    Clear
+                  </button>
+                ) : null}
+              </div>
+              <p className="text-xs text-gray-500">
+                This question’s choices become the options the respondent picked (or didn’t pick) earlier.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                  value={optionsFrom?.question || ''}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    if (!nextId) {
+                      onChange('options_from', null);
+                      return;
+                    }
+                    onChange('options_from', {
+                      question: nextId,
+                      mode: optionsFrom?.mode || 'selected',
+                    });
+                  }}
+                >
+                  <option value="">Off — use fixed options</option>
+                  {carrySources.map((s) => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
+                  ))}
+                </select>
+                <select
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm bg-white"
+                  disabled={!optionsFrom}
+                  value={optionsFrom?.mode || 'selected'}
+                  onChange={(e) => {
+                    if (!optionsFrom) return;
+                    onChange('options_from', {
+                      question: optionsFrom.question,
+                      mode: e.target.value,
+                    });
+                  }}
+                >
+                  <option value="selected">Their selected options</option>
+                  <option value="unselected">Options they did not select</option>
+                </select>
+              </div>
+              {hasOptionsFrom(question) ? (
+                <p className="text-xs text-green-800 bg-green-50 border border-green-100 rounded-lg px-2.5 py-2">
+                  Fixed answer options are turned off for this question. If nothing carries forward, the question is skipped.
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="text-xs text-gray-500">
+              {index === 0
+                ? 'The first question cannot carry forward options.'
+                : !OPTIONS_FROM_TARGET_TYPES.includes(question.questionType)
+                  ? 'Carry-forward options only work on single or multiple choice.'
+                  : 'Add an earlier choice or Likert question to carry options forward.'}
             </p>
           )}
           {canEnd ? (

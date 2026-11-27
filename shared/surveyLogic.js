@@ -77,12 +77,28 @@ export function questionId(question, index) {
   return `q_idx_${index}`;
 }
 
+export const OPTIONS_FROM_MODES = ['selected', 'unselected'];
+export const OPTIONS_FROM_SOURCE_TYPES = ['single_checkbox', 'multiple_checkbox', 'likert'];
+export const OPTIONS_FROM_TARGET_TYPES = ['single_checkbox', 'multiple_checkbox'];
+
+export function hasOptionsFrom(question) {
+  return Boolean(question?.options_from?.question);
+}
+
 export function hasLogicRules(question) {
-  return Boolean(question?.show_if || question?.end_after_if);
+  return Boolean(question?.show_if || question?.end_after_if || hasOptionsFrom(question));
 }
 
 export function surveyHasLogic(questions) {
   return (questions || []).some(hasLogicRules);
+}
+
+export function normalizeOptionsFrom(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const question = String(raw.question || '').trim();
+  if (!question) return null;
+  const mode = OPTIONS_FROM_MODES.includes(raw.mode) ? raw.mode : 'selected';
+  return { question, mode };
 }
 
 const remapRuleQuestionIds = (rule, idMap) => {
@@ -121,7 +137,83 @@ export function stabilizeLogicQuestions(questions) {
     else next.show_if = null;
     if (q.end_after_if) next.end_after_if = remapRuleQuestionIds(q.end_after_if, idMap);
     else next.end_after_if = null;
+    const from = normalizeOptionsFrom(q.options_from);
+    if (from) {
+      next.options_from = {
+        ...from,
+        question: idMap.get(String(from.question)) || String(from.question),
+      };
+    } else {
+      next.options_from = null;
+    }
     return next;
+  });
+}
+
+function buildQuestionsById(list) {
+  const questionsById = new Map();
+  list.forEach((q, i) => {
+    const qid = questionId(q, i);
+    questionsById.set(qid, q);
+    questionsById.set(`q_idx_${i}`, q);
+    questionsById.set(`preview_q_${i + 1}`, q);
+    if (q?._id != null) questionsById.set(String(q._id), q);
+    if (q?.id != null) questionsById.set(String(q.id), q);
+  });
+  return questionsById;
+}
+
+function readAnswerValue(answersByQuestionId, sourceId) {
+  return typeof answersByQuestionId?.get === 'function'
+    ? answersByQuestionId.get(sourceId)
+    : answersByQuestionId?.[sourceId];
+}
+
+/**
+ * Resolve live choice options from a prior question's answer.
+ * Returns [] when the source is missing, hidden, unanswered, or yields no options.
+ */
+export function resolveOptionsFrom(question, questions, answersByQuestionId = {}, visibleIds = null) {
+  const from = normalizeOptionsFrom(question?.options_from);
+  if (!from) return normalizeOptions(question?.options || []);
+
+  const list = Array.isArray(questions) ? questions : [];
+  const questionsById = buildQuestionsById(list);
+  const source = questionsById.get(String(from.question));
+  if (!source || !OPTIONS_FROM_SOURCE_TYPES.includes(source.questionType)) {
+    return [];
+  }
+
+  const sourceIndex = list.findIndex((q, i) => questionId(q, i) === String(from.question)
+    || String(q?._id) === String(from.question)
+    || String(q?.id) === String(from.question));
+  const sourceId = sourceIndex >= 0 ? questionId(source, sourceIndex) : String(from.question);
+  const visible = visibleIds == null
+    ? null
+    : (visibleIds instanceof Set ? visibleIds : new Set(visibleIds));
+  if (visible && !visible.has(sourceId)) return [];
+
+  const raw = readAnswerValue(answersByQuestionId, sourceId);
+  if (isBlankAnswer(raw)) return [];
+
+  const sourceOpts = normalizeOptions(source.options || []);
+  const selectedIds = new Set(resolveAnswerToOptionIds(source, raw));
+  if (from.mode === 'unselected') {
+    return sourceOpts.filter((opt) => !selectedIds.has(opt.id));
+  }
+  return sourceOpts.filter((opt) => selectedIds.has(opt.id));
+}
+
+/** Copy questions with options_from replaced by resolved option lists. */
+export function questionsWithResolvedOptions(questions, answersByQuestionId = {}, visibleIds = null) {
+  const list = Array.isArray(questions) ? questions : [];
+  return list.map((q) => {
+    if (!hasOptionsFrom(q)) return q;
+    const options = resolveOptionsFrom(q, list, answersByQuestionId, visibleIds);
+    const maxSelections = q.questionType === 'multiple_checkbox'
+      ? Math.min(Math.max(1, Number(q.maxSelections) || 1), Math.max(1, options.length || 1))
+      : q.maxSelections;
+    return { ...q, options, maxSelections };
   });
 }
 
@@ -299,16 +391,7 @@ function evaluateRule(rule, ctx) {
  */
 export function evaluateSurveyLogic(questions, answersByQuestionId = {}) {
   const list = Array.isArray(questions) ? questions : [];
-  const questionsById = new Map();
-  list.forEach((q, i) => {
-    const qid = questionId(q, i);
-    questionsById.set(qid, q);
-    // Alias keys so rules written before stabilize / preview still resolve.
-    questionsById.set(`q_idx_${i}`, q);
-    questionsById.set(`preview_q_${i + 1}`, q);
-    if (q?._id != null) questionsById.set(String(q._id), q);
-    if (q?.id != null) questionsById.set(String(q.id), q);
-  });
+  const questionsById = buildQuestionsById(list);
 
   const visibleIds = new Set();
   const hiddenIds = new Set();
@@ -334,6 +417,12 @@ export function evaluateSurveyLogic(questions, answersByQuestionId = {}) {
     } else if (q.show_if) {
       const ctx = { questionsById, answersByQuestionId, visibleIds };
       show = evaluateRule(q.show_if, ctx);
+    }
+
+    // Carry-forward with no live options → hide (same as a failed show rule).
+    if (show && hasOptionsFrom(q)) {
+      const liveOpts = resolveOptionsFrom(q, list, answersByQuestionId, visibleIds);
+      if (!liveOpts.length) show = false;
     }
 
     if (!show) {
@@ -505,6 +594,29 @@ export function validateLogicOnQuestions(questions) {
       }
       if (index >= 1) {
         warnings.push(`Question ${index + 1}: End rule after Q1 still pays full credits (2+ answers).`);
+      }
+    }
+
+    const from = normalizeOptionsFrom(q.options_from);
+    if (from) {
+      if (index === 0) {
+        errors.push('The first question cannot carry forward options.');
+      }
+      if (!OPTIONS_FROM_TARGET_TYPES.includes(q.questionType)) {
+        errors.push(`Question ${index + 1}: carry-forward options only work on single or multiple choice.`);
+      }
+      if (!earlierIds.has(from.question)) {
+        errors.push(`Question ${index + 1}: carry-forward source must be an earlier question.`);
+      } else {
+        const source = list.find((sq, si) => questionId(sq, si) === from.question);
+        if (!source || !OPTIONS_FROM_SOURCE_TYPES.includes(source.questionType)) {
+          errors.push(`Question ${index + 1}: carry-forward source must be a choice or Likert question.`);
+        } else if (!normalizeOptions(source.options || []).length) {
+          errors.push(`Question ${index + 1}: carry-forward source needs at least one option.`);
+        }
+      }
+      if (!OPTIONS_FROM_MODES.includes(from.mode)) {
+        errors.push(`Question ${index + 1}: carry-forward mode must be selected or unselected.`);
       }
     }
   });

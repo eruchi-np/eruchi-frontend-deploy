@@ -236,6 +236,17 @@ export default function SurveyQuestions({
                       {/* Options for checkbox, Likert, and attention-check questions */}
                       {(q.questionType === 'single_checkbox' || q.questionType === 'multiple_checkbox' || q.questionType === 'likert' || q.questionType === 'attention_check') && (
                         <div className="p-5 bg-green-50 rounded-xl border border-green-100">
+                          {q.options_from?.question ? (
+                            <div className="space-y-2">
+                              <label className="text-sm font-semibold text-gray-900">
+                                Answer Options
+                              </label>
+                              <p className="text-sm text-gray-600">
+                                Options come from an earlier question at answer time (see Logic).
+                              </p>
+                            </div>
+                          ) : (
+                          <>
                           <div className="flex justify-between items-center mb-4">
                             <label className="text-sm font-semibold text-gray-900">
                               Answer Options
@@ -366,6 +377,23 @@ export default function SurveyQuestions({
                               </p>
                             </div>
                           )}
+                          </>
+                          )}
+                          {q.options_from?.question && q.questionType === 'multiple_checkbox' ? (
+                            <div className="mt-4 pt-4 border-t border-green-100">
+                              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                                Max Selections Allowed
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                max={20}
+                                value={q.maxSelections}
+                                onChange={e => handleQuestionChange(idx, 'maxSelections', Number(e.target.value))}
+                                className="w-24 px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                              />
+                            </div>
+                          ) : null}
                         </div>
                       )}
 

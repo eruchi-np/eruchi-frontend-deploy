@@ -527,6 +527,7 @@ export default function useSepSurveyForm() {
     attentionAnswer: '',
     show_if: null,
     end_after_if: null,
+    options_from: null,
     metricTag: 'none',
   });
 
@@ -614,6 +615,28 @@ export default function useSepSurveyForm() {
       }
       // Drop show rules that become invalid for attention / first question handled at validate time
       if (value === 'attention_check') updated[index].show_if = null;
+      if (value !== 'single_checkbox' && value !== 'multiple_checkbox') {
+        updated[index].options_from = null;
+      }
+    }
+
+    if (field === 'options_from' && value) {
+      // Keep authored options in the form so published logic surveys can still
+      // pass the text-only structure check; take/runtime ignores them.
+      updated[index].attentionCheck = false;
+      updated[index].attentionAnswer = '';
+      if (updated[index].questionType === 'attention_check') {
+        updated[index].questionType = 'single_checkbox';
+      }
+    }
+    if (field === 'options_from' && !value) {
+      if (
+        (updated[index].questionType === 'single_checkbox'
+          || updated[index].questionType === 'multiple_checkbox')
+        && !(updated[index].options || []).length
+      ) {
+        updated[index].options = normalizeOptions(['Option 1', 'Option 2']);
+      }
     }
 
     setFormData((prev) => ({ ...prev, questions: updated }));
@@ -713,6 +736,7 @@ export default function useSepSurveyForm() {
           metricTag: 'none',
           show_if: null,
           end_after_if: null,
+          options_from: null,
         },
       ],
     }));

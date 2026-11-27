@@ -19,6 +19,7 @@ export const mapLoadedQuestions = (questions) =>
       randomizeOptions: Boolean(q.randomizeOptions),
       show_if: q.show_if || null,
       end_after_if: q.end_after_if || null,
+      options_from: q.options_from || null,
     }))
     : [{ ...EMPTY_QUESTION }];
 
